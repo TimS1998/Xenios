@@ -1,0 +1,36 @@
+# /etc/systemd/system/xenios.service
+#   sudo cp server/deploy/linux/xenios.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now xenios
+#   journalctl -u xenios     → Einrichtungscode beim ersten Start
+# Die Konfiguration liegt im beschreibbaren Datenordner (die App ändert sie). Eine ältere config.json im
+# Repository-Ordner vorher nach data/ verschieben.
+[Unit]
+Description=Xenios (Espressomaschine + Mühle)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Xenios/server
+Environment=XENIOS_CONFIG=/home/pi/Xenios/server/data/config.json
+Environment=XENIOS_DATA_DIR=/home/pi/Xenios/server/data
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/Xenios/server/data
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

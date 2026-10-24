@@ -1,0 +1,18 @@
+# Cloudflare-Tunnel per Konfigurationsdatei (Alternative zum Dashboard)
+#   cloudflared tunnel login
+#   cloudflared tunnel create xenia            -> erzeugt <TUNNEL-ID>.json
+#   cloudflared tunnel route dns xenia xenia.deine-domain.de
+#   cloudflared --config deploy/cloudflared/config.yml tunnel run      (Test)
+#   cloudflared service install                (Windows-Dienst; nutzt %USERPROFILE%\.cloudflared\config.yml)
+tunnel: <TUNNEL-ID>
+credentials-file: C:\Users\<BENUTZER>\.cloudflared\<TUNNEL-ID>.json
+
+ingress:
+  - hostname: xenia.deine-domain.de
+    service: http://127.0.0.1:8080
+    originRequest:
+      connectTimeout: 10s
+      # Live-Updates (Server-Sent Events) offen halten
+      keepAliveTimeout: 90s
+      disableChunkedEncoding: false
+  - service: http_status:404

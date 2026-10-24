@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Xenios</string>
+    <string name="widget_power">Kaffeemaschine Ein/Aus</string>
+    <string name="widget_status">Kaffeemaschine</string>
+    <string name="widget_wide">Kaffeemaschine schmal</string>
+    <string name="widget_wide_desc">Status, Temperatur und Ein/Eco/Aus in einer Zeile</string>
+    <string name="widget_large">Kaffeemaschine groß</string>
+    <string name="widget_large_desc">Status, Temperaturen, Dampf, nächstes Einschalten und Ein/Eco/Aus</string>
+    <string name="widget_power_desc">Maschine mit einem Tipp ein- oder ausschalten</string>
+    <string name="widget_status_desc">Status, Temperatur und Ein/Eco/Aus</string>
+    <string name="tile_label">Kaffeemaschine</string>
+    <string name="sc_on_short">Einschalten</string>
+    <string name="sc_on_long">Maschine einschalten</string>
+    <string name="sc_off_short">Ausschalten</string>
+    <string name="sc_off_long">Maschine ausschalten</string>
+    <string name="sc_eco_short">Eco</string>
+    <string name="sc_eco_long">Eco-Modus</string>
+    <string name="sc_timer_short">Timer</string>
+    <string name="sc_timer_long">Wochen-Timer</string>
+    <string name="sc_dashboard_short">Dashboard</string>
+    <string name="sc_dashboard_long">Dashboard öffnen</string>
+    <string name="setup_title">Mit Xenios verbinden</string>
+    <string name="setup_text">Cloudflare-Adresse und/oder lokale Adresse deines Servers sowie das App-Passwort. Die App erhält dafür eine eigene Anmeldung, die du in den Einstellungen unter „Angemeldete Geräte“ siehst.</string>
+    <string name="mode_server">Mit Server (Xenios, auch von unterwegs)</string>
+    <string name="mode_direct">Direkt im Heimnetz (ohne Server)</string>
+    <string name="direct_text">Die App spricht Maschine und Mühle direkt im WLAN an. Das funktioniert nur zu Hause. Ohne Server gibt es keine Push-Benachrichtigungen, keine zusätzlichen Schaltzeiten und kein Einschalten vor dem Wecker.</string>
+    <string name="direct_scan">Im WLAN suchen</string>
+    <string name="direct_help">IPs finden – Anleitung</string>
+    <string name="direct_machine">IP-Adresse der Maschine</string>
+    <string name="direct_grinder">IP-Adresse der Mühle (optional)</string>
+    <string name="direct_grinder_pw">Owner-Passwort der Mühle (optional)</string>
+    <string name="direct_grinder_hint">Ohne Passwort zeigt die App nur, ob die Mühle erreichbar ist. Mit Passwort auch Rezepte, Mahlvorgänge und Meldungen.</string>
+    <string name="setup_url">Server-Adresse (Cloudflare)</string>
+    <string name="setup_local">Lokale Adresse im WLAN (optional)</string>
+    <string name="setup_local_hint">Wird genutzt, solange das Handy im Heimnetz ist, sonst die Cloudflare-Adresse.</string>
+    <string name="setup_password">App-Passwort</string>
+    <string name="setup_name">Gerätename</string>
+    <string name="setup_connect">Verbinden</string>
+    <string name="state_offline">Offline</string>
+    <string name="state_login">Anmelden</string>
+</resources>

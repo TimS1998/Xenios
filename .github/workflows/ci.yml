@@ -1,0 +1,56 @@
+name: Server testen
+
+# Tests des Servers (gegen die simulierte Maschine/Mühle) und ein Probelauf des Docker-Images.
+on:
+  push:
+    branches: [main]
+    paths: ['server/**', 'docker/**', '.github/workflows/ci.yml']
+  pull_request:
+    paths: ['server/**', 'docker/**', '.github/workflows/ci.yml']
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Tests
+        working-directory: server
+        run: npm test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Image bauen
+        run: docker build -f docker/Dockerfile -t xenios:ci server
+
+      - name: Probelauf wie in compose.yaml (schreibgeschützt, ohne Capabilities)
+        run: |
+          docker run -d --name xenios --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+            -p 127.0.0.1:8443:8443 xenios:ci
+          for i in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' xenios)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f 'Health: {{.State.Health.Status}}' xenios
+          test "$(docker inspect -f '{{.State.Health.Status}}' xenios)" = healthy
+          curl -fsk https://127.0.0.1:8443/auth/session | tee /dev/stderr | grep -q '"setup":true'
+          docker logs xenios 2>&1 | grep -q 'Einrichtungscode'
+          # Laufzeitdaten landen nur im Volume /data
+          docker exec xenios ls /data | grep -q secret.key
+
+      - name: Protokoll bei Fehler
+        if: failure()
+        run: docker logs xenios || true

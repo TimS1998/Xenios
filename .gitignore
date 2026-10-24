@@ -1,0 +1,18 @@
+# Geheimnisse und Laufzeitdaten – nie committen
+config.json
+config.*.json
+!config.example.json
+data/
+data-*/
+.env
+secret.key
+*.pem
+keystore/
+*.jks
+*.keystore
+*.apk
+
+# Werkzeuge
+node_modules/
+*.log
+.claude/

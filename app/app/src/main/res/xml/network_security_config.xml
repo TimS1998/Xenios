@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Klartext muss für die lokale Adresse im Heimnetz (z. B. http://192.168.178.32) erlaubt sein;
+  IP-Bereiche lassen sich hier nicht angeben. Die App lässt http nur für private Adressen zu
+  (SetupActivity.normalizeLocal); die Cloudflare-Adresse ist immer https mit gültigem Zertifikat.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

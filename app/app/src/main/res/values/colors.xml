@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- wie public/app.css -->
+    <color name="surface">#FBF8FF</color>
+    <color name="on_surface">#1B1B21</color>
+    <color name="primary">#4A5891</color>
+    <color name="widget_on">#4A5891</color>
+    <color name="widget_ready">#2E7D4F</color>
+    <color name="widget_eco">#8A6D1F</color>
+    <color name="widget_off">#2C2D33</color>
+    <color name="widget_offline">#6B2A2A</color>
+    <color name="widget_text">#FFFFFF</color>
+    <color name="widget_text_dim">#C9CBD3</color>
+</resources>
