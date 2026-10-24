@@ -21,7 +21,7 @@ Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Wid
 
 **Docker** (Linux-Server, Raspberry Pi, NAS):
 ```bash
-git clone <repo-url> xenios && cd xenios/docker
+git clone https://github.com/TimS1998/Xenios.git xenios && cd xenios/docker
 docker compose up -d
 docker compose logs xenios       # zeigt den Einrichtungscode
 ```
@@ -36,7 +36,7 @@ Ausführlich: [Einrichtung](docs/Einrichtung.md) (Docker, Windows-Autostart, Clo
 
 ## Releases
 
-Ein Tag `v*` erzeugt automatisch ein **GitHub-Release mit der Android-App (APK)** und veröffentlicht das **Docker-Image in GitHub Packages** (`ghcr.io/<github-name>/xenios`, amd64 und arm64):
+Ein Tag `v*` erzeugt automatisch ein **GitHub-Release mit der Android-App (APK)** und veröffentlicht das **Docker-Image in GitHub Packages** (`ghcr.io/tims1998/xenios`, amd64 und arm64):
 ```bash
 git tag v2.0.0
 git push origin v2.0.0

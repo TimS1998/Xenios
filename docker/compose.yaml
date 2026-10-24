@@ -5,7 +5,7 @@
 #   https://<IP-des-Servers>:8443         → im Browser einrichten (Zertifikatswarnung einmal bestätigen)
 #
 # Fertiges Image statt selbst bauen (GitHub Packages): in .env
-#   XENIOS_IMAGE=ghcr.io/<github-name>/xenios:latest
+#   XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest
 #   XENIOS_PULL=always
 #
 # Mit Cloudflare-Tunnel (Zugriff von unterwegs, ohne Portfreigabe): in .env
