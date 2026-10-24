@@ -2,7 +2,7 @@ name: Release
 
 # Ein Tag v* (z. B. v2.0.0) erzeugt:
 #  - ein GitHub-Release mit der Android-App (APK) als Download
-#  - das Docker-Image in GitHub Packages: ghcr.io/<besitzer>/xenios:<version> und :latest (amd64 + arm64)
+#  - das Docker-Image in GitHub Packages: ghcr.io/tims1998/xenios:<version> und :latest (amd64 + arm64)
 #
 #   git tag v2.0.0 && git push origin v2.0.0
 on:

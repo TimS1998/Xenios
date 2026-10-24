@@ -74,7 +74,7 @@ docker compose logs xenios           # Einrichtungscode ablesen
 ```
 Dann `https://<IP-des-Servers>:8443` öffnen und der Einrichtung folgen (wie oben).
 
-- **Fertiges Image statt selbst bauen:** Jedes Release veröffentlicht das Image in GitHub Packages (amd64 und arm64). In `docker/.env`: `XENIOS_IMAGE=ghcr.io/<github-name>/xenios:latest` und `XENIOS_PULL=always`.
+- **Fertiges Image statt selbst bauen:** Jedes Release veröffentlicht das Image in GitHub Packages (amd64 und arm64). In `docker/.env`: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always`.
 - **Daten** (Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge) liegen im Volume `xenios_xenios-data`. Sicherung: `docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .` (enthält `secret.key`, also sicher aufbewahren).
 - **Zertifikat:** Im Container kennt der Server die LAN-IP des Rechners nicht. In der App unter *Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP bzw. den Hostnamen eintragen; das Zertifikat wird sofort neu erzeugt.
 - **Ports und Pfade** sind im Container fest (Umgebungsvariablen im `Dockerfile`) und in der App als gesperrt markiert. Den HTTPS-Port auf dem Rechner ändert `XENIOS_HTTPS_PORT` in `.env`. Unter Linux umgehen Docker-Ports `ufw`; mit `XENIOS_HTTPS_PORT=<LAN-IP>:8443` lauscht der Port nur im Heimnetz.

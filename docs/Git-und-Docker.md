@@ -7,7 +7,7 @@ Wo was liegt, wenn alles eingerichtet ist:
 | **Code** | dieses Repository | `git push` |
 | **Actions** | Tests, Probelauf des Docker-Images, Bau der APK | jeder Push (Workflows in `.github/workflows/`) |
 | **Releases** | die Android-App als `Xenios-<nr>.apk` | ein Tag `v…` |
-| **Packages** | das Docker-Image `ghcr.io/<github-name>/xenios` (amd64 + arm64) | derselbe Tag |
+| **Packages** | das Docker-Image `ghcr.io/tims1998/xenios` (amd64 + arm64) | derselbe Tag |
 
 Die Befehle sind für PowerShell (Windows) geschrieben; unter Linux/macOS sind sie gleich, außer wo „Linux“ steht.
 
@@ -103,7 +103,7 @@ gh run watch                      # Tests → APK + Image → Release (ca. 10 mi
 ```
 Danach:
 - **Releases** (`gh release view --web`): `Xenios-<nr>.apk` zum Herunterladen. Auf dem Handy öffnen und installieren („Unbekannte Apps installieren“ für den Browser einmal erlauben).
-- **Packages**: `ghcr.io/<github-name>/xenios:2.1.0` und `:latest`.
+- **Packages**: `ghcr.io/tims1998/xenios:2.1.0` und `:latest`.
 
 Ein fehlgeschlagenes Release wiederholen: Fehler beheben und committen, dann das Tag verschieben:
 ```powershell
@@ -119,7 +119,7 @@ GitHub → *Actions* → *Android-App bauen* → *Run workflow*, oder `gh workfl
 Entweder das Paket öffentlich machen (GitHub → Profil → *Packages* → `xenios` → *Package settings* → *Change visibility* → Public; der Code bleibt privat), oder auf dem Server einmal anmelden:
 ```bash
 # Token: GitHub → Settings → Developer settings → Personal access tokens (classic) → nur „read:packages“
-echo <TOKEN> | docker login ghcr.io -u <github-name> --password-stdin
+echo <TOKEN> | docker login ghcr.io -u TimS1998 --password-stdin
 ```
 
 ---
@@ -138,7 +138,7 @@ echo <TOKEN> | docker login ghcr.io -u <github-name> --password-stdin
 
 ### 3.2 Starten
 ```bash
-git clone https://github.com/<github-name>/xenios.git
+git clone https://github.com/TimS1998/Xenios.git xenios
 cd xenios/docker
 cp .env.example .env              # Einstellungen, siehe unten
 docker compose up -d
@@ -150,7 +150,7 @@ Wichtige Werte in `docker/.env`:
 
 | Variable | Wofür |
 |---|---|
-| `XENIOS_IMAGE=ghcr.io/<github-name>/xenios:latest` und `XENIOS_PULL=always` | fertiges Image aus Packages laden statt selbst zu bauen (schneller, v. a. auf dem Raspberry Pi) |
+| `XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always` | fertiges Image aus Packages laden statt selbst zu bauen (schneller, v. a. auf dem Raspberry Pi) |
 | `XENIOS_HTTPS_PORT=192.168.178.32:8443` | Port nur im Heimnetz öffnen (unter Linux umgehen Docker-Ports die Firewall `ufw`) |
 | `TUNNEL_TOKEN=…` und `COMPOSE_PROFILES=tunnel` | Cloudflare-Tunnel im selben Compose starten; im Cloudflare-Dashboard den Public Hostname auf `http://xenios:8080` setzen |
 | `TZ=Europe/Berlin` | Zeitzone für Zeitplan und Wecker |
@@ -172,7 +172,7 @@ git pull                          # holt auch neue compose.yaml
 docker compose up -d              # baut neu bzw. lädt das neue Image (je nach XENIOS_PULL)
 docker image prune -f             # alte Images aufräumen
 ```
-Einstellungen, Sitzungen und Bezüge bleiben erhalten; sie liegen im Volume, nicht im Image. Eine bestimmte Version festhalten: `XENIOS_IMAGE=ghcr.io/<github-name>/xenios:2.1.0`.
+Einstellungen, Sitzungen und Bezüge bleiben erhalten; sie liegen im Volume, nicht im Image. Eine bestimmte Version festhalten: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`.
 
 ### 3.5 Sichern und wiederherstellen
 Sicherung (enthält `secret.key` und damit den Schlüssel zum Mühlen-Passwort, also sicher aufbewahren):
