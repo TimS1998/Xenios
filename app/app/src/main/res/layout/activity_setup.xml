@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/launcher_maskable" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="@string/setup_title"
+            android:textColor="@color/on_surface"
+            android:textSize="22sp" />
+
+        <RadioGroup
+            android:id="@+id/mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/mode_server"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_server"
+                android:textColor="@color/on_surface" />
+
+            <RadioButton
+                android:id="@+id/mode_direct"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_direct"
+                android:textColor="@color/on_surface" />
+        </RadioGroup>
+
+        <!-- Mit Server -->
+        <LinearLayout
+            android:id="@+id/server_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"
+                android:alpha="0.75"
+                android:text="@string/setup_text"
+                android:textColor="@color/on_surface"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/setup_url"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:autofillHints="url"
+                android:hint="https://xenia.example.com"
+                android:imeOptions="actionNext"
+                android:inputType="textUri"
+                android:textColor="@color/on_surface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/setup_local"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/local_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="http://192.168.178.32"
+                android:imeOptions="actionNext"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:textColor="@color/on_surface" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:alpha="0.7"
+                android:text="@string/setup_local_hint"
+                android:textColor="@color/on_surface"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/setup_password"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/password"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:autofillHints="password"
+                android:imeOptions="actionNext"
+                android:inputType="textPassword"
+                android:textColor="@color/on_surface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/setup_name"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:maxLength="60"
+                android:textColor="@color/on_surface" />
+        </LinearLayout>
+
+        <!-- Direkt im Heimnetz -->
+        <LinearLayout
+            android:id="@+id/direct_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"
+                android:alpha="0.75"
+                android:text="@string/direct_text"
+                android:textColor="@color/on_surface"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/scan"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/direct_scan" />
+
+                <Button
+                    android:id="@+id/help"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/direct_help" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/direct_machine"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/machine_ip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="192.168.178.55"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:textColor="@color/on_surface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/direct_grinder"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/grinder_ip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="192.168.178.54"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:textColor="@color/on_surface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/direct_grinder_pw"
+                android:textColor="@color/on_surface" />
+
+            <EditText
+                android:id="@+id/grinder_pw"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:importantForAutofill="no"
+                android:inputType="textPassword"
+                android:textColor="@color/on_surface" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:alpha="0.7"
+                android:text="@string/direct_grinder_hint"
+                android:textColor="@color/on_surface"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="#BA1A1A"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/connect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/setup_connect" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Langdruck auf das App-Symbol. Ein/Eco/Aus laufen ohne die App zu öffnen. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="on"
+        android:enabled="true"
+        android:icon="@drawable/sc_on"
+        android:shortcutShortLabel="@string/sc_on_short"
+        android:shortcutLongLabel="@string/sc_on_long">
+        <intent
+            android:action="app.xeniabridge.ACTION"
+            android:targetPackage="app.xeniabridge"
+            android:targetClass="app.xeniabridge.ActionActivity">
+            <extra android:name="mode" android:value="on" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="eco"
+        android:enabled="true"
+        android:icon="@drawable/sc_eco"
+        android:shortcutShortLabel="@string/sc_eco_short"
+        android:shortcutLongLabel="@string/sc_eco_long">
+        <intent
+            android:action="app.xeniabridge.ACTION"
+            android:targetPackage="app.xeniabridge"
+            android:targetClass="app.xeniabridge.ActionActivity">
+            <extra android:name="mode" android:value="eco" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="off"
+        android:enabled="true"
+        android:icon="@drawable/sc_off"
+        android:shortcutShortLabel="@string/sc_off_short"
+        android:shortcutLongLabel="@string/sc_off_long">
+        <intent
+            android:action="app.xeniabridge.ACTION"
+            android:targetPackage="app.xeniabridge"
+            android:targetClass="app.xeniabridge.ActionActivity">
+            <extra android:name="mode" android:value="off" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="timer"
+        android:enabled="true"
+        android:icon="@drawable/sc_timer"
+        android:shortcutShortLabel="@string/sc_timer_short"
+        android:shortcutLongLabel="@string/sc_timer_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.xeniabridge"
+            android:targetClass="app.xeniabridge.MainActivity">
+            <extra android:name="path" android:value="/timer" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="dashboard"
+        android:enabled="true"
+        android:icon="@drawable/sc_dashboard"
+        android:shortcutShortLabel="@string/sc_dashboard_short"
+        android:shortcutLongLabel="@string/sc_dashboard_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.xeniabridge"
+            android:targetClass="app.xeniabridge.MainActivity">
+            <extra android:name="path" android:value="/dashboard" />
+        </intent>
+    </shortcut>
+</shortcuts>

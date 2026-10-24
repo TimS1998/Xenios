@@ -1,0 +1,63 @@
+# Xenios mit Docker (Linux-Server, Raspberry Pi, NAS). Alle Befehle in diesem Ordner (docker/):
+#
+#   docker compose up -d                  → bauen und starten
+#   docker compose logs xenios            → Einrichtungscode anzeigen (nur beim ersten Start)
+#   https://<IP-des-Servers>:8443         → im Browser einrichten (Zertifikatswarnung einmal bestätigen)
+#
+# Fertiges Image statt selbst bauen (GitHub Packages): in .env
+#   XENIOS_IMAGE=ghcr.io/<github-name>/xenios:latest
+#   XENIOS_PULL=always
+#
+# Mit Cloudflare-Tunnel (Zugriff von unterwegs, ohne Portfreigabe): in .env
+#   TUNNEL_TOKEN=…   und   COMPOSE_PROFILES=tunnel
+#   Im Cloudflare-Dashboard: Public Hostname → Service HTTP → xenios:8080
+#
+# Aktualisieren:  git pull && docker compose up -d      (mit fertigem Image: docker compose up -d)
+name: xenios
+
+services:
+  xenios:
+    image: ${XENIOS_IMAGE:-xenios:local}
+    pull_policy: ${XENIOS_PULL:-build}      # build = aus ../server bauen, always = fertiges Image laden
+    build:
+      context: ../server
+      dockerfile: ../docker/Dockerfile
+    container_name: xenios
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${XENIOS_HTTPS_PORT:-8443}:8443"  # HTTPS im Heimnetz (mit IP davor nur auf dieser Netzwerkkarte)
+      # - "80:8081"                        # optional: Heimnetz-HTTP (in der App unter Server einschalten) – unverschlüsselt
+      # Port 8080 (Tunnel) bleibt bewusst intern: nur cloudflared im selben Compose-Netz erreicht ihn.
+    volumes:
+      - xenios-data:/data                  # Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      XENIOS_SECRET_KEY: ${XENIOS_SECRET_KEY:-}   # leer = Schlüssel in /data/secret.key
+    # Härtung: Dateisystem schreibgeschützt (außer /data und /tmp), keine Linux-Capabilities, keine Rechte-Ausweitung
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 100
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.4.0
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      xenios:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  xenios-data:

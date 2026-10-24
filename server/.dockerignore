@@ -1,0 +1,6 @@
+# Build-Kontext ist dieser Ordner. Nur das Nötige ins Image (Allowlist) –
+# config.json, data/ und Schlüssel gelangen so nie in den Build.
+*
+!package.json
+!src/
+!web/
