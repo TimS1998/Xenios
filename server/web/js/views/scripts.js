@@ -1,7 +1,11 @@
 // Skripte: Liste, Start/Stopp, Editor, Export/Import.
 import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl } from '../ui.js';
-import { api, store, subscribe, machineOn } from '../api.js';
+import { api, store, subscribe, machineOn, directMode } from '../api.js';
 import { setTopActions } from '../app.js';
+import { shotChart } from '../gauge.js';
+import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
+import { scriptName } from '../../shared/visualizer.js';
+import { openCommunity } from './community.js';
 
 export function scriptsView(root) {
   return listTab(root);
@@ -23,6 +27,8 @@ function listTab(root) {
     const fileInput = h('input', { type: 'file', accept: '.script,application/json,text/plain', hidden: true, onchange: () => importFile(fileInput) });
     setTopActions(
       h('button', { class: 'icon-btn', 'aria-label': 'Skript importieren (.script)', title: 'Skript importieren (.script)', onclick: () => fileInput.click() }, icon('upload'), fileInput),
+      directMode ? null : h('button', { class: 'icon-btn', 'aria-label': 'Profile entdecken (visualizer.coffee)', title: 'Profile entdecken (visualizer.coffee)', onclick: () => openCommunity(load) }, icon('explore')),
+      h('button', { class: 'icon-btn', 'aria-label': 'Druckprofil erstellen', title: 'Druckprofil erstellen', onclick: () => openProfileBuilder(load) }, icon('profile')),
       h('button', { class: 'icon-btn', 'aria-label': 'Neues Skript', onclick: () => openEditor(null, data, load) }, icon('add')));
   }
 
@@ -229,4 +235,95 @@ function defaultArg(a) {
 function argSummary(def, st) {
   if (!def.args?.length) return '';
   return '· ' + def.args.map((a, i) => `${fmt(st.args?.[i], a.step < 1 ? 1 : 0)}${a.unit ? ' ' + a.unit : ''}`).join(' / ');
+}
+
+// --- Druckprofil-Baukasten --------------------------------------------------------
+// Erzeugt ein normales Skript der Maschine (läuft also auch über die Tasten):
+// Brühventil auf → Vorbrühen → optional Pause (Pumpe aus) → Hauptdruck → optional Abfall in vier Stufen → Pumpe aus.
+// Vorlagen nach dem Profil-Leitfaden von Decent Espresso, nur der Druckanteil. Fluss- und Temperaturvorgaben der
+// Decent kann ein Xenia-Skript so nicht nachbilden; Zahlen, die der Leitfaden offen lässt, sind übliche Werte.
+const PROFILE_PRESETS = [
+  { name: 'Klassisch', roast: 'Alle Röstungen', hint: '1:2 in 25–30 s.', v: { preP: 2, preT: 4, pauseT: 0, mainP: 9, mainT: 25, endP: 9, declineT: 0 } },
+  { name: 'E61', roast: 'Mitteldunkel bis dunkel', hint: 'Ohne Vorbrühen, 9 bar gehalten. 1:2 in etwa 25 s, eher etwas gröber mahlen.', v: { preP: 0, preT: 0, pauseT: 0, mainP: 9, mainT: 27, endP: 9, declineT: 0 } },
+  { name: 'Bestes Druckprofil', roast: 'Mittelhell bis dunkel', hint: 'Wie E61, aber der Druck sinkt sanft – schont den Puck, passt zu vielen Bohnen. 1:2 in etwa 30 s.', v: { preP: 3, preT: 6, pauseT: 0, mainP: 9, mainT: 6, endP: 6, declineT: 18 } },
+  { name: 'Mild und süß', roast: 'Mittelhell bis mitteldunkel', hint: 'Konstant 6 bar, verzeiht Fehler bei Puck und Mühle. Feiner: 1:2 in etwa 35 s (mild, süß). Gröber: 1:2–1:3 unter 20 s (heller).', v: { preP: 2, preT: 4, pauseT: 0, mainP: 6, mainT: 30, endP: 6, declineT: 0 } },
+  { name: 'Turbo', roast: 'Hell (nordisch)', hint: 'Nach Extractamundo Dos: niedriger Druck (höchstens 6 bar), grob, schnell. 1:2,2 oft unter 20 s, bis 1:4. Lebhaft und süß, wenig Körper.', v: { preP: 2, preT: 3, pauseT: 0, mainP: 6, mainT: 15, endP: 6, declineT: 0 } },
+  { name: 'Blooming', roast: 'Hell bis mittelhell', hint: 'Nach Scott Rao: füllen, bis etwa 8 g in der Tasse sind, dann ohne Druck quellen lassen, danach 6–9 bar mit sanftem Abfall. 1:2 in 60–70 s. Anspruchsvoll, sehr intensiv.', v: { preP: 3, preT: 10, pauseT: 25, mainP: 8.5, mainT: 6, endP: 6, declineT: 20 } },
+  { name: 'Allongé', roast: 'Hell bis mittelhell', hint: 'Nach Scott Rao: 1:5 in 30–35 s, deutlich gröber mahlen, Druck fällt langsam. Verdünnter als Espresso, nichts für Milch.', v: { preP: 2, preT: 4, pauseT: 0, mainP: 8, mainT: 4, endP: 6, declineT: 26 } },
+  { name: 'Londinium', roast: 'Mittel bis dunkel', hint: 'Hebel-Stil: Vorbrühen bei 3 bar, Spitze 9 bar, danach fallend wie bei der Hebelmaschine. Weiches Mundgefühl.', v: { preP: 3, preT: 10, pauseT: 0, mainP: 9, mainT: 4, endP: 5, declineT: 22 } },
+  { name: 'Cremina', roast: 'Mitteldunkel bis dunkel', hint: 'Langsames Vorbrühen, Anstieg auf 8–9 bar, dann allmählicher Abfall. 1:2 in etwa 50 s, feiner mahlen. Vollmundig, Bitterschokolade.', v: { preP: 2.5, preT: 12, pauseT: 0, mainP: 8.5, mainT: 6, endP: 4, declineT: 30 } },
+  { name: '80er', roast: 'Mitteldunkel bis dunkel', hint: 'Sehr tolerant, schwer zu überextrahieren. 1:2 über 40 s; Ristretto 1:1 bis etwa 60 s. Decent brüht dabei kühl (82 → 72 °C) – Brühtemperatur der Xenia dafür senken.', v: { preP: 3, preT: 8, pauseT: 0, mainP: 8, mainT: 10, endP: 6, declineT: 24 } },
+];
+
+function openProfileBuilder(onSaved) {
+  let preset = PROFILE_PRESETS[0];
+  const p = { ...preset.v, basket: 'none', name: 'Profil Klassisch' };
+  fullscreen((root, close) => {
+    const preview = h('div', { class: 'chart-box' });
+    const summary = h('p', { class: 'small muted' });
+    const presetInfo = h('div', { class: 'preset-info' });
+    const nameInput = h('input', { class: 'text', value: p.name, maxlength: 40, 'aria-label': 'Name', placeholder: 'Name (A–Z, 0–9, - _ #)' });
+    nameInput.addEventListener('input', () => { p.name = nameInput.value; });
+    const rows = {};
+    const slider = (key, label, min, max, step, unit) => {
+      rows[key] = sliderRow({ label, min, max, step, value: p[key], unit, digits: step < 1 ? 1 : 0, onInput: (v) => { p[key] = v; redraw(); } });
+      return rows[key];
+    };
+    function redraw() {
+      const steps = profileSteps(p);
+      preview.replaceChildren(shotChart([], { width: 640, height: 220, minSeconds: 20, target: targetCurve(steps) }));
+      const total = p.preT + p.pauseT + p.mainT + (p.endP !== p.mainP ? p.declineT : 0);
+      summary.textContent = `${steps.length} Schritte · Pumpe insgesamt ${fmt(total)} s. Die Maschine regelt den Druck selbst; ohne Kaffee im Sieb wird er nicht erreicht.`;
+    }
+    const presetChips = h('div', { class: 'chips' }, PROFILE_PRESETS.map((pr) => h('button', { class: 'chip', onclick: () => {
+      preset = pr;
+      Object.assign(p, pr.v);
+      p.name = scriptName(`Profil ${pr.name}`);
+      nameInput.value = p.name;
+      for (const [key, row] of Object.entries(rows)) row.setValue(p[key]);
+      paintPreset();
+      redraw();
+    } }, pr.name)));
+    function paintPreset() {
+      for (const c of presetChips.children) c.setAttribute('aria-pressed', String(c.textContent === preset.name));
+      presetInfo.replaceChildren(h('strong', {}, preset.roast), ` · ${preset.hint}`);
+    }
+    const basket = h('select', { class: 'text', 'aria-label': 'Sieb' },
+      [['none', 'Sieb nicht vorgeben'], ['single', 'Einfaches Sieb'], ['double', 'Doppeltes Sieb']].map(([v, t]) => h('option', { value: v }, t)));
+    basket.addEventListener('change', () => { p.basket = basket.value; redraw(); });
+
+    async function save() {
+      try {
+        await api('/api/machine/scripts', { method: 'POST', body: { name: p.name.trim(), steps: profileSteps(p), kind: 'standard' } });
+        snackbar(`„${p.name.trim()}“ als Skript gespeichert`);
+        close();
+        onSaved?.();
+      } catch (e) {
+        snackbar(e.message);
+      }
+    }
+    root.append(
+      h('div', { class: 'row', style: { margin: '4px 0 12px' } },
+        h('div', { class: 'grow' }, h('strong', {}, 'Druckprofil erstellen')),
+        h('button', { class: 'btn grey', onclick: close }, 'Abbrechen'),
+        h('button', { class: 'btn filled', onclick: save }, 'Speichern')),
+      h('div', { class: 'card' }, preview, summary),
+      h('div', { class: 'section-title' }, 'Vorlage'),
+      presetChips,
+      h('div', { class: 'card preset-card' }, presetInfo,
+        h('p', { class: 'small muted' }, 'Nach dem Profil-Leitfaden von Decent Espresso, übertragen auf reine Druckstufen. Fluss- und Temperaturvorgaben der Decent bildet ein Xenia-Skript nicht ab.')),
+      h('div', { class: 'card', style: { 'margin-top': '12px' } },
+        h('label', { class: 'field' }, h('span', {}, 'Name'), nameInput),
+        h('label', { class: 'field', style: { 'margin-top': '8px' } }, h('span', {}, 'Sieb (Totvolumen des Durchflussmessers)'), basket)),
+      h('div', { class: 'card' }, h('h3', {}, 'Vorbrühen'),
+        slider('preP', 'Druck', 0, 6, 0.5, 'bar'), slider('preT', 'Dauer', 0, 15, 0.5, 's'),
+        slider('pauseT', 'Pause danach (Pumpe aus)', 0, 40, 1, 's')),
+      h('div', { class: 'card' }, h('h3', {}, 'Hauptphase'),
+        slider('mainP', 'Druck', 4, 10, 0.5, 'bar'), slider('mainT', 'Dauer', 3, 45, 1, 's')),
+      h('div', { class: 'card' }, h('h3', {}, 'Abfall (Hebel-Stil)'),
+        slider('endP', 'Enddruck', 3, 10, 0.5, 'bar'), slider('declineT', 'Dauer', 0, 30, 1, 's'),
+        h('p', { class: 'small muted' }, 'Fällt in vier Stufen vom Hauptdruck auf den Enddruck. Dauer 0 = kein Abfall.')));
+    paintPreset();
+    redraw();
+  });
 }

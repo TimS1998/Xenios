@@ -7,6 +7,7 @@ import { navigate, setTopActions, localStorageGet, localStorageSet } from '../ap
 import { liveHistory, SERIES } from './home.js';
 import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
+import { shotMetrics } from '../../shared/shot-analysis.js';
 
 const TILES = {
   shot: { title: 'Live-Bezug', icon: 'coffee', wide: true, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
@@ -18,6 +19,7 @@ const TILES = {
   shotTimes: { title: 'Bezugszeiten', icon: 'timer', wide: false, build: shotTimesTile, link: '/bezuege' },
   grinds: { title: 'Mahlgewichte', icon: 'scale', wide: false, build: grindsTile, link: '/muehle' },
   grinder: { title: 'Mühle heute', icon: 'grinder', wide: false, build: grinderTile, link: '/muehle' },
+  care: { title: 'Pflege', icon: 'check', wide: false, build: careTile, link: '/bezuege' },
   live: { title: 'Verlauf (10 min)', icon: 'history', wide: true, build: liveTile },
 };
 const KEY = 'dashboard';
@@ -71,7 +73,7 @@ export function dashboardView(root) {
   }
 
   function update() {
-    const ctx = { m: store.machine, g: store.grinder?.enabled ? store.grinder : null, shots };
+    const ctx = { m: store.machine, g: store.grinder?.enabled ? store.grinder : null, shots, maint };
     for (const b of built) {
       try {
         const r = b.update(ctx) || {};
@@ -81,8 +83,10 @@ export function dashboardView(root) {
     }
   }
 
+  let maint = null;
   async function loadShots() {
     try { shots = (await api('/api/shots')).shots || []; } catch { /* nächster Versuch beim nächsten Bezug */ }
+    try { maint = (await api('/api/maintenance')).backflush; } catch { maint = null; }
     update();
   }
 
@@ -276,11 +280,14 @@ function lastShotTile({ wide }) {
         box.replaceChildren(h('div', { class: 'empty' }, 'Noch kein Bezug'));
         return {};
       }
-      const amount = ls.weight ? [fmt(ls.weight), 'g'] : ls.volumeMl ? [fmt(ls.volumeMl, 0), 'ml'] : ['–', ''];
+      const met = shotMetrics(ls);
+      const ratio = met.ratio;
+      const amount = met.yieldG ? [fmt(met.yieldG), 'g'] : ls.volumeMl ? [fmt(ls.volumeMl, 0), 'ml'] : ['–', ''];
       box.replaceChildren(
-        h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(ls.timeMs / 1000), 's'), kpi('Menge', amount[0], amount[1], 'w'), kpi('Max. Druck', fmt(ls.maxPressure), 'bar', 'pu')),
+        h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(ls.timeMs / 1000), 's'), kpi('Menge', amount[0], amount[1], 'w'),
+          ratio ? kpi('Verhältnis', `1:${fmt(ratio)}`, '') : kpi('Max. Druck', fmt(ls.maxPressure), 'bar', 'pu')),
         ls.curve?.length > 1 ? shotChart(ls.curve, { width: wide ? 560 : 320, height: wide ? 160 : 130, minSeconds: 20 }) : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
-      return { extra: `${ago(ls.endedAt)}${ls.estimated ? ' · nachträglich' : ''}` };
+      return { extra: `${ls.notes?.rating ? `${'★'.repeat(ls.notes.rating)} · ` : ''}${ago(ls.endedAt)}${ls.estimated ? ' · nachträglich' : ''}` };
     },
   };
 }
@@ -419,6 +426,24 @@ function liveTile({ wide }) {
     update() {
       box.replaceChildren(liveChart(liveHistory, SERIES, { width: wide ? 640 : 320, height: wide ? 200 : 150, spanMs: 10 * 60e3 }));
       return {};
+    },
+  };
+}
+
+// Pflege: Tage seit dem letzten Backflush als Ring (voll = fällig)
+function careTile() {
+  const box = h('div', {});
+  return {
+    body: box,
+    update({ maint: b }) {
+      if (!b) return { hidden: true };
+      const pct = b.daysSince === null ? 1 : Math.min(1, b.daysSince / b.intervalDays);
+      box.replaceChildren(h('div', { class: `care-row ${b.due ? 'due' : ''}` },
+        ring(pct, b.daysSince === null ? '–' : `${b.daysSince} d`),
+        h('div', {},
+          h('div', { class: 'label' }, b.due ? 'Backflush fällig' : 'Backflush ok'),
+          h('div', { class: 'muted small' }, b.lastAt ? `${fmtInt(b.shotsSince)} Bezüge seit dem letzten · alle ${b.intervalDays} Tage` : 'Noch nie eingetragen'))));
+      return { extra: b.due ? h('span', { class: 'badge warn' }, 'fällig') : '' };
     },
   };
 }

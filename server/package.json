@@ -1,6 +1,6 @@
 {
   "name": "xenios",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Xenios: sicherer Web-Server, Web-App und Android-App für die Xenia-Espressomaschine und die Mahlkönig E64 WS",
   "type": "module",
@@ -12,7 +12,7 @@
     "start": "node src/index.js",
     "mock": "node mock/mock-devices.js",
     "dev": "node src/index.js --config mock/dev-config.json",
-    "test": "node --test --test-force-exit test/unit.test.js test/integration.test.js test/direct.test.js test/admin.test.js test/shots.test.js"
+    "test": "node --test --test-force-exit test/unit.test.js test/integration.test.js test/direct.test.js test/admin.test.js test/shots.test.js test/analysis.test.js test/community.test.js"
   },
   "license": "Apache-2.0"
 }

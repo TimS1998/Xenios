@@ -2,6 +2,7 @@
 // Läuft im Server (Node) und in der Android-App im Direkt-Modus (Browser): Speicher, Logger und fetch werden übergeben.
 import { Emitter, MemoryStore } from './emitter.js';
 import { logger } from './log.js';
+import { dialIn, STRENGTH } from './shot-analysis.js';
 
 let log = logger('xenia');
 
@@ -76,6 +77,11 @@ export const SCRIPT_OPS = {
 // Eingebaute Skripte (IDs < 10), z. B. für die Tastenbelegung.
 // Skript 9 (Bezug per Drehknopf der Mühle, Grind-by-Sync) ist bewusst nicht dabei: an einem Taster funktioniert es nicht.
 export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis', 8: 'Doppelte Dosis' };
+
+// Geschmack in der Bewertung eines Bezugs
+export const TASTE = { sour: 'sauer', balanced: 'ausgewogen', bitter: 'bitter' };
+
+const shotId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 export function scriptType(id) {
   if (id >= 10 && id < 150) return 'standard';
@@ -384,6 +390,10 @@ export class Machine extends Emitter {
       if (!s.shot.running) {
         this._liveStarts.push(Date.now());
         s.shot = { running: true, timeMs: 0, startedAt: new Date().toISOString(), curve: [] };
+        // Hat die App kurz vorher ein Skript gestartet, gehört es zu diesem Bezug (für die Zielkurve in der Analyse)
+        const p = this._pendingScript;
+        if (p && Date.now() - p.at < 20e3) s.shot.script = { id: p.id, title: p.title ?? BUILTIN_SCRIPTS[p.id] ?? null, steps: p.steps ?? null };
+        this._pendingScript = null;
         this.kick(this.cfg.pollActiveMs);
       }
       s.shot.timeMs = extractionMs;
@@ -435,6 +445,7 @@ export class Machine extends Emitter {
     const curve = s.shot.curve;
     const maxPressure = curve.reduce((m, p) => Math.max(m, p[1] || 0), 0);
     const shot = {
+      id: shotId(),
       endedAt: new Date().toISOString(),
       startedAt: s.shot.startedAt,
       timeMs,
@@ -443,6 +454,7 @@ export class Machine extends Emitter {
       maxPressure: round(maxPressure, 1),
       groupTemp: s.temp.group,
       curve: curve.slice(0, 300),
+      ...(s.shot.script ? { script: s.shot.script } : {}),
     };
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
     s.lastShot = shot;
@@ -453,7 +465,7 @@ export class Machine extends Emitter {
       if (shot.weight) parts.push(`${fmt(shot.weight)} g`);
       else if (shot.volumeMl) parts.push(`${fmt(shot.volumeMl, 0)} ml`);
       if (shot.maxPressure) parts.push(`max. ${fmt(shot.maxPressure)} bar`);
-      this._event('shot', { title: 'Bezug fertig', body: parts.join(' · '), tag: 'shot' });
+      this._event('shot', { title: 'Bezug fertig', body: parts.join(' · '), tag: 'shot', shotId: shot.id });
     }
   }
 
@@ -529,6 +541,7 @@ export class Machine extends Emitter {
       const d = i === 0 && !stale ? diag : {};
       const timeMs = num(d.EXTRACTION_TIME_MS);
       const shot = {
+        id: shotId(),
         endedAt: new Date().toISOString(),
         startedAt: null,
         timeMs: timeMs || null,
@@ -563,10 +576,19 @@ export class Machine extends Emitter {
         i--;
       }
     }
-    if (removed) {
-      this.history.save();
-      log.info(`${removed} doppelte Bezüge im Protokoll zusammengeführt`);
+    // Ältere Einträge ohne ID bekommen eine stabile aus ihrem Zeitpunkt (für Notizen und die Detailansicht)
+    const seen = new Set(list.map((s) => s.id).filter(Boolean));
+    let ids = 0;
+    for (const s of list) {
+      if (s.id) continue;
+      let id = `t${(Date.parse(s.endedAt) || 0).toString(36)}`;
+      while (seen.has(id)) id += 'x';
+      seen.add(id);
+      s.id = id;
+      ids++;
     }
+    if (removed || ids) this.history.save();
+    if (removed) log.info(`${removed} doppelte Bezüge im Protokoll zusammengeführt`);
   }
 
   // Protokoll-Einträge; Druckkurven nur für die ersten `curves` (Datenmenge)
@@ -576,11 +598,145 @@ export class Machine extends Emitter {
 
   shotsCsv() {
     const cell = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
-    const rows = [['Nr', 'Ende', 'Dauer (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst']];
+    const text = (v) => (v ? `"${String(v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"` : '');
+    const rows = [['Nr', 'Ende', 'Dauer (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst',
+      'Dosis (g)', 'Verhältnis 1:', 'Rezept Mühle', 'Skript', 'Bohne', 'Mahlgrad', 'Bewertung', 'Geschmack', 'Stärke', 'Notiz']];
     for (const s of this.history.data.shots) {
-      rows.push([s.no ?? '', s.endedAt, cell(s.timeMs ? Math.round(s.timeMs / 100) / 10 : null), cell(s.weight), cell(s.volumeMl), cell(s.maxPressure), cell(s.groupTemp), s.estimated ? 'nein' : 'ja']);
+      const n = s.notes || {};
+      const yieldG = n.yieldG ?? s.weight;
+      const ratio = s.dose?.g && yieldG ? Math.round((yieldG / s.dose.g) * 10) / 10 : null;
+      rows.push([s.no ?? '', s.endedAt, cell(s.timeMs ? Math.round(s.timeMs / 100) / 10 : null), cell(s.weight), cell(s.volumeMl), cell(s.maxPressure), cell(s.groupTemp), s.estimated ? 'nein' : 'ja',
+        cell(s.dose?.g), cell(ratio), s.dose?.recipe ?? '', text(s.script?.title), text(n.bean), text(n.grind), n.rating ?? '', TASTE[n.taste] ?? '', STRENGTH[n.strength] ?? '', text(n.text)]);
     }
     return '﻿' + rows.map((r) => r.join(';')).join('\r\n') + '\r\n';
+  }
+
+  _shot(id) {
+    const s = this.history.data.shots.find((x) => x.id === String(id));
+    if (!s) throw httpError(404, 'Bezug nicht gefunden');
+    return s;
+  }
+
+  // Ein Bezug mit Vergleichskurven: frühere Bezüge mit demselben Skript, sonst derselben Bohne, sonst die letzten;
+  // dazu der Referenz-Bezug (zur selben Bohne, falls vorhanden).
+  shotDetail(id) {
+    const shot = this._shot(id);
+    const list = this.history.data.shots;
+    const i = list.indexOf(shot);
+    const earlier = list.slice(i + 1).filter((s) => s.curve?.length > 1);
+    const bean = shot.notes?.bean;
+    const same = (pred) => earlier.filter(pred).slice(0, 5);
+    const compare = (shot.script ? same((s) => s.script?.id === shot.script.id) : [])
+      .concat(bean ? same((s) => s.notes?.bean === bean) : [])
+      .concat(earlier.slice(0, 5))
+      .filter((s, k, a) => a.indexOf(s) === k)
+      .slice(0, 5);
+    const refs = list.filter((s) => s.notes?.reference && s !== shot && s.curve?.length > 1);
+    const reference = (bean && refs.find((s) => s.notes.bean === bean)) || refs[0] || null;
+    const beans = [...new Set(list.map((s) => s.notes?.bean).filter(Boolean))].slice(0, 50);
+    return { shot, compare, reference, beans, advice: dialIn(shot, list.slice(i + 1, i + 60)), lastGrind: this._lastGrind(shot) };
+  }
+
+  // Zuletzt notierter Mahlgrad (zur selben Bohne, falls bekannt) als Vorschlag für die Bewertung
+  _lastGrind(shot) {
+    const list = this.history.data.shots;
+    const bean = shot.notes?.bean;
+    const hit = list.find((s) => s !== shot && s.notes?.grind && (!bean || s.notes.bean === bean));
+    return hit?.notes.grind ?? null;
+  }
+
+  // Bewertung und Notizen zu einem Bezug (alle Felder optional; null löscht)
+  annotateShot(id, body = {}) {
+    const shot = this._shot(id);
+    const n = { ...(shot.notes || {}) };
+    const set = (k, v) => { if (v === null || v === undefined || v === '') delete n[k]; else n[k] = v; };
+    if ('rating' in body) {
+      const r = body.rating === null ? null : Number(body.rating);
+      if (r !== null && !(Number.isInteger(r) && r >= 1 && r <= 5)) throw httpError(400, 'Bewertung: 1 bis 5 Sterne');
+      set('rating', r);
+    }
+    if ('taste' in body) {
+      if (body.taste !== null && !(body.taste in TASTE)) throw httpError(400, 'Geschmack: sour, balanced oder bitter');
+      set('taste', body.taste);
+    }
+    if ('strength' in body) {
+      if (body.strength !== null && !(body.strength in STRENGTH)) throw httpError(400, 'Stärke: weak, ok oder strong');
+      set('strength', body.strength);
+    }
+    // Mahlgrad so, wie er an der Mühle steht (Skala je nach Mühle, daher Text)
+    if ('grind' in body) set('grind', body.grind === null ? null : String(body.grind).trim().replace(/[\u0000-\u001f]/g, '').slice(0, 12));
+    if ('bean' in body) set('bean', body.bean === null ? null : String(body.bean).trim().slice(0, 60));
+    if ('text' in body) set('text', body.text === null ? null : String(body.text).trim().slice(0, 500));
+    if ('yieldG' in body) {
+      const y = body.yieldG === null || body.yieldG === '' ? null : Number(body.yieldG);
+      if (y !== null && !(Number.isFinite(y) && y > 0 && y < 400)) throw httpError(400, 'Ausbeute: 1 bis 399 g');
+      set('yieldG', y === null ? null : round(y, 1));
+    }
+    if ('doseG' in body) {
+      // Dosis von Hand, falls die Mühle keinen passenden Mahlvorgang kennt
+      const d = body.doseG === null || body.doseG === '' ? null : Number(body.doseG);
+      if (d !== null && !(Number.isFinite(d) && d > 0 && d < 40)) throw httpError(400, 'Dosis: 1 bis 39 g');
+      set('doseG', d === null ? null : round(d, 1));
+    }
+    if ('reference' in body) set('reference', body.reference ? true : null);
+    if (Object.keys(n).length) shot.notes = n;
+    else delete shot.notes;
+    this.history.save();
+    const i = this.history.data.shots.indexOf(shot);
+    return { shot, advice: dialIn(shot, this.history.data.shots.slice(i + 1, i + 60)) };
+  }
+
+  // Mahlvorgang der Mühle dem Bezug zuordnen: der letzte erfolgreiche bis 20 min vor dem Start (Dosis, Rezept, Verhältnis).
+  // Läuft nach jedem Abgleich mit der Mühle; betrachtet nur Bezüge der letzten 48 h.
+  linkGrinds(grinds) {
+    if (!Array.isArray(grinds) || !grinds.length) return 0;
+    const list = this.history.data.shots;
+    const used = new Set(list.map((s) => s.dose?.grindId).filter((x) => x !== undefined));
+    const now = Date.now();
+    let linked = 0;
+    for (const s of list) {
+      const end = Date.parse(s.endedAt);
+      if (now - end > 48 * 3600e3) break;
+      if (s.dose) continue;
+      const start = s.startedAt ? Date.parse(s.startedAt) : end - (s.timeMs || 0);
+      const g = grinds
+        .filter((x) => x.success && x.weightG > 0 && !used.has(x.id))
+        .map((x) => ({ x, t: Date.parse(x.at) }))
+        .filter(({ t }) => Number.isFinite(t) && t <= start + 60e3 && t >= start - 20 * 60e3)
+        .sort((a, b) => b.t - a.t)[0]?.x;
+      if (!g) continue;
+      s.dose = { g: g.weightG, targetG: g.targetG ?? null, recipe: g.recipe ?? null, type: g.type ?? null, grindId: g.id, at: g.at, durationMs: g.durationMs ?? null, gbs: Boolean(g.gbs) };
+      used.add(g.id);
+      linked++;
+    }
+    if (linked) this.history.save();
+    return linked;
+  }
+
+  // --- Pflege: Backflush-Erinnerung ------------------------------------------------
+  maintenance() {
+    const m = this.history.data.maintenance || {};
+    const intervalDays = m.intervalDays ?? 7;
+    const last = m.backflushAt ? Date.parse(m.backflushAt) : null;
+    const since = (t) => this.history.data.shots.filter((s) => !last || Date.parse(s.endedAt) > t).length;
+    const daysSince = last ? Math.floor((Date.now() - last) / 86400e3) : null;
+    return {
+      backflush: { lastAt: m.backflushAt ?? null, daysSince, shotsSince: last ? since(last) : null, intervalDays, due: daysSince === null || daysSince >= intervalDays },
+    };
+  }
+
+  markBackflush() {
+    this.history.data.maintenance = { ...(this.history.data.maintenance || {}), backflushAt: new Date().toISOString() };
+    this.history.save();
+    return this.maintenance();
+  }
+
+  setMaintenance({ intervalDays }) {
+    const d = Number(intervalDays);
+    if (!(Number.isInteger(d) && d >= 1 && d <= 60)) throw httpError(400, 'Intervall: 1 bis 60 Tage');
+    this.history.data.maintenance = { ...(this.history.data.maintenance || {}), intervalDays: d };
+    this.history.save();
+    return this.maintenance();
   }
 
   // --- Aktionen ---------------------------------------------------------------
@@ -657,6 +813,10 @@ export class Machine extends Emitter {
   async runScript(id) {
     this._lastAppAction = Date.now();
     await this.client.post('/api/v2/scripts/execute', { ID: Number(id) });
+    // Merken, damit der gleich erkannte Bezug weiß, welches Skript lief; Titel und Schritte kommen nach (Zielkurve)
+    const pending = { id: Number(id), at: Date.now() };
+    this._pendingScript = pending;
+    this.readScript(id).then((r) => { pending.title = r.title || BUILTIN_SCRIPTS[id] || null; pending.steps = r.steps; }).catch(() => {});
     this._acted();
     return { ok: true };
   }

@@ -146,7 +146,7 @@ export function createDirectBackend() {
   route('GET', '/api/sessions', async () => ({ sessions: [] }));
   route('POST', '/api/sessions/revoke-all', async () => ({ ok: true }));
   route('GET', '/api/push/key', async () => ({ enabled: false, topics: {} }));
-  for (const [m, p] of [['GET', '/api/schedule'], ['PUT', '/api/schedule'], ['GET', '/api/wake'], ['PUT', '/api/wake'], ['POST', '/api/push/subscribe']]) route(m, p, serverOnly);
+  for (const [m, p] of [['GET', '/api/schedule'], ['PUT', '/api/schedule'], ['GET', '/api/wake'], ['PUT', '/api/wake'], ['POST', '/api/push/subscribe'], ['GET', '/api/community/shots'], ['GET', '/api/community/shots/:id']]) route(m, p, serverOnly);
 
   const listeners = new Set();
   const emit = (name, data) => { for (const fn of listeners) fn(name, data); };
@@ -154,6 +154,8 @@ export function createDirectBackend() {
   grinder.on('state', () => emit('grinder', grinder.snapshot()));
   machine.on('event', (ev) => emit('event', ev));
   grinder.on('event', (ev) => emit('event', ev));
+  grinder.on('state', () => machine.linkGrinds(grinder.state.grinds));
+  machine.on('event', (ev) => { if (ev.topic === 'shot' && running && cfg.grinder.enabled) grinder.kick(5000); });
 
   let running = false;
   return {

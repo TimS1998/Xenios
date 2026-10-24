@@ -74,14 +74,17 @@ export function ring(progress, label) {
 
 // Bezugskurve mit Achsen: Druck (bar, links) und Gewicht (g, rechts) über die Bezugszeit.
 // curve: [[t_s, druck_bar, gewicht_g, ml], …]; live: Endpunkt markieren und Zeitachse mitwachsen lassen.
-export function shotChart(curve, { width = 320, height = 150, live = false, minSeconds = 30 } = {}) {
-  const pts = (curve || []).filter((p) => Number.isFinite(p[0]));
+// Für die Analyse: compare = frühere Kurven (blass), reference = Referenz-Bezug, target = Soll-Druck [[t, bar] | null, …].
+export function shotChart(curve, { width = 320, height = 150, live = false, minSeconds = 30, compare = [], reference = null, target = null } = {}) {
+  const clean = (c) => (c || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
+  const pts = clean(curve);
+  const others = [...compare.map(clean), clean(reference)].filter((c) => c.length > 1);
   const pad = { l: 26, r: 30, t: 18, b: 18 };
   const iw = width - pad.l - pad.r;
   const ih = height - pad.t - pad.b;
-  const tEnd = pts.length ? pts[pts.length - 1][0] : 0;
+  const tEnd = Math.max(pts.length ? pts[pts.length - 1][0] : 0, ...others.map((c) => c[c.length - 1][0]), ...(target || []).filter(Boolean).map((p) => p[0]));
   const tMax = Math.max(minSeconds, Math.ceil((tEnd + (live ? 3 : 0)) / 5) * 5);
-  const wPeak = Math.max(0, ...pts.map((p) => p[2] || 0));
+  const wPeak = Math.max(0, ...pts.map((p) => p[2] || 0), ...others.flat().map((p) => p[2] || 0));
   const wMax = Math.max(40, Math.ceil(wPeak / 10) * 10);
   const x = (t) => pad.l + (t / tMax) * iw;
   const yP = (v) => pad.t + ih - (Math.min(12, Math.max(0, v || 0)) / 12) * ih;
@@ -95,12 +98,24 @@ export function shotChart(curve, { width = 320, height = 150, live = false, minS
   }
   const step = tMax > 60 ? 20 : tMax > 30 ? 10 : 5;
   for (let t = step; t < tMax; t += step) grid.push(h('text', { x: x(t), y: height - 4, class: 'lbl', 'text-anchor': 'middle' }, `${t} s`));
-  const line = (fy, idx) => pts.map((p) => `${x(p[0]).toFixed(1)},${fy(p[idx]).toFixed(1)}`).join(' ');
+  const lineOf = (c, fy, idx) => c.map((p) => `${x(p[0]).toFixed(1)},${fy(p[idx]).toFixed(1)}`).join(' ');
+  const line = (fy, idx) => lineOf(pts, fy, idx);
   const hasW = pts.some((p) => p[2] > 0);
   const last = pts[pts.length - 1];
+  // Zielkurve in Abschnitten (null trennt Schritte ohne bekannten Druck)
+  const targetLines = [];
+  let seg = [];
+  for (const p of target || []) {
+    if (p) seg.push(p);
+    else if (seg.length) { targetLines.push(seg); seg = []; }
+  }
+  if (seg.length) targetLines.push(seg);
   return h('svg', { class: 'shot-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Bezugskurve: Druck und Gewicht' },
     h('text', { x: 2, y: 9, class: 'lbl' }, 'bar'), h('text', { x: width - 2, y: 9, class: 'lbl', 'text-anchor': 'end' }, 'g'),
     ...grid,
+    ...compare.map(clean).filter((c) => c.length > 1).map((c) => h('polyline', { class: 'cmp', points: lineOf(c, yP, 1) })),
+    reference && clean(reference).length > 1 ? h('polyline', { class: 'ref', points: lineOf(clean(reference), yP, 1) }) : null,
+    ...targetLines.filter((s) => s.length > 1).map((s) => h('polyline', { class: 'target', points: s.map((p) => `${x(p[0]).toFixed(1)},${yP(p[1]).toFixed(1)}`).join(' ') })),
     pts.length > 1 ? h('polygon', { class: 'area', points: `${x(pts[0][0]).toFixed(1)},${yP(0)} ${line(yP, 1)} ${x(last[0]).toFixed(1)},${yP(0)}` }) : null,
     pts.length > 1 && hasW ? h('polyline', { class: 'w', points: line(yW, 2) }) : null,
     pts.length > 1 ? h('polyline', { class: 'p', points: line(yP, 1) }) : null,

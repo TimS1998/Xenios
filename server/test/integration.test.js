@@ -400,6 +400,29 @@ test('Keine gefährlichen Aufrufe an die Geräte', () => {
   assert.ok(!gets.some((l) => /alldelete|forget|tara|get_time|forcescan/.test(l)));
 });
 
+test('Bezugs-Analyse und Pflege über die API', async () => {
+  let r = await call('GET', '/api/shots');
+  const id = r.json.shots[0].id;
+  assert.ok(id);
+  r = await call('GET', `/api/shots/${id}`);
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json.compare));
+  r = await call('PUT', `/api/shots/${id}/notes`, { rating: 5, taste: 'balanced', bean: 'Test-Bohne', reference: true });
+  assert.equal(r.json.shot.notes.rating, 5);
+  r = await call('PUT', `/api/shots/${id}/notes`, { rating: 9 });
+  assert.equal(r.status, 400);
+  r = await call('PUT', `/api/shots/${id}/notes`, { rating: 1 }, { headers: { 'X-Xenia': '0' } });
+  assert.equal(r.status, 403, 'CSRF-Schutz');
+  r = await call('GET', '/api/shots/gibtsnicht');
+  assert.equal(r.status, 404);
+  r = await call('POST', '/api/maintenance/backflush');
+  assert.equal(r.json.backflush.due, false);
+  r = await call('PUT', '/api/maintenance', { intervalDays: 10 });
+  assert.equal(r.json.backflush.intervalDays, 10);
+  r = await call('GET', '/api/maintenance', undefined, { auth: false });
+  assert.equal(r.status, 401);
+});
+
 test('Abmelden entwertet die Sitzung', async () => {
   let r = await call('POST', '/auth/logout');
   assert.equal(r.status, 200);

@@ -16,6 +16,7 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 - **App-Shortcuts:** `/?do=on|off|eco|steam` schaltet nur bei Aufrufen ohne fremde Herkunft (`Sec-Fetch-Site` `none`/`same-origin`); ein Link von einer anderen Webseite wird auf `/` umgeleitet.
 - **Push:** Abos nur für die Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft).
 - **Proxy:** `CF-Connecting-IP` und `X-Forwarded-Proto` werden nur auf dem HTTP-Tunnel-Port und nur von vertrauten Adressen (`trustProxy`) ausgewertet.
+- **visualizer.coffee:** Der Server fragt nur `https://visualizer.coffee` ab (keine Weiterleitungen, 12 s Zeitlimit, Antworten höchstens 3 MB), IDs werden vorher als UUID geprüft. Ergebnisse bleiben 10 min (Suche) bzw. 1 h (Bezug) im Speicher, weil visualizer.coffee ausführliche Abfragen auf etwa 10 pro Minute begrenzt.
 
 ## Endpunkte
 
@@ -41,6 +42,12 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | GET | `/api/state` | – | `{machine, grinder, server}` (siehe unten) |
 | GET | `/api/stream` | – | **Server-Sent Events**: `snapshot`, `machine`, `grinder`, `event`, `server` (Funktionen geändert); höchstens 50 gleichzeitig |
 | GET | `/api/shots` | – | Bezugs-Protokoll (bis 500 Einträge, Druckkurven für die neuesten 20), `total` |
+| GET | `/api/shots/:id` | – | ein Bezug mit Kurve, `compare` (bis 5 frühere: gleiches Skript, gleiche Bohne, sonst die letzten), `reference` (Referenz-Bezug), `beans`, `advice` (Einstell-Assistent), `lastGrind` (zuletzt notierter Mahlgrad) |
+| PUT | `/api/shots/:id/notes` | `{"rating":1..5,"taste":"sour"|"balanced"|"bitter","strength":"weak"|"ok"|"strong","bean","grind","yieldG","doseG","text","reference":bool}` | Bewertung und Notizen (alle Felder optional, `null` löscht). Antwort `{shot, advice}`: `advice` = `{dir:"finer"|"coarser"|"keep"|"longer"|"shorter"|"puck", size:0..2, title, text, anchor, trail}` aus Geschmack, Stärke, Zeit und den bewerteten Bezügen derselben Bohne (14 Tage) |
+| GET | `/api/community/shots?profile=&roaster=&bean=&min=0..100&page=` | – | Suche in der visualizer.coffee-Community (nur Server): `{items:[{id,title,user,bean,roast,dose,yield,ratio,time,enjoyment}], page, more}` |
+| GET | `/api/community/shots/:id` | – | ein Community-Bezug als Xenia-Skript: `{name, steps, curve, target, info}`; `steps` sind Druckstufen aus dem gemessenen Verlauf, zum Speichern über `POST /api/machine/scripts` |
+| GET / PUT | `/api/maintenance` | `{"intervalDays":1..60}` | Backflush-Erinnerung: `{backflush:{lastAt,daysSince,shotsSince,intervalDays,due}}` |
+| POST | `/api/maintenance/backflush` | – | Backflush als erledigt eintragen |
 | GET | `/api/shots.csv` | – | gesamtes Protokoll als CSV (Excel, Semikolon) |
 | GET | `/api/widget` | – | kompakter Zustand für Widgets/Kachel: `{online,status,label,heated,steamOn,steamReady,tankOk,group,groupSet,boiler,boilerSet,steam,steamSet,shot,next:{at,reason}|null}` |
 | POST | `/api/machine/power` | `{"mode":"on"\|"off"\|"eco","steam":bool?}` | `{"ok":true}` |
@@ -96,7 +103,7 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | Thema | Auslöser |
 |---|---|
 | `heated` | Brühgruppe erreicht Solltemperatur − 0,8 °C (einmal pro Einschalten) |
-| `shot` | Bezug beendet (≥ 3 s): Zeit, Gewicht/Menge, Maximaldruck |
+| `shot` | Bezug beendet (≥ 3 s): Zeit, Gewicht/Menge, Maximaldruck; im Live-Stream zusätzlich `shotId` (für „Bewerten“) |
 | `steam` | Dampfdruck erreicht |
 | `tank` | Wassertank leer |
 | `power` | Maschine ein-/ausgeschaltet, **nicht** über die App (Timer, Taste, Auto-Aus) |

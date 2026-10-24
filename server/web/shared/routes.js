@@ -15,6 +15,11 @@ const enc = (s) => new TextEncoder().encode(s);
 
 export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('GET', '/api/shots', async () => ({ shots: machine.shots(500, { curves: 20 }), total: machine.history.data.shots.length }));
+  route('GET', '/api/shots/:id', async ({ params }) => machine.shotDetail(params.id));
+  route('PUT', '/api/shots/:id/notes', async ({ params, body }) => machine.annotateShot(params.id, body));
+  route('GET', '/api/maintenance', async () => machine.maintenance());
+  route('PUT', '/api/maintenance', async ({ body }) => machine.setMaintenance(body));
+  route('POST', '/api/maintenance/backflush', async () => machine.markBackflush());
   route('GET', '/api/shots.csv', async () => ({ download: { data: enc(machine.shotsCsv()), filename: `Xenia-Bezuege-${new Date().toISOString().slice(0, 10)}.csv`, type: 'text/csv; charset=utf-8' } }));
 
   // Maschine

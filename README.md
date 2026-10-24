@@ -2,9 +2,9 @@
 
 Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Widgets für die **Xenia-Espressomaschine** und die **Mahlkönig E64 WS**. Mit Passwort geschützt, im Heimnetz per HTTPS und von unterwegs verschlüsselt über einen Cloudflare-Tunnel erreichbar.
 
-| Dashboard | Home | Skripte | Steuerung | Timer | Mühle |
-|---|---|---|---|---|---|
-| Anpassbare Übersicht zum Ansehen (auch fürs Tablet): Instrumente, Live-Druckkurve beim Bezug, letzter Bezug und Mahlvorgang, Verläufe | Druck- und Temperatur-Instrumente, Live-Diagramm, Ein/Aus/Eco/Dampf, Zieltemperatur | Schnellstart (einfach/doppelt/Dauerbezug), Skript-Editor, Export/Import | Tastenbelegung, Bezugsgewichte, Paddle | Wochenplan, Schaltzeiten über den Server, Einschalten vor dem ersten Wecker | Rezepte, Mahlvorgänge, Grind-by-Sync, Meldungen |
+| Dashboard | Home | Bezüge | Skripte | Steuerung | Timer | Mühle |
+|---|---|---|---|---|---|---|
+| Anpassbare Übersicht zum Ansehen (auch fürs Tablet): Instrumente, Live-Druckkurve beim Bezug, letzter Bezug und Mahlvorgang, Verläufe | Druck- und Temperatur-Instrumente, Live-Diagramm, Ein/Aus/Eco/Dampf, Zieltemperatur | Protokoll mit Analyse: Kurve gegen frühere Bezüge, Referenz und Zielkurve des Skripts, Dosis und Verhältnis automatisch von der Mühle, Einstell-Assistent (nach jedem Bezug Geschmack und Stärke antippen → feiner/gröber, mehr/weniger Ausbeute, mit Verlauf je Bohne), Backflush-Erinnerung, CSV | Schnellstart (einfach/doppelt/Dauerbezug), Skript-Editor, Druckprofil-Baukasten mit Vorlagen nach dem Decent-Profil-Leitfaden (Blooming, Londinium, Allongé, Turbo …), Profile der visualizer.coffee-Community mit einem Klick übernehmen, Export/Import | Tastenbelegung, Bezugsgewichte, Paddle | Wochenplan, Schaltzeiten über den Server, Einschalten vor dem ersten Wecker | Rezepte, Mahlvorgänge, Grind-by-Sync, Meldungen |
 
 **Android-App** ([Anleitung](docs/Android-App.md)): Widgets, Schnelleinstellungs-Kachel, App-Shortcuts, Direkt-Modus ohne Server.
 

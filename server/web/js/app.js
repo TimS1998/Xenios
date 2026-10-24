@@ -11,6 +11,7 @@ import { grinderView } from './views/grinder.js';
 import { settingsView } from './views/settings.js';
 import { serverView } from './views/server.js';
 import { showSetup } from './setup.js';
+import { quickRate } from './views/shot-detail.js';
 
 const ROUTES = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', view: dashboardView, title: 'Dashboard', wide: true },
@@ -105,9 +106,11 @@ subscribe(() => {
   dot.title = !store.connected ? 'Keine Verbindung zum Server' : m && !m.online ? 'Maschine nicht erreichbar' : 'Verbunden';
 });
 
-// Ereignisse aus dem Server als Snackbar
+// Ereignisse aus dem Server als Snackbar; nach einem Bezug mit „Bewerten“ (Einstell-Assistent)
 subscribe((part, ev) => {
-  if (part === 'event' && ev && ev.topic !== 'grinder') snackbar(`${ev.title} – ${ev.body}`);
+  if (part !== 'event' || !ev || ev.topic === 'grinder') return;
+  if (ev.topic === 'shot' && ev.shotId) snackbar(`${ev.title} – ${ev.body}`, { action: 'Bewerten', onAction: () => quickRate(ev.shotId), duration: 15000 });
+  else snackbar(`${ev.title} – ${ev.body}`);
 });
 
 // --- Login --------------------------------------------------------------------

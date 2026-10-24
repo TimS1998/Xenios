@@ -10,6 +10,7 @@ import { ROOT, loadConfig, updateConfigFile, migrateSecrets, applyTimezone, secr
 import { logger, setLogLevel } from './log.js';
 import { Sessions, LoginLimiter, tokenFromRequest } from './auth.js';
 import { authRoutes, makeSetupCode } from './admin.js';
+import { communityRoutes } from './community.js';
 import { PushService, PUSH_TOPICS, normalizePrefs, generateVapidKeys } from './push.js';
 import { Machine, httpError } from './machine.js';
 import { deviceRoutes, createRouter } from '../web/shared/routes.js';
@@ -81,6 +82,10 @@ export function createApp(cfg, hooks = {}) {
   };
   machine.on('event', onEvent);
   grinder.on('event', onEvent);
+  // Mahlvorgang der Mühle dem Bezug zuordnen (Dosis, Rezept): nach jedem Abgleich mit der Mühle,
+  // und nach einem Bezug die Mühle bald neu einlesen, damit der Mahlvorgang davor schon bekannt ist
+  grinder.on('state', () => machine.linkGrinds(grinder.state.grinds));
+  machine.on('event', (ev) => { if (ev.topic === 'shot' && cfg.grinder.enabled && started) grinder.kick(5000); });
   const scheduler = new Scheduler(cfg, machine, { onEvent });
   const wake = new Wake(cfg, machine, { onEvent });
   const updateViewers = () => {
@@ -151,6 +156,8 @@ export function createApp(cfg, hooks = {}) {
 
   // Maschine und Mühle (gemeinsam mit dem Direkt-Modus der App)
   deviceRoutes(route, { machine, grinder, cfg });
+  // Profile aus der Community von visualizer.coffee
+  communityRoutes(route, { version: VERSION, fetchImpl: hooks.fetch });
 
   // Zusätzliche Schaltzeiten (führt der Server aus)
   route('GET', '/api/schedule', async () => ({ rules: scheduler.list(), actions: SCHEDULE_ACTIONS }));
