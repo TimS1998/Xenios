@@ -150,7 +150,7 @@ export function targetBar(value, target, { max = null, width = 300, height = 26,
 // samples: [{t, ...werte}], series: [{key, label, unit, axis: 'temp'|'bar', cls}]
 export function liveChart(samples, series, { width = 320, height = 150, spanMs = 5 * 60e3 } = {}) {
   const now = Date.now();
-  const pad = { l: 28, r: 24, t: 8, b: 16 };
+  const pad = { l: 28, r: 24, t: 20, b: 16 }; // oben Platz für die Einheiten über der Skala
   const iw = width - pad.l - pad.r;
   const ih = height - pad.t - pad.b;
   const axes = { temp: [20, 110], bar: [0, 12] };

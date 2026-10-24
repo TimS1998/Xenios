@@ -273,7 +273,7 @@ test('Bezugs-Protokoll: nachträglich erkannte Bezüge, CSV, bleibt nach Neustar
   const before = m.history.data.shots.length;
   const counter = m.history.data.counter ?? 100;
   m.history.data.counter = counter;
-  m._liveShots = 0;
+  m._liveStarts = [];
   m._lastDiag = { EXTRACTION_TIME_MS: 27500, PU_LOADCELL_VOLUME: 36.2 };
   m._checkCounter(counter + 2, '');
   assert.equal(m.history.data.shots.length, before + 2);
@@ -283,7 +283,7 @@ test('Bezugs-Protokoll: nachträglich erkannte Bezüge, CSV, bleibt nach Neustar
   assert.equal(newest.weight, 36.2);
   assert.equal(newest.no, counter + 2);
   // Live erkannte Bezüge werden nicht doppelt gezählt
-  m._liveShots = 1;
+  m._liveStarts = [Date.now()];
   m._checkCounter(counter + 3, '');
   assert.equal(m.history.data.shots.length, before + 2);
   let r = await call('GET', '/api/shots');

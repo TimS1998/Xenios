@@ -38,16 +38,20 @@
 
 Voraussetzung: eine eigene Domain bei Cloudflare (kostenloser Tarif reicht).
 
+Der Einrichtungs-Assistent (Schritt „Unterwegs“) und *Einstellungen → Server & Sicherheit → Von unterwegs* zeigen die Schritte passend zur Installation, mit der richtigen **Service URL** zum Kopieren: in Docker `http://xenios:8080`, sonst `http://127.0.0.1:8080`. Dort die öffentliche Adresse eintragen und **Testen**: Der Server ruft sich selbst über die Adresse auf und prüft, dass wirklich er antwortet. Mit gesetzter Adresse wird sie auch Kontakt für die Push-Dienste, solange dort noch der Platzhalter steht.
+
+Mit Docker: siehe [Abschnitt 4](#4-alternativ-linux-server-raspberry-pi-oder-nas-mit-docker) (Token in `docker/.env`). Ohne Docker:
+
 **Variante A – Dashboard (am einfachsten):**
-1. <https://one.dash.cloudflare.com> → *Networks* → *Tunnels* → **Create a tunnel** → *Cloudflared* → Name `xenia`.
+1. <https://one.dash.cloudflare.com> → *Networks* → *Tunnels* → **Create a tunnel** → *Cloudflared* → Name `xenios`.
 2. cloudflared auf dem PC installieren: `winget install --id Cloudflare.cloudflared`
 3. Den angezeigten Befehl `cloudflared.exe service install <TOKEN>` als Administrator ausführen. Damit läuft der Tunnel als Windows-Dienst.
-4. *Public Hostname* anlegen: Subdomain `xenia`, Domain `deine-domain.de`, **Service `HTTP` → `localhost:8080`**.
+4. *Public Hostname* anlegen: Subdomain z. B. `xenios`, Domain `deine-domain.de`, **Service URL `http://127.0.0.1:8080`**.
 5. In Cloudflare unter *SSL/TLS* → *Edge Certificates*: **Always Use HTTPS** einschalten und **Minimum TLS 1.2** setzen.
 
 **Variante B – Konfigurationsdatei:** siehe [`server/deploy/cloudflared/config.yml`](../server/deploy/cloudflared/config.yml).
 
-Danach ist die App unter `https://xenia.deine-domain.de` erreichbar.
+Danach ist die App unter `https://xenios.deine-domain.de` erreichbar.
 
 ### Empfohlene Härtung in Cloudflare (optional)
 - **WAF → Rate limiting rule:** Pfad `/auth/login`, 10 Anfragen pro Minute pro IP → Block. Das ergänzt die Sperre im Server.

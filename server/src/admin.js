@@ -46,7 +46,22 @@ export function deviceUrl(v, label) {
   return u.origin;
 }
 
+// Öffentliche Adresse über den Cloudflare-Tunnel: nur https://name.domain (Cloudflare liefert das Zertifikat)
+export function publicUrl(v) {
+  let u;
+  try {
+    u = new URL(String(v ?? '').trim());
+  } catch {
+    throw bad('Öffentliche Adresse: z. B. https://xenios.deine-domain.de');
+  }
+  if (u.protocol !== 'https:' || u.port || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
+    throw bad('Öffentliche Adresse: nur https://name.domain, ohne Port und Pfad');
+  }
+  return u.origin;
+}
+
 export const FIELDS = {
+  publicUrl: (v) => (v === null || v === '' ? null : publicUrl(v)),
   'machine.url': (v) => deviceUrl(v, 'Adresse der Xenia'),
   'grinder.enabled': bool('Mühle'),
   'grinder.url': (v) => deviceUrl(v, 'Adresse der Mühle'),
@@ -107,8 +122,25 @@ export function makeSetupCode() {
 }
 const normCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-// --- Geräte testen --------------------------------------------------------------------------------
-export async function probeDevice({ kind, url, password }, { pinned = null } = {}) {
+// --- Geräte und Tunnel testen ----------------------------------------------------------------------
+// Ruft /healthz über die öffentliche Adresse auf; nur wenn dort genau dieser Server antwortet (gleiche Instanz-ID), steht der Tunnel.
+export async function probeTunnel(url, instance, { fetchImpl = globalThis.fetch } = {}) {
+  let res;
+  try {
+    res = await fetchImpl(`${url}/healthz`, { redirect: 'manual', headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(8000) });
+  } catch (e) {
+    const why = e.name === 'TimeoutError' ? 'Zeitüberschreitung' : e.cause?.code === 'ENOTFOUND' ? 'Name unbekannt – DNS-Eintrag fehlt noch?' : e.cause?.code || e.message;
+    throw httpError(502, `Nicht erreichbar (${why})`);
+  }
+  const id = res.headers.get('x-xenios-instance');
+  if (res.status === 200 && id === instance) return { ok: true, name: 'Tunnel funktioniert', detail: `${new URL(url).host} → dieser Server` };
+  if (id) throw httpError(502, 'Unter dieser Adresse antwortet ein anderer Xenios-Server');
+  if ([502, 503, 530].includes(res.status)) throw httpError(502, `Cloudflare erreicht den Server nicht (HTTP ${res.status}) – läuft cloudflared, stimmt die Service URL?`);
+  throw httpError(502, `Unerwartete Antwort (HTTP ${res.status}) – zeigt der Public Hostname auf den Tunnel?`);
+}
+
+export async function probeDevice({ kind, url, password }, { pinned = null, instance = null } = {}) {
+  if (kind === 'tunnel') return probeTunnel(publicUrl(url), instance);
   if (kind === 'machine') {
     const base = deviceUrl(url, 'Adresse der Xenia');
     const m = await new XeniaClient({ url: base, timeoutMs: 4000 }).get('/api/v2/machine');
@@ -138,11 +170,11 @@ export async function probeDevice({ kind, url, password }, { pinned = null } = {
       t.close();
     }
   }
-  throw bad('kind: machine oder grinder');
+  throw bad('kind: machine, grinder oder tunnel');
 }
 
 // --- Routen -----------------------------------------------------------------------------------------
-// app: { cfg, sessions, limiter, machine, grinder, setup, devicesStarted(), startDevices(), broadcastServer(), hooks, version }
+// app: { cfg, sessions, limiter, machine, grinder, setup, instance, devicesStarted(), startDevices(), broadcastServer(), hooks, version }
 export function authRoutes(route, app) {
   const { cfg, sessions, limiter, machine, grinder, hooks } = app;
   const needsSetup = () => !cfg.auth.passwordHash;
@@ -190,6 +222,9 @@ export function authRoutes(route, app) {
   // Übernimmt geprüfte Änderungen: in config.json speichern und sofort anwenden.
   function applyChanges(clean) {
     if (!Object.keys(clean).length) return [];
+    if (clean.publicUrl && /@example\.com$/.test(cfg.push.subject) && !cfg._locked.includes('push.subject') && !('push.subject' in clean)) {
+      clean['push.subject'] = clean.publicUrl;
+    }
     updateConfigFile(cfg._file, clean, cfg._box);
     for (const [p, v] of Object.entries(clean)) setPath(cfg, p, v);
     const keys = Object.keys(clean);
@@ -226,6 +261,12 @@ export function authRoutes(route, app) {
     return clean;
   }
 
+  // Service URL für den Public Hostname in Cloudflare: im Container der Compose-Dienstname, sonst Loopback
+  function tunnelEnv() {
+    const docker = fs.existsSync('/.dockerenv');
+    return { docker, service: `http://${docker ? 'xenios' : '127.0.0.1'}:${cfg.http.port}`, httpEnabled: cfg.http.enabled };
+  }
+
   function view(ctx) {
     const values = Object.fromEntries(Object.keys(FIELDS).map((p) => [p, SECRET_FIELDS.includes(p) ? '' : getPath(cfg, p)]));
     let timezones = [];
@@ -240,6 +281,7 @@ export function authRoutes(route, app) {
         node: process.version,
         uptimeS: Math.round(process.uptime()),
         docker: fs.existsSync('/.dockerenv'),
+        tunnel: tunnelEnv(),
         configFile: cfg._file,
         dataDir: cfg.dataDir,
         secretKey: cfg._box.source(),
@@ -278,18 +320,23 @@ export function authRoutes(route, app) {
   // --- Ersteinrichtung im Browser (nur solange kein Passwort gesetzt ist; Code steht im Server-Log) ---
   route('POST', '/auth/setup/check', async (ctx) => {
     await checkSetupCode(ctx);
-    return { ok: true, locked: cfg._locked, values: { 'machine.url': cfg.machine.url, 'grinder.enabled': cfg.grinder.enabled, 'grinder.url': cfg.grinder.url, timezone: cfg.timezone } };
+    return {
+      ok: true,
+      locked: cfg._locked,
+      values: { 'machine.url': cfg.machine.url, 'grinder.enabled': cfg.grinder.enabled, 'grinder.url': cfg.grinder.url, timezone: cfg.timezone, publicUrl: cfg.publicUrl },
+      env: tunnelEnv(),
+    };
   }, { auth: false });
   route('POST', '/auth/setup/probe', async (ctx) => {
     await checkSetupCode(ctx);
-    return probeDevice(ctx.body);
+    return probeDevice(ctx.body, { instance: app.instance });
   }, { auth: false });
   route('POST', '/auth/setup', async (ctx) => {
     await checkSetupCode(ctx);
-    const { password, machineUrl, grinder: g = {}, timezone } = ctx.body;
+    const { password, machineUrl, grinder: g = {}, timezone, publicUrl: pub } = ctx.body;
     const problem = passwordProblem(password);
     if (problem) throw bad(`Passwort: ${problem}`);
-    const wanted = { 'machine.url': machineUrl, 'grinder.enabled': g.enabled, 'grinder.url': g.enabled ? g.url : undefined, 'grinder.password': g.enabled && g.password ? g.password : undefined, timezone: timezone || undefined };
+    const wanted = { 'machine.url': machineUrl, 'grinder.enabled': g.enabled, 'grinder.url': g.enabled ? g.url : undefined, 'grinder.password': g.enabled && g.password ? g.password : undefined, timezone: timezone || undefined, publicUrl: pub || undefined };
     const changes = Object.fromEntries(Object.entries(wanted).filter(([p, v]) => v !== undefined && !cfg._locked.includes(p)));
     const clean = validate(changes);
     clean['auth.passwordHash'] = hashPassword(password);
@@ -335,7 +382,7 @@ export function authRoutes(route, app) {
   });
   route('POST', '/api/admin/probe', async ({ body }) => {
     const same = body.kind === 'grinder' && deviceUrl(body.url, 'Adresse der Mühle') === cfg.grinder.url;
-    return probeDevice({ ...body, password: body.password || (same ? cfg.grinder.password : '') }, { pinned: same ? grinder.pinnedFingerprint : null });
+    return probeDevice({ ...body, password: body.password || (same ? cfg.grinder.password : '') }, { pinned: same ? grinder.pinnedFingerprint : null, instance: app.instance });
   });
   route('POST', '/api/admin/grinder/unpin', async (ctx) => {
     grinder.unpin();

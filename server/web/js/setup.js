@@ -1,14 +1,16 @@
 // Ersteinrichtung im Browser: Einrichtungscode (aus dem Server-Log), App-Passwort, Maschine, Mühle.
-import { h, icon, switchEl } from './ui.js';
+import { h, icon, switchEl, snackbar } from './ui.js';
 import { api } from './api.js';
 
-const STEPS = ['Code', 'Passwort', 'Xenia', 'Mühle', 'Fertig'];
+const STEPS = ['Code', 'Passwort', 'Xenia', 'Mühle', 'Unterwegs', 'Fertig'];
 
 export function showSetup(root, { onDone }) {
   const st = {
     step: 0, dir: 1, code: '', password: '', password2: '',
     machineUrl: 'http://192.168.178.55',
     grinder: { enabled: true, url: 'https://192.168.178.54', password: '' },
+    tunnel: { enabled: false, url: '' },
+    env: { docker: false, service: 'http://127.0.0.1:8080', httpEnabled: true },
     locked: [],
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
     probe: {},
@@ -36,7 +38,7 @@ export function showSetup(root, { onDone }) {
       d.classList.toggle('active', i === st.step);
     });
     progress.style.setProperty('--p', String(st.step / (STEPS.length - 1)));
-    const panel = [codeStep, passwordStep, machineStep, grinderStep, doneStep][st.step]();
+    const panel = [codeStep, passwordStep, machineStep, grinderStep, tunnelStep, doneStep][st.step]();
     panel.classList.add('setup-panel', st.dir > 0 ? 'from-right' : 'from-left');
     stage.replaceChildren(panel);
     setTimeout(() => panel.querySelector('input:not([type=checkbox])')?.focus(), 260);
@@ -78,6 +80,9 @@ export function showSetup(root, { onDone }) {
           st.machineUrl = r.values['machine.url'] || st.machineUrl;
           st.grinder.enabled = r.values['grinder.enabled'] !== false;
           st.grinder.url = r.values['grinder.url'] || st.grinder.url;
+          st.tunnel.url = r.values.publicUrl || '';
+          st.tunnel.enabled = Boolean(r.values.publicUrl);
+          st.env = r.env || st.env;
           go(1);
         } catch (ex) {
           e.textContent = ex.message;
@@ -164,7 +169,32 @@ export function showSetup(root, { onDone }) {
     return form;
   }
 
-  // 5. Zusammenfassung
+  // 5. Von unterwegs: Cloudflare-Tunnel (optional)
+  function tunnelStep() {
+    const t = st.tunnel;
+    const url = h('input', { type: 'url', class: 'text', value: t.url, placeholder: 'https://xenios.deine-domain.de', disabled: locked('publicUrl'), autocomplete: 'off', spellcheck: 'false' });
+    url.addEventListener('input', () => { t.url = url.value.trim(); });
+    const result = probeResult('tunnel');
+    const test = h('button', { type: 'button', class: 'btn tonal' }, icon('cloud', 's18'), 'Testen');
+    test.onclick = () => busy(test, () => runProbe('tunnel', { url: t.url }, result));
+    const fields = h('div', { class: 'collapse', hidden: !t.enabled },
+      tunnelGuide(st.env),
+      h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', {}, 'Öffentliche Adresse'), url), test),
+      result,
+      h('p', { class: 'muted small' }, 'Noch nicht fertig? Einfach weiter. Eintragen und testen geht jederzeit unter Einstellungen → Server & Sicherheit.'));
+    const next = h('button', { class: 'btn filled', type: 'submit' }, 'Weiter', icon('right', 's18'));
+    const form = h('form', {},
+      h('p', { class: 'muted' }, 'Optional: Xenios von unterwegs erreichen, über einen Cloudflare-Tunnel. Ohne Portfreigabe im Router und mit echtem Zertifikat; damit lässt sich die App auch installieren und Push nutzen.'),
+      h('div', { class: 'row', style: { margin: '4px 0 12px' } },
+        h('div', { class: 'grow' }, h('div', {}, 'Cloudflare-Tunnel'), h('div', { class: 'small muted' }, 'Braucht ein Cloudflare-Konto und eine eigene Domain')),
+        switchEl({ checked: t.enabled, label: 'Cloudflare-Tunnel', onChange: (on) => { t.enabled = on; fields.hidden = !on; } })),
+      fields,
+      nav(() => go(3), next));
+    form.addEventListener('submit', (ev) => { ev.preventDefault(); go(5); });
+    return form;
+  }
+
+  // 6. Zusammenfassung
   function doneStep() {
     const e = err();
     const finish = h('button', { class: 'btn filled', type: 'submit' }, icon('check', 's18'), 'Einrichtung abschließen');
@@ -174,9 +204,10 @@ export function showSetup(root, { onDone }) {
         row('App-Passwort', '•'.repeat(Math.min(12, st.password.length))),
         row('Xenia', st.machineUrl),
         row('Mühle', st.grinder.enabled ? st.grinder.url : 'nicht eingebunden'),
+        row('Unterwegs', st.tunnel.enabled && st.tunnel.url ? st.tunnel.url : 'später einrichten'),
         row('Zeitzone', st.timezone || 'System')),
       h('p', { class: 'muted small' }, 'Alles lässt sich später unter Einstellungen → Server ändern: Ports, Zertifikat, Funktionen, Zeitzone, Passwort.'),
-      e, nav(() => go(3), finish));
+      e, nav(() => go(4), finish));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       busy(finish, async () => {
@@ -185,6 +216,7 @@ export function showSetup(root, { onDone }) {
             code: st.code, password: st.password, timezone: st.timezone,
             machineUrl: locked('machine.url') ? undefined : st.machineUrl,
             grinder: { enabled: st.grinder.enabled, url: locked('grinder.url') ? undefined : st.grinder.url, password: st.grinder.password || undefined },
+            publicUrl: st.tunnel.enabled && st.tunnel.url && !locked('publicUrl') ? st.tunnel.url : undefined,
           } });
           card.classList.add('finished');
           setTimeout(onDone, 450);
@@ -225,6 +257,38 @@ export function fillProbe(box, r) {
     h('div', {}, `${r.name}${r.detail ? ` · ${r.detail}` : ''}`),
     r.login === false ? h('div', { class: 'small bad-text' }, 'Passwort falsch') : r.login ? h('div', { class: 'small' }, 'Anmeldung ok') : null,
     r.fingerprint ? h('div', { class: 'small muted fp' }, `Zertifikat ${r.fingerprint.slice(0, 23)}…`) : null));
+}
+
+// Schritt-für-Schritt-Anleitung für den Cloudflare-Tunnel, passend zur Installation (Docker oder direkt).
+// env: { docker, service, httpEnabled } vom Server
+export function tunnelGuide(env) {
+  const link = (href, text) => h('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text);
+  return h('ol', { class: 'guide' },
+    h('li', {}, 'Cloudflare-Konto und eine eigene Domain, die bei Cloudflare verwaltet wird.'),
+    h('li', {}, 'Auf ', link('https://one.dash.cloudflare.com', 'one.dash.cloudflare.com'), ' unter ', h('b', {}, 'Networks → Tunnels → Create a tunnel → Cloudflared'), ' einen Tunnel „xenios“ anlegen.'),
+    env.docker
+      ? h('li', {}, 'Bei „Install and run a connector“ ', h('b', {}, 'Docker'), ' wählen und nur den Token kopieren (den langen Teil nach --token, den Befehl nicht ausführen). Auf dem Server in docker/.env eintragen …',
+        copyBlock('TUNNEL_TOKEN=<token>\nCOMPOSE_PROFILES=tunnel'), '… und im Ordner docker/ neu starten:', copyBlock('docker compose up -d'))
+      : h('li', {}, 'Bei „Install and run a connector“ dein Betriebssystem wählen und den angezeigten Befehl auf diesem Rechner ausführen. Er richtet cloudflared als Dienst ein.'),
+    h('li', {}, 'Beim Tunnel einen ', h('b', {}, 'Public Hostname'), ' anlegen: Subdomain und Domain wählen, als ', h('b', {}, 'Service URL'), ' genau das eintragen:', copyBlock(env.service)),
+    h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.deine-domain.de) eintragen und testen.'));
+}
+
+function copyBlock(text) {
+  const code = h('code', {}, text);
+  const btn = h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Kopieren', title: 'Kopieren', onclick: async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      snackbar('Kopiert');
+    } catch {
+      // ohne Zwischenablage (z. B. http): Text markieren, dann Strg+C
+      const r = document.createRange();
+      r.selectNodeContents(code);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+    }
+  } }, icon('copy', 's18'));
+  return h('div', { class: 'copy-block' }, code, btn);
 }
 
 export function revealToggle(inputs) {

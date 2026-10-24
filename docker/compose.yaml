@@ -45,7 +45,7 @@ services:
     pids_limit: 100
 
   cloudflared:
-    image: cloudflare/cloudflared:2025.4.0
+    image: cloudflare/cloudflared:2026.10.3    # Cloudflare unterstützt Connector-Versionen nur etwa ein Jahr: regelmäßig erhöhen
     profiles: [tunnel]
     restart: unless-stopped
     command: tunnel --no-autoupdate run

@@ -34,6 +34,7 @@ export function h(tag, attrs, ...children) {
 const P = {
   home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
   dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  copy: 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
   screen: 'M17 1.01 7 1c-1.1 0-1.99.9-1.99 2v18c0 1.1.89 2 1.99 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z',
   list: 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z',
   event: 'M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z',
@@ -162,7 +163,7 @@ export function sheet(title, content, opts) {
 export function dialog(title, content, actions = []) {
   return new Promise((resolve) => {
     let close;
-    const btns = actions.map((a) => h('button', { class: `btn ${a.kind || 'text'}`, onclick: () => { close(); resolve(a.value); } }, a.label));
+    const btns = actions.map((a) => h('button', { class: `btn ${a.kind || 'text'}`, onclick: () => { resolve(a.value); close(); } }, a.label)); // erst den Wert, sonst gewinnt resolve(undefined) aus onClose
     const panel = h('div', { class: 'dialog', role: 'alertdialog' }, h('h2', {}, title), typeof content === 'string' ? h('p', { class: 'muted' }, content) : content, h('div', { class: 'actions' }, btns));
     close = overlay(panel, { onClose: () => resolve(undefined) });
   });
@@ -216,3 +217,47 @@ document.addEventListener('pointerdown', (e) => {
   el.append(dot);
   dot.addEventListener('animationend', () => dot.remove(), { once: true });
 }, { passive: true });
+
+// Zeitwähler im App-Stil: zwei Rädchen (Stunde, Minute) mit Einrasten statt des Browser-Popups.
+// → Minuten seit Mitternacht, null (bei allowClear: „Keine“) oder undefined (abgebrochen)
+export function pickTimeDialog({ title = 'Uhrzeit', value = 7 * 60, allowClear = false } = {}) {
+  const v = value ?? 7 * 60;
+  const hours = wheel(24, Math.floor(v / 60));
+  const minutes = wheel(60, v % 60);
+  const content = h('div', { class: 'wheels' }, hours.el, h('span', { class: 'wheel-sep' }, ':'), minutes.el);
+  const actions = [
+    allowClear ? { label: 'Keine', value: 'clear' } : null,
+    { label: 'Abbrechen', value: 'cancel' },
+    { label: 'OK', value: 'ok', kind: 'filled' },
+  ].filter(Boolean);
+  setTimeout(() => hours.el.focus(), 60);
+  return dialog(title, content, actions).then((r) => (r === 'ok' ? hours.value * 60 + minutes.value : r === 'clear' ? null : undefined));
+}
+
+function wheel(count, selected) {
+  const ITEM = 40;
+  const items = Array.from({ length: count }, (_, i) => h('div', { class: 'wheel-item', role: 'option', onclick: () => go(i) }, String(i).padStart(2, '0')));
+  const el = h('div', { class: 'wheel', tabindex: '0', role: 'listbox' }, h('div', { class: 'wheel-pad' }), items, h('div', { class: 'wheel-pad' }));
+  let value = Math.min(count - 1, Math.max(0, selected));
+  const mark = () => items.forEach((it, i) => it.setAttribute('aria-selected', String(i === value)));
+  const go = (i, smooth = true) => el.scrollTo({ top: Math.min(count - 1, Math.max(0, i)) * ITEM, behavior: smooth ? 'smooth' : 'auto' });
+  el.addEventListener('scroll', () => {
+    const i = Math.min(count - 1, Math.max(0, Math.round(el.scrollTop / ITEM)));
+    if (i !== value) {
+      value = i;
+      mark();
+    }
+  }, { passive: true });
+  el.addEventListener('keydown', (e) => {
+    const d = { ArrowUp: -1, ArrowDown: 1, PageUp: -5, PageDown: 5 }[e.key];
+    if (d) {
+      e.preventDefault();
+      go(value + d);
+    } else if (e.key === 'Enter') {
+      el.closest('.dialog')?.querySelector('.btn.filled')?.click();
+    }
+  });
+  mark();
+  requestAnimationFrame(() => go(value, false));
+  return { el, get value() { return value; } };
+}

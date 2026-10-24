@@ -51,6 +51,7 @@ export const DEFAULTS = {
     publicKey: null,
     privateKey: null,         // verschlüsselt gespeichert
   },
+  publicUrl: null,           // Adresse über den Cloudflare-Tunnel, z. B. https://xenios.deine-domain.de
   timezone: null,             // IANA-Zeitzone für Zeitplan und Wecker, z. B. "Europe/Berlin"; null = System bzw. TZ
   dataDir: 'data',
   logLevel: 'info',

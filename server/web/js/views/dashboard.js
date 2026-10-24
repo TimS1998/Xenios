@@ -11,7 +11,7 @@ import { ALERT_TEXT } from '../../shared/grinder-core.js';
 const TILES = {
   shot: { title: 'Live-Bezug', icon: 'coffee', wide: true, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
   status: { title: 'Status', icon: 'power', wide: false, build: statusTile },
-  gauges: { title: 'Instrumente', icon: 'thermo', wide: true, build: gaugesTile },
+  gauges: { title: 'Instrumente', icon: 'thermo', wide: false, build: gaugesTile },
   lastShot: { title: 'Letzter Bezug', icon: 'coffee', wide: false, build: lastShotTile, link: '/bezuege' },
   lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', wide: false, build: lastGrindTile, link: '/muehle' },
   week: { title: 'Bezüge pro Tag', icon: 'event', wide: false, build: weekTile, link: '/bezuege' },
@@ -21,22 +21,29 @@ const TILES = {
   live: { title: 'Verlauf (10 min)', icon: 'history', wide: true, build: liveTile },
 };
 const KEY = 'dashboard';
+const LAYOUT_VERSION = 2; // 2: breite Kacheln nur noch oben (Live-Bezug) und unten (Verlauf), sonst entstehen Lücken
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
 
 function loadLayout() {
   let saved = null;
   try { saved = JSON.parse(localStorageGet(KEY) || 'null'); } catch { /* kaputt → Standard */ }
-  const tiles = (Array.isArray(saved?.tiles) ? saved.tiles : []).filter((t) => TILES[t?.id]).map((t) => ({ id: t.id, on: t.on !== false, wide: Boolean(t.wide) }));
+  const current = saved?.v === LAYOUT_VERSION;
+  const tiles = (Array.isArray(saved?.tiles) ? saved.tiles : []).filter((t) => TILES[t?.id]).map((t) => ({ id: t.id, on: t.on !== false, wide: current ? Boolean(t.wide) : TILES[t.id].wide }));
   for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, wide: TILES[id].wide });
   return { tiles, keepAwake: Boolean(saved?.keepAwake) };
 }
-const saveLayout = (l) => localStorageSet(KEY, JSON.stringify(l));
+const saveLayout = (l) => localStorageSet(KEY, JSON.stringify({ ...l, v: LAYOUT_VERSION }));
 
 export function dashboardView(root) {
   let layout = loadLayout();
   let shots = [];
   let built = [];
   const grid = h('div', { class: 'dash stagger' });
+  // Lückenlos stapeln: feine Rasterzeilen, jede Kachel belegt so viele, wie ihr Inhalt hoch ist (auch nach Live-Updates)
+  const ROW = 8;
+  const GAP = 12;
+  const fit = (el) => { if (!el.hidden) el.style.setProperty('grid-row-end', `span ${Math.ceil((el.getBoundingClientRect().height + GAP) / ROW)}`); };
+  const sizes = new ResizeObserver((entries) => entries.forEach((e) => fit(e.target)));
   root.append(grid);
   setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Dashboard anpassen', title: 'Dashboard anpassen', onclick: customize }, icon('tune')));
 
@@ -58,6 +65,8 @@ export function dashboardView(root) {
       return { id: t.id, el, extra, update: t0.update };
     });
     grid.replaceChildren(built.length ? built.map((b) => b.el) : h('div', { class: 'empty' }, 'Keine Kachel ausgewählt. Oben rechts lässt sich das Dashboard anpassen.'));
+    sizes.disconnect();
+    built.forEach((b) => sizes.observe(b.el));
     update();
   }
 
@@ -161,6 +170,7 @@ export function dashboardView(root) {
   if (layout.keepAwake) setAwake(true);
   return () => {
     disposed = true;
+    sizes.disconnect();
     un();
     clearInterval(tick);
     document.removeEventListener('visibilitychange', onVisible);
@@ -359,7 +369,8 @@ function grindsTile() {
         box.replaceChildren(h('div', { class: 'empty' }, 'Mühle nicht eingerichtet'));
         return {};
       }
-      const list = (g.grinds || []).filter((x) => x.success && x.weightG).slice(0, 12).reverse();
+      // Spülen/abgebrochene Mahlvorgänge (unter halbem Ziel) verzerren die Skala und sagen über die Genauigkeit nichts
+      const list = (g.grinds || []).filter((x) => x.success && x.weightG >= 1 && (!x.targetG || x.weightG >= x.targetG / 2)).slice(0, 12).reverse();
       if (!list.length) {
         box.replaceChildren(h('div', { class: 'empty' }, 'Noch keine Mahlvorgänge'));
         return {};

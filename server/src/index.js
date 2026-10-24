@@ -3,6 +3,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, loadConfig, updateConfigFile, migrateSecrets, applyTimezone, secretBox } from './config.js';
@@ -50,6 +51,8 @@ export function createApp(cfg, hooks = {}) {
   const serveStatic = makeStatic(path.join(ROOT, 'web'));
   const streams = new Set();
   const setup = { code: cfg.auth.passwordHash ? null : makeSetupCode() };
+  // Zufällige Kennung dieses Prozesses: der Tunnel-Test erkennt daran, dass unter der öffentlichen Adresse genau dieser Server antwortet
+  const instance = crypto.randomBytes(12).toString('base64url');
 
   // --- Live-Updates per Server-Sent Events ----------------------------------
   function send(stream, event, data) {
@@ -118,7 +121,7 @@ export function createApp(cfg, hooks = {}) {
 
   // Anmeldung, Einrichtung, Sitzungen, Server-Einstellungen
   authRoutes(route, {
-    cfg, sessions, limiter, machine, grinder, setup, hooks, version: VERSION,
+    cfg, sessions, limiter, machine, grinder, setup, hooks, instance, version: VERSION,
     devicesStarted: () => started,
     startDevices,
     broadcastServer: () => broadcast('server', serverInfo()),
@@ -232,7 +235,7 @@ export function createApp(cfg, hooks = {}) {
     const p = url.pathname;
     try {
       if (p === '/healthz') {
-        res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'X-Xenios-Instance': instance });
         return res.end('ok');
       }
       if (p === '/api/stream' && req.method === 'GET') return stream(req, res, ip);
@@ -308,7 +311,7 @@ export function createApp(cfg, hooks = {}) {
     log.debug(`Stream geöffnet von ${ip} (${streams.size} aktiv)`);
   }
 
-  return { handle, machine, grinder, push, sessions, streams, scheduler, wake, setup, startDevices, stop };
+  return { handle, machine, grinder, push, sessions, streams, scheduler, wake, setup, instance, startDevices, stop };
 }
 
 // --- Zugänge (Ports) ------------------------------------------------------------

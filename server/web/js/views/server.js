@@ -2,7 +2,7 @@
 import { h, icon, snackbar, switchEl, sheet, confirmDialog, ago } from '../ui.js';
 import { api, refreshState } from '../api.js';
 import { logout } from '../app.js';
-import { fillProbe, revealToggle, shake } from '../setup.js';
+import { fillProbe, revealToggle, shake, tunnelGuide } from '../setup.js';
 
 const LOCK_HINT = 'per Umgebungsvariable festgelegt';
 
@@ -122,6 +122,14 @@ export function serverView(root) {
       toggle('Mahlkönig-Mühle', 'E64 WS: Rezepte, Mahlvorgänge, Meldungen', 'grinder.enabled', { onChange: (on) => { grinderFields.hidden = !on; } }),
       grinderFields);
 
+    // Von unterwegs (Cloudflare-Tunnel)
+    const [tTest, tBox] = probeButton('tunnel', () => ({ url: value('publicUrl') }));
+    const remote = card('Von unterwegs (Cloudflare-Tunnel)', 'cloud',
+      h('div', { class: 'field-row' }, text('Öffentliche Adresse', 'publicUrl', { type: 'url', placeholder: 'https://xenios.deine-domain.de', parse: (v) => v.trim() || null, format: (v) => v || '' }), tTest),
+      tBox,
+      s.tunnel.httpEnabled ? null : warn('Der Tunnel-Port ist aus. Unten unter „Tunnel-Port (Cloudflare)“ einschalten, sonst erreicht cloudflared den Server nicht.'),
+      h('details', { class: 'adv', open: !data.values.publicUrl }, h('summary', {}, 'Anleitung', icon('more', 's20')), tunnelGuide(s.tunnel)));
+
     // Funktionen
     const features = card('Funktionen der App', 'tune',
       toggle('Paddle', 'Pumpe direkt steuern', 'features.paddle'),
@@ -177,10 +185,6 @@ export function serverView(root) {
       h('div', { class: 'grid2' }, text('Adresse', 'lan.host'), number('Port', 'lan.port', 1, 65535)),
       value('lan.enabled') ? warn('Passwort und Sitzung gehen hier im Klartext durchs WLAN. Nur in einem vertrauenswürdigen Heimnetz nutzen.') : null);
 
-    // Push
-    const push = card('Push-Benachrichtigungen', 'bell',
-      text('Kontakt für Push-Dienste (VAPID)', 'push.subject', { placeholder: 'mailto:du@example.com' }),
-      h('div', { class: 'small muted', style: { 'margin-top': '6px' } }, 'Die Schlüssel erzeugt der Server selbst; der private Schlüssel liegt verschlüsselt in der Konfiguration.'));
 
     // System
     const up = s.uptimeS;
@@ -198,7 +202,7 @@ export function serverView(root) {
       gap(),
       select('Protokoll-Stufe', 'logLevel', [['error', 'nur Fehler'], ['warn', 'Warnungen'], ['info', 'Normal'], ['debug', 'Ausführlich (Fehlersuche)']]));
 
-    body.replaceChildren(h('div', { class: 'stagger' }, devices, features, time, security, network, push, system));
+    body.replaceChildren(h('div', { class: 'stagger' }, devices, remote, features, time, security, network, system));
   }
 
   async function loadSessions(box) {

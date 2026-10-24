@@ -1,5 +1,5 @@
 // Wochen-Timer (Auto-Ein/Aus pro Tag, Brühen/Dampf), Eco- und Abschalt-Timer, Uhr der Maschine.
-import { h, icon, snackbar, switchEl, sliderRow, hhmm, fromHhmm, fmtInt, sheet } from '../ui.js';
+import { h, icon, snackbar, switchEl, sliderRow, hhmm, fromHhmm, fmtInt, sheet, pickTimeDialog } from '../ui.js';
 import { api, store } from '../api.js';
 
 const DAY_DE = { MONDAY: 'Montag', TUESDAY: 'Dienstag', WEDNESDAY: 'Mittwoch', THUSRDAY: 'Donnerstag', FRIDAY: 'Freitag', SATURDAY: 'Samstag', SUNDAY: 'Sonntag' };
@@ -245,9 +245,9 @@ export function timerView(root) {
     const plan = wake.plan;
     const planText = !c.enabled ? 'Aus' : plan ? `Einschalten ${when(plan.at)} – Wecker ${when(plan.alarm)} (${plan.device})` : 'Kein passender Wecker gemeldet';
     const timeField = (key, label) => {
-      const input = h('input', { class: 'text', type: 'time', value: c[key], step: 60, 'aria-label': label });
-      input.addEventListener('change', () => { if (/^d{2}:d{2}$/.test(input.value)) { c[key] = input.value; markWake(); } });
-      return h('label', { class: 'field grow' }, h('span', {}, label), input);
+      const btn = h('button', { type: 'button', class: 'text time-field', 'aria-label': label }, c[key]);
+      btn.addEventListener('click', () => pickTime(fromHhmm(c[key]), (m) => { c[key] = hhmm(m); btn.textContent = c[key]; markWake(); }));
+      return h('div', { class: 'field grow' }, h('span', {}, label), btn);
     };
     const steamSel = h('select', { class: 'text', 'aria-label': 'Dampfkessel' },
       [['', 'Wie Startmodus der Maschine'], ['true', 'Mit Dampfkessel'], ['false', 'Ohne Dampfkessel']].map(([v, t]) =>
@@ -320,25 +320,8 @@ export function timerView(root) {
   };
 }
 
-function pickTime(current, onPick, allowClear = false) {
-  // Natives Zeitfeld öffnen (Android zeigt den Material-Zeitwähler)
-  const input = h('input', { type: 'time', class: 'time-input', value: current !== null && current !== undefined ? hhmm(current) : '07:00' });
-  input.style.setProperty('position', 'fixed');
-  input.style.setProperty('opacity', '0');
-  input.style.setProperty('pointer-events', 'none');
-  input.style.setProperty('bottom', '0');
-  document.body.append(input);
-  const done = () => {
-    const v = fromHhmm(input.value);
-    input.remove();
-    if (v !== null) onPick(v);
-    else if (allowClear) onPick(null);
-  };
-  input.addEventListener('change', done, { once: true });
-  input.addEventListener('blur', () => setTimeout(() => input.remove(), 300), { once: true });
-  if (input.showPicker) {
-    try { input.showPicker(); return; } catch { /* Fallback */ }
-  }
-  input.focus();
-  input.click();
+// Zeitwähler der App (statt des Browser-Popups, das am Desktop irgendwo am Bildschirmrand aufgeht)
+async function pickTime(current, onPick, allowClear = false) {
+  const v = await pickTimeDialog({ title: 'Uhrzeit', value: current, allowClear });
+  if (v !== undefined) onPick(v);
 }

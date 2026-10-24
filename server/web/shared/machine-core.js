@@ -243,8 +243,9 @@ export class Machine extends Emitter {
     this._offlineNotified = false;
     this._lastAppAction = 0;
     this._paddleUntil = 0;
-    this._liveShots = 0;      // live erkannte Bezüge seit der letzten Zählerprüfung
+    this._liveStarts = [];    // Startzeiten live erkannter Bezüge, die der Bezugszähler noch nicht mitgezählt hat
     this._lastDiag = null;
+    this._repairHistory();
     this.state.lastShot = this.history.data.shots?.[0] || null;
   }
 
@@ -381,7 +382,7 @@ export class Machine extends Emitter {
     // Bezug erkennen (Status 3)
     if (status === 3) {
       if (!s.shot.running) {
-        this._liveShots++;
+        this._liveStarts.push(Date.now());
         s.shot = { running: true, timeMs: 0, startedAt: new Date().toISOString(), curve: [] };
         this.kick(this.cfg.pollActiveMs);
       }
@@ -446,7 +447,7 @@ export class Machine extends Emitter {
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
     s.lastShot = shot;
     if (timeMs >= 3000) {
-      shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveShots : null;
+      shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveStarts.length : null;
       this._log(shot);
       const parts = [`${fmt(timeMs / 1000)} s`];
       if (shot.weight) parts.push(`${fmt(shot.weight)} g`);
@@ -502,28 +503,37 @@ export class Machine extends Emitter {
   // Bezüge, die nicht live erkannt wurden (App/Server war aus, Bezug zu kurz zwischen zwei Abfragen):
   // Der Bezugszähler der Maschine (MA_EXTRACTIONS) steigt trotzdem. Dann einen Eintrag mit den
   // zuletzt gemeldeten Werten (Zeit, Waage) anlegen.
+  // Die Maschine zählt einen Bezug erst an seinem Ende. Ein live erkannter Start bleibt deshalb in _liveStarts,
+  // bis der Zähler ihn mitgezählt hat – ein Abgleich mitten im Bezug macht daraus keinen „verpassten“ Bezug.
   _checkCounter(count, lastMl) {
     if (count === null || !Number.isFinite(count)) return;
     const h = this.history.data;
     const prev = h.counter ?? null;
     h.counter = count;
-    const live = this._liveShots;
-    this._liveShots = 0;
+    // Starts, die der Zähler nie mitzählt (z. B. kurzes Spülen), nach 3 min vergessen; der laufende Bezug bleibt
+    const now = Date.now();
+    this._liveStarts = this._liveStarts.filter((t, i, a) => now - t < 3 * 60e3 || (this.state.shot.running && i === a.length - 1));
     if (prev === null || count <= prev) {
       if (prev !== count) this.history.save();
       return;
     }
-    const missed = count - prev - live;
+    const used = Math.min(this._liveStarts.length, count - prev);
+    this._liveStarts.splice(0, used);
+    const missed = count - prev - used;
+    // Werte der letzten Abfrage nur übernehmen, wenn sie nicht zu einem schon live protokollierten Bezug gehören
+    const diag = this._lastDiag || {};
+    const lastLogged = h.shots[0];
+    const stale = Boolean(lastLogged && !lastLogged.estimated && Math.abs((lastLogged.timeMs || 0) - (num(diag.EXTRACTION_TIME_MS) || 0)) < 500);
     // älteste zuerst eintragen, damit der neueste oben im Protokoll steht
     for (let i = Math.min(missed, 20) - 1; i >= 0; i--) {
-      const d = i === 0 ? this._lastDiag || {} : {};
+      const d = i === 0 && !stale ? diag : {};
       const timeMs = num(d.EXTRACTION_TIME_MS);
       const shot = {
         endedAt: new Date().toISOString(),
         startedAt: null,
         timeMs: timeMs || null,
         weight: i === 0 ? round(num(d.PU_LOADCELL_VOLUME), 1) || null : null,
-        volumeMl: i === 0 ? round(num(d.PU_SENS_FLOW_METER_ML) ?? num(lastMl), 1) || null : null,
+        volumeMl: i === 0 && !stale ? round(num(d.PU_SENS_FLOW_METER_ML) ?? num(lastMl), 1) || null : null,
         maxPressure: null,
         groupTemp: null,
         no: count - i,
@@ -533,6 +543,30 @@ export class Machine extends Emitter {
       this._log(shot);
     }
     this.history.save();
+  }
+
+  // Doppelte Einträge aus älteren Versionen entfernen: Lief der Zählerabgleich mitten im Bezug, entstand nach dem live
+  // erfassten Bezug ein zweiter, „nachträglicher“ mit dessen Werten. Der live erfasste (mit Kurve) bleibt und erhält die
+  // Nummer des doppelten, denn die Zählung hatte ihn eins zu niedrig nummeriert.
+  _repairHistory() {
+    const list = this.history.data.shots;
+    if (!Array.isArray(list)) return;
+    let removed = 0;
+    for (let i = 0; i < list.length - 1; i++) {
+      const dup = list[i];
+      const live = list[i + 1];
+      const gap = Date.parse(dup.endedAt) - Date.parse(live.endedAt);
+      if (dup.estimated && !live.estimated && dup.timeMs && live.timeMs && Math.abs(dup.timeMs - live.timeMs) < 500 && gap >= 0 && gap < 5 * 60e3) {
+        if (dup.no) live.no = dup.no;
+        list.splice(i, 1);
+        removed++;
+        i--;
+      }
+    }
+    if (removed) {
+      this.history.save();
+      log.info(`${removed} doppelte Bezüge im Protokoll zusammengeführt`);
+    }
   }
 
   // Protokoll-Einträge; Druckkurven nur für die ersten `curves` (Datenmenge)

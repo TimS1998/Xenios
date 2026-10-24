@@ -21,10 +21,10 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 
 | Methode | Pfad | Body | Antwort |
 |---|---|---|---|
-| GET | `/healthz` | – | `ok` (ohne Anmeldung, für Monitoring) |
+| GET | `/healthz` | – | `ok` (ohne Anmeldung, für Monitoring); Header `X-Xenios-Instance` = zufällige Kennung dieses Prozesses (für den Tunnel-Test) |
 | GET | `/auth/session` | – | `{"authenticated":bool,"setup":bool}` (`setup` = noch nicht eingerichtet) |
 | POST | `/auth/setup/check` | `{"code"}` | Einrichtungscode prüfen (nur vor der Einrichtung) |
-| POST | `/auth/setup/probe` | `{"code","kind":"machine"\|"grinder","url","password"?}` | Verbindung zu Xenia bzw. Mühle testen: `{ok,name,detail?,fingerprint?,login?}` |
+| POST | `/auth/setup/probe` | `{"code","kind":"machine"\|"grinder"\|"tunnel","url","password"?}` | Verbindung zu Xenia, Mühle bzw. über den Cloudflare-Tunnel testen: `{ok,name,detail?,fingerprint?,login?}` |
 | POST | `/auth/setup` | `{"code","password","machineUrl"?,"grinder"?:{enabled,url,password},"timezone"?}` | Ersteinrichtung abschließen; setzt das Sitzungs-Cookie |
 | POST | `/auth/login` | `{"password":"…","remember":true}` | `{"ok":true}` + Cookie |
 | POST | `/auth/logout` | – | `{"ok":true}` |
@@ -35,7 +35,7 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | GET | `/api/admin/config` | – | Server-Einstellungen: `values` (Pfad → Wert, Passwörter leer), `secrets` (gesetzt?), `locked` (per Umgebungsvariable), `timezones`, `status` (Version, Zertifikat, gemerktes Mühlen-Zertifikat, Zugänge, Schlüsselquelle …) |
 | PUT | `/api/admin/config` | `{"changes":{"machine.url":"http://…","features.paddle":false,…}}` | prüfen, in `config.json` speichern, sofort anwenden; Antwort wie GET plus `applied` |
 | POST | `/api/admin/password` | `{"current","next"}` | App-Passwort ändern; alle anderen Sitzungen enden |
-| POST | `/api/admin/probe` | `{"kind","url","password"?}` | Verbindungstest (bei gleicher Mühlen-Adresse mit gemerktem Zertifikat und gespeichertem Passwort) |
+| POST | `/api/admin/probe` | `{"kind","url","password"?}` | Verbindungstest (bei gleicher Mühlen-Adresse mit gemerktem Zertifikat und gespeichertem Passwort). `kind: "tunnel"`: ruft `<url>/healthz` auf und prüft, dass dieselbe Instanz antwortet |
 | POST | `/api/admin/grinder/unpin` | – | gemerktes Zertifikat der Mühle vergessen |
 | POST | `/api/admin/tls/renew` | – | HTTPS-Zertifikat neu erzeugen (sofort aktiv) |
 | GET | `/api/state` | – | `{machine, grinder, server}` (siehe unten) |

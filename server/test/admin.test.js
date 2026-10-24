@@ -11,6 +11,7 @@ import { loadConfig, secretBox, readConfigFile, migrateSecrets } from '../src/co
 import { GrinderHttp } from '../src/grinder.js';
 import { isPushEndpoint } from '../src/push.js';
 import { passwordProblem } from '../src/auth.js';
+import { probeTunnel } from '../src/admin.js';
 import { setLogLevel } from '../src/log.js';
 
 setLogLevel('error');
@@ -224,6 +225,29 @@ test('Geheimnisse: AES-256-GCM, an den Feldnamen gebunden, falscher Schlüssel s
   } finally {
     fs.rmSync(d, { recursive: true, force: true });
   }
+});
+
+test('Cloudflare-Tunnel: öffentliche Adresse prüfen, Test erkennt genau diesen Server', async () => {
+  // /healthz nennt die Instanz, der Test vergleicht sie
+  const hz = await fetch(`${base}/healthz`);
+  assert.equal(hz.headers.get('x-xenios-instance'), app.instance);
+  assert.deepEqual(await probeTunnel(base, app.instance).then((r) => r.ok), true);
+  await assert.rejects(probeTunnel(base, 'andere-instanz'), /anderer Xenios-Server/);
+  await assert.rejects(probeTunnel(app.machine.client.url, app.instance), /Unerwartete Antwort/);
+  await assert.rejects(probeTunnel('http://127.0.0.1:1', app.instance), /Nicht erreichbar/);
+  // Nur https://name.domain; Setzen der Adresse übernimmt sie als Push-Kontakt, solange dort der Platzhalter steht
+  for (const v of ['http://xenios.example.org', 'https://xenios.example.org:8443', 'https://xenios.example.org/app']) {
+    assert.equal((await call('PUT', '/api/admin/config', { changes: { publicUrl: v } })).status, 400, v);
+  }
+  let r = await call('PUT', '/api/admin/config', { changes: { publicUrl: 'https://xenios.example.org/' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.values.publicUrl, 'https://xenios.example.org');
+  assert.equal(r.json.values['push.subject'], 'https://xenios.example.org');
+  assert.match(r.json.status.tunnel.service, /^http:\/\/(xenios|127\.0\.0\.1):\d+$/);
+  r = await call('POST', '/api/admin/probe', { kind: 'tunnel', url: 'ftp://x' });
+  assert.equal(r.status, 400);
+  r = await call('PUT', '/api/admin/config', { changes: { publicUrl: null } });
+  assert.equal(r.json.values.publicUrl, null);
 });
 
 test('Push-Abos nur bei echten Push-Diensten, Passwort-Regeln', () => {
