@@ -431,4 +431,4 @@ Die Mahlkönig E64 WS ist mit der Xenia gekoppelt (`M2m.CoffeeMachinesConfig` in
 4. Drehknopf an der Mühle → `POST /api/v2/scripts/execute {"ID":9}` startet den Bezug.
 5. Die Mühle übernimmt `REAL_EXTRACTION_TIME_MS` beim Übergang auf `MA_STATUS 4`. Ihr Algorithmus passt den Mahlgrad an. Bezüge über 80 s oder mit `MA_EXTRACTION_STATUS 2` werden verworfen, bei ≤ 10 s wird nichts angepasst. Bezüge, die nicht die Mühle gestartet hat, zählen als Spülung.
 
-Details zur Mühlenseite: [API-Muehle-E64WS.md](API-Muehle-E64WS.md).
+Details zur Mühlenseite: [API-Muehle-E64WS.md](API-Muehle-E64WS.md). Druckprofile über den Drehknopf: Xenios kann zwischen Mühle und Xenia vermitteln und Skript 9 gegen ein Profil mit Stopp beim Zielgewicht (Befehl 27) tauschen, siehe [Einrichtung.md, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional).

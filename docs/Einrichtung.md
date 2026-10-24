@@ -106,10 +106,31 @@ Alles lässt sich in der App unter **Einstellungen → Server & Sicherheit** än
 | HTTPS an/aus, Adresse, Port, weitere Namen/IPs, Zertifikat neu erzeugen | `https.*` | an, `0.0.0.0:8443` |
 | Tunnel-Port für cloudflared | `http.*` | `127.0.0.1:8080` |
 | Heimnetz-HTTP (unverschlüsselt) | `lan.*` | aus |
+| Grind-by-Sync-Vermittler, IP der Mühle (siehe unten) | `gbs.enabled` / `gbs.host` / `gbs.port` / `gbs.grinderIp` | aus, `0.0.0.0:80` (Docker: 8082), IP aus `grinder.url` |
+| Profil für den Drehknopf der Mühle (unter **Skripte**) | `data/gbs.json` | Original-Skript 9 |
 | Proxy-Header vertrauen | `trustProxy` | `loopback` (Docker: `private`) |
 | Push-Kontakt | `push.subject` | `mailto:xenia@example.com` |
 | Protokoll-Stufe | `logLevel` | `info` |
 
-**Umgebungsvariablen** (Präfix `XENIOS_`) überschreiben die Datei und sind dann in der App gesperrt: `XENIOS_MACHINE_URL`, `XENIOS_GRINDER_URL`, `XENIOS_GRINDER_PASSWORD`, `XENIOS_HTTP_HOST`, `XENIOS_HTTP_PORT`, `XENIOS_HTTPS_HOST`, `XENIOS_HTTPS_PORT`, `XENIOS_LAN_PORT`, `XENIOS_TRUST_PROXY`, `XENIOS_DATA_DIR`, `XENIOS_LOG_LEVEL`. Dazu `XENIOS_CONFIG` (Pfad der Konfiguration) und `XENIOS_SECRET_KEY` bzw. `XENIOS_SECRET_KEY_FILE` (Schlüssel für die Geheimnisse).
+**Umgebungsvariablen** (Präfix `XENIOS_`) überschreiben die Datei und sind dann in der App gesperrt: `XENIOS_MACHINE_URL`, `XENIOS_GRINDER_URL`, `XENIOS_GRINDER_PASSWORD`, `XENIOS_HTTP_HOST`, `XENIOS_HTTP_PORT`, `XENIOS_HTTPS_HOST`, `XENIOS_HTTPS_PORT`, `XENIOS_LAN_PORT`, `XENIOS_GBS_PORT`, `XENIOS_TRUST_PROXY`, `XENIOS_DATA_DIR`, `XENIOS_LOG_LEVEL`. Dazu `XENIOS_CONFIG` (Pfad der Konfiguration) und `XENIOS_SECRET_KEY` bzw. `XENIOS_SECRET_KEY_FILE` (Schlüssel für die Geheimnisse).
 
 **Geheimnisse:** Mühlen-Passwort und privater Push-Schlüssel stehen mit AES-256-GCM verschlüsselt in `config.json` (`enc:v1:…`); Klartext aus älteren Versionen wird beim Start automatisch verschlüsselt. Der Schlüssel liegt in `data/secret.key`, außer er kommt per Umgebungsvariable. Liegt er neben der Konfiguration, schützt das vor dem Weitergeben oder Sichern von `config.json` allein, nicht vor jemandem mit Zugriff auf den ganzen Datenordner. Geht der Schlüssel verloren, Mühlen-Passwort neu eingeben (Push-Abos auf den Geräten neu einschalten).
+
+## 6. Grind-by-Sync mit Druckprofilen (optional)
+
+Normal startet der Drehknopf der E64 WS nach einem GbS-Mahlvorgang das fest eingebaute Skript 9 der Xenia. Mit dem Vermittler startet er stattdessen ein Druckprofil aus der App, und die Mühle lernt trotzdem weiter.
+
+**So funktioniert es:** Die Mühle fragt Xenios statt der Xenia ab. Xenios reicht alle Abfragen unverändert an die Xenia weiter. Nur `scripts/execute {"ID":9}` (der Druck auf den Drehknopf) wird getauscht: Xenios schreibt das gewählte Profil als Skript **„Xenios GbS“** auf die Maschine. Vorn steht der Stopp beim Zielgewicht des Mühlenrezepts (Befehl 27, Wert aus `brewratio`, auf ganze Gramm gerundet), und die letzte Druckstufe wird um bis zu 30 s verlängert. So endet der Bezug wie beim Original am Gewicht, und die Mühle lernt aus der Bezugszeit. Das Skript wird nur neu geschrieben, wenn sich Profil oder Zielgewicht ändern. Geht etwas schief (Profil gelöscht, Maschine antwortet nicht), startet Xenios das Original-Skript 9.
+
+**Einrichten:**
+1. *Server & Sicherheit → Grind-by-Sync mit Druckprofilen*: Vermittler einschalten. Die IP der Mühle wird aus der Adresse der Mühle übernommen; steht dort ein Name, die IP eintragen (am besten im Router fest vergeben).
+2. An der Mühle (Web-Oberfläche als Owner): *Connectivity → Machine To Machine → Xenia → Configuration*, als Host die IP des Xenios-Servers eintragen.
+3. Unter **Skripte → Grind-by-Sync** das Profil wählen. Dort steht auch, wann sich die Mühle zuletzt gemeldet hat und was beim letzten Drehknopf gestartet wurde.
+
+**Sicherheit:** Die Mühle fragt immer unverschlüsselt und ohne Anmeldung Port 80 ab; anders geht es nicht. Xenios nimmt auf diesem Port deshalb nur Verbindungen von der IP der Mühle an und trennt alle anderen sofort. Weitergereicht werden nur die Abfragen, die die Mühle braucht (`machine`, `mako`, `info`, `status`, `overview`, `diagram/get`, `brewratio`, `scripts/execute` mit ID 9). Skripte löschen, Einstellungen oder WLAN erreicht man darüber nicht, auch nicht mit gefälschter Absender-IP.
+
+**Ohne Docker:** Port 80 braucht unter Linux Rechte: `sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(which node)")"`. Unter Windows die Firewall-Freigabe für Port 80 erlauben. Heimnetz-HTTP muss dann auf einem anderen Port als 80 laufen.
+
+**Mit Docker:** In `docker/compose.yaml` die Zeile `- "80:8082"` aktivieren und `docker compose up -d`. Xenios muss die echte IP der Mühle sehen. Beim normalen Docker unter Linux ist das so, bei rootless Docker und Docker Desktop oft nicht. Wird die Mühle abgewiesen, steht die gesehene IP im Log und unter *Skripte → Grind-by-Sync*.
+
+**Zurück:** In der Mühle wieder die IP der Xenia eintragen. Läuft Xenios nicht, findet die Mühle keine Xenia und Grind-by-Sync geht nicht.

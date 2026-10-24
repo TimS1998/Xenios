@@ -1,7 +1,7 @@
 // Skripte: Liste, Start/Stopp, Editor, Export/Import.
-import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl } from '../ui.js';
+import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl, ago } from '../ui.js';
 import { api, store, subscribe, machineOn, directMode } from '../api.js';
-import { setTopActions } from '../app.js';
+import { setTopActions, navigate } from '../app.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
 import { scriptName } from '../../shared/visualizer.js';
@@ -18,6 +18,8 @@ function listTab(root) {
   const features = store.server?.features || {};
   let data = { scripts: [], ops: {}, builtin: {} };
   let sortBy = 'name';
+  let gbs = null;
+  const gbsBox = h('div', {});
   const listEl = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Lade Skripte …'));
   const sortBtn = h('button', { class: 'btn text', onclick: () => { sortBy = sortBy === 'name' ? 'id' : 'name'; sortBtn.lastChild.textContent = sortBy === 'name' ? 'Name' : 'ID'; paint(); } }, icon('sort', 's18'), h('span', {}, 'Name'));
   const stopBtn = h('button', { class: 'btn danger wide big', onclick: stop }, icon('stop', 's20'), 'Skript stoppen');
@@ -52,9 +54,54 @@ function listTab(root) {
       quickBtn('Einfach', 7), quickBtn('Doppelt', 8), quickBtn('Dauerbezug', 2)),
     h('div', { style: { height: '12px' } }),
     stopBtn,
+    gbsBox,
     h('div', { class: 'section-title with-action' }, h('span', {}, 'Alle Skripte'), sortBtn),
     listEl,
   );
+
+  // Grind-by-Sync: welches Profil der Drehknopf der Mühle startet (nur mit Server)
+  function paintGbs() {
+    if (!gbs) return gbsBox.replaceChildren();
+    if (!gbs.enabled) {
+      return gbsBox.replaceChildren(h('div', { class: 'section-title' }, 'Grind-by-Sync'),
+        h('div', { class: 'card gbs-card' }, h('div', { class: 'row' },
+          h('div', { class: 'grow small muted' }, 'Druckprofile auch beim Start über den Drehknopf der Mühle: dafür den Vermittler in den Server-Einstellungen einschalten.'),
+          h('button', { class: 'btn tonal', onclick: () => navigate('/server') }, 'Einrichten'))));
+    }
+    const choices = data.scripts.filter((s) => (s.type === 'standard' || s.type === 'pressure') && s.title !== gbs.helperName);
+    const sel = h('select', { class: 'text', 'aria-label': 'Profil für den Drehknopf', disabled: !features.scriptEditor },
+      h('option', { value: '', selected: !gbs.scriptId }, 'Original der Xenia (Skript 9)'),
+      choices.map((s) => h('option', { value: String(s.id), selected: s.id === gbs.scriptId }, `${s.title} (ID ${s.id})`)),
+      gbs.scriptId && !choices.some((s) => s.id === gbs.scriptId) ? h('option', { value: String(gbs.scriptId), selected: true }, `Skript ${gbs.scriptId}${data.scripts.length ? ' (nicht mehr da)' : ''}`) : null);
+    sel.addEventListener('change', () => saveGbs({ scriptId: sel.value ? Number(sel.value) : null }));
+    const g = gbs.lastGrind;
+    const st = gbs.lastStart;
+    const lines = [
+      gbs.lastContact ? `Mühle zuletzt: ${ago(gbs.lastContact)}` : 'Die Mühle hat sich noch nicht gemeldet (Host in der Mühle umgestellt?)',
+      g ? `Letztes Rezept: ${g.weight ? `${fmt(g.weight)} g` : 'Zielgewicht unbekannt'} · ${ago(g.at)}` : 'Noch kein Mahlvorgang über Grind-by-Sync',
+      st ? `Letzter Start: ${st.swapped ? `${st.title} bis ${st.weight} g` : 'Original-Skript 9'}${st.ok ? '' : ' (von der Xenia abgelehnt)'} · ${ago(st.at)}` : null,
+    ].filter(Boolean);
+    gbsBox.replaceChildren(h('div', { class: 'section-title' }, 'Grind-by-Sync'),
+      h('div', { class: 'card gbs-card' },
+        h('label', { class: 'field' }, h('span', {}, 'Profil für den Drehknopf der Mühle'), sel),
+        h('div', { class: 'row toggle-row' },
+          h('div', { class: 'grow' }, h('div', {}, 'Bis zum Zielgewicht laufen lassen'),
+            h('div', { class: 'small muted' }, 'Hält den letzten Druck bis zu 30 s länger, damit der Bezug am Gewicht endet. Sonst wäre die Bezugszeit immer gleich und die Mühle lernt nichts.')),
+          switchEl({ checked: gbs.extend, disabled: !features.scriptEditor, label: 'Bis zum Zielgewicht laufen lassen', onChange: (on) => saveGbs({ extend: on }) })),
+        h('div', { class: 'small muted gbs-status' }, lines.map((l) => h('div', {}, l))),
+        gbs.lastError ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, `${gbs.lastError} – die Mühle startet dann das Original-Skript 9.`)) : null,
+        gbs.refused && !gbs.lastContact ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, `Verbindung von ${gbs.refused.ip} abgewiesen – stimmt die IP der Mühle (${gbs.grinderIp || 'fehlt'})?`)) : null,
+        features.scriptEditor ? null : h('p', { class: 'small muted' }, 'Der Skript-Editor ist aus: Xenios legt das Profil als Skript „Xenios GbS“ auf der Maschine an und braucht ihn dafür.')));
+  }
+  async function saveGbs(change) {
+    try {
+      gbs = await api('/api/gbs', { method: 'PUT', body: change });
+      snackbar(change.scriptId === null ? 'Drehknopf startet wieder das Original' : 'Gespeichert');
+    } catch (e) {
+      snackbar(e.message);
+    }
+    paintGbs();
+  }
 
   function quickBtn(label, id) {
     const b = h('button', { class: 'btn tonal', disabled: !machineOn(), onclick: () => run(id, label) }, icon('play', 's18'), label);
@@ -95,7 +142,7 @@ function listTab(root) {
       const play = h('button', { class: 'icon-btn tonal', 'aria-label': `${s.title} starten`, disabled: !machineOn(), onclick: () => run(s.id, s.title) }, icon('play'));
       runButtons.push(play);
       return h('div', { class: 'script-item' },
-        h('div', { class: 'grow' }, h('div', { class: 't' }, s.title), h('div', { class: 'id' }, `ID: ${s.id} · ${TYPE_LABEL[s.type] || s.type}`)),
+        h('div', { class: 'grow' }, h('div', { class: 't' }, s.title), h('div', { class: 'id' }, `ID: ${s.id} · ${s.title === gbs?.helperName ? 'von Grind-by-Sync verwaltet' : TYPE_LABEL[s.type] || s.type}`)),
         h('a', { class: 'icon-btn', href: `/api/machine/scripts/${s.id}/export`, download: '', 'aria-label': `${s.title} exportieren`, title: 'Exportieren (.script)' }, icon('download', 's20')),
         features.scriptEditor ? h('button', { class: 'icon-btn', 'aria-label': `${s.title} bearbeiten`, onclick: () => openEditor(s, data, load) }, icon('edit', 's20')) : null,
         play);
@@ -103,12 +150,14 @@ function listTab(root) {
   }
 
   async function load() {
+    if (!directMode) gbs = await api('/api/gbs').catch(() => null);
     try {
       data = await api('/api/machine/scripts');
       paint();
     } catch (e) {
       listEl.replaceChildren(h('div', { class: 'empty' }, e.message));
     }
+    paintGbs();
   }
   load();
   paintEnabled();

@@ -16,6 +16,9 @@ export const DEFAULTS = {
   // HTTPS fürs Heimnetz (selbstsigniertes Zertifikat, wird beim ersten Start erzeugt).
   // hosts: zusätzliche Namen/IPs fürs Zertifikat (z. B. die LAN-IP des Docker-Hosts)
   https: { enabled: true, host: '0.0.0.0', port: 8443, hosts: [], cert: null, key: null }, // null = <dataDir>/tls-*.pem
+  // Grind-by-Sync-Vermittler: Xenios antwortet der Mühle als Xenia (die E64 WS fragt immer Port 80 ab).
+  // Nur Verbindungen von grinderIp werden angenommen; null = IP aus grinder.url.
+  gbs: { enabled: false, host: '0.0.0.0', port: 80, grinderIp: null },
   auth: {
     passwordHash: null,       // scrypt-Hash, wird bei der Einrichtung (Web oder "npm run setup") gesetzt
     sessionDays: 90,          // Wie lange ein Gerät angemeldet bleibt (gleitend)
@@ -70,6 +73,7 @@ export const ENV_OVERRIDES = [
   ['XENIOS_HTTPS_HOST', 'https.host'],
   ['XENIOS_HTTPS_PORT', 'https.port', Number],
   ['XENIOS_LAN_PORT', 'lan.port', Number],
+  ['XENIOS_GBS_PORT', 'gbs.port', Number],
   ['XENIOS_TRUST_PROXY', 'trustProxy'],
   ['XENIOS_DATA_DIR', 'dataDir'],
   ['XENIOS_LOG_LEVEL', 'logLevel'],

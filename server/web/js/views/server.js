@@ -38,7 +38,7 @@ export function serverView(root) {
   async function save() {
     saveBtn.disabled = true;
     const keys = Object.keys(dirty);
-    const listener = keys.some((k) => /^(http|https|lan)\.(enabled|host|port)$/.test(k));
+    const listener = keys.some((k) => /^(http|https|lan|gbs)\.(enabled|host|port)$/.test(k));
     try {
       data = await api('/api/admin/config', { method: 'PUT', body: { changes: dirty } });
       for (const k of keys) delete dirty[k];
@@ -158,7 +158,7 @@ export function serverView(root) {
     // Zugänge & Verschlüsselung
     const httpHost = value('http.host');
     const listeners = h('div', { class: 'chips listener-chips' }, s.listeners.map((l) => h('span', { class: `chip status ${l.ok ? 'on' : l.error ? 'bad' : ''}`, title: l.error || '' },
-      h('span', { class: 'dot' }), `${{ http: 'Tunnel', https: 'HTTPS', lan: 'Heimnetz-HTTP' }[l.kind]} :${l.port}`)));
+      h('span', { class: 'dot' }), `${{ http: 'Tunnel', https: 'HTTPS', lan: 'Heimnetz-HTTP', gbs: 'Grind-by-Sync' }[l.kind]} :${l.port}`)));
     const tls = s.tls;
     const network = card('Zugänge & Verschlüsselung', 'wifi',
       listeners,
@@ -185,6 +185,29 @@ export function serverView(root) {
       h('div', { class: 'grid2' }, text('Adresse', 'lan.host'), number('Port', 'lan.port', 1, 65535)),
       value('lan.enabled') ? warn('Passwort und Sitzung gehen hier im Klartext durchs WLAN. Nur in einem vertrauenswürdigen Heimnetz nutzen.') : null);
 
+    // Grind-by-Sync-Vermittler
+    const urlIp = (() => {
+      try {
+        const host = new URL(value('grinder.url')).hostname.replace(/^\[|\]$/g, '');
+        return /^[\d.]+$|:/.test(host) ? host : null;
+      } catch { return null; }
+    })();
+    const gbsCard = card('Grind-by-Sync mit Druckprofilen', 'grinder',
+      h('p', { class: 'small muted' }, 'Xenios gibt sich der Mühle gegenüber als Xenia aus und reicht alles an die echte Xenia weiter. Nur der Start per Drehknopf wird gegen das unter Skripte gewählte Profil getauscht; es stoppt wie das Original beim Zielgewicht des Mühlenrezepts.'),
+      toggle('Vermittler', 'Unverschlüsselt und ohne Anmeldung, aber nur für die IP der Mühle', 'gbs.enabled'),
+      h('div', { class: 'grid2' }, text('Adresse', 'gbs.host'), number('Port', 'gbs.port', 1, 65535)),
+      gap(),
+      text('IP der Mühle', 'gbs.grinderIp', { placeholder: urlIp ? `aus der Adresse der Mühle: ${urlIp}` : 'z. B. 192.168.178.54', parse: (v) => v.trim() || null, format: (v) => v || '' }),
+      s.docker ? h('p', { class: 'small muted' }, `Im Container lauscht der Vermittler auf Port ${value('gbs.port')}. In compose.yaml die Zeile „80:${value('gbs.port')}“ aktivieren – die Mühle fragt immer Port 80 ab.`) : null,
+      !s.docker && Number(value('gbs.port')) !== 80 ? warn('Die Mühle fragt immer Port 80 ab. Ein anderer Port geht nur mit einer Weiterleitung von 80 auf diesen Port.') : null,
+      h('details', { class: 'adv' }, h('summary', {}, 'Mühle umstellen', icon('more', 's20')),
+        h('ol', { class: 'small' },
+          h('li', {}, 'Vermittler einschalten und speichern.'),
+          h('li', {}, 'An der Mühle (Web-Oberfläche als Owner): Connectivity → Machine To Machine → Xenia → Configuration.'),
+          h('li', {}, 'Als Host die IP dieses Servers eintragen statt der IP der Xenia.'),
+          h('li', {}, 'Unter Skripte das Profil für den Drehknopf wählen.')),
+        h('p', { class: 'small muted' }, 'Läuft Xenios nicht, findet die Mühle keine Xenia. Zurück: in der Mühle wieder die IP der Xenia eintragen.')));
+
 
     // System
     const up = s.uptimeS;
@@ -202,7 +225,7 @@ export function serverView(root) {
       gap(),
       select('Protokoll-Stufe', 'logLevel', [['error', 'nur Fehler'], ['warn', 'Warnungen'], ['info', 'Normal'], ['debug', 'Ausführlich (Fehlersuche)']]));
 
-    body.replaceChildren(h('div', { class: 'stagger' }, devices, remote, features, time, security, network, system));
+    body.replaceChildren(h('div', { class: 'stagger' }, devices, remote, features, time, security, network, gbsCard, system));
   }
 
   async function loadSessions(box) {

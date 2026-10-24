@@ -60,7 +60,7 @@ export function createMockXenia({ speed = 1 } = {}) {
       s.pump += (target - s.pump) * 0.35;
       s.pumpPw = Math.round(50 + s.pump * 4);
       if (b.t > 6000) { s.scale += 0.45 * speed; s.flowMl += 0.5 * speed; }
-      if (b.t >= b.duration) {
+      if (b.t >= b.duration || (b.stopAt && s.scale >= b.stopAt)) {
         s.MA_STATUS = 4; s.brewing = null; s.extractions++;
         setTimeout(() => { if (s.MA_STATUS === 4) s.MA_STATUS = 1; s.pump = 0; s.pumpPw = 0; }, 2500 / speed);
       }
@@ -86,7 +86,9 @@ export function createMockXenia({ speed = 1 } = {}) {
   const startBrew = (id) => {
     if (![1, 4].includes(s.MA_STATUS)) return false;
     s.MA_STATUS = 3; s.extractionMs = 0; s.scale = 0; s.flowMl = 0;
-    s.brewing = { t: 0, duration: id === 2 ? 60000 : 27000, id };
+    // Befehl 27 (Bezug stoppen bei x g) beendet den Bezug am Gewicht
+    const stop = /(?:^|;)27 (\d+(?:\.\d+)?)/.exec(s.scripts[id]?.content || '');
+    s.brewing = { t: 0, duration: id === 2 ? 60000 : 27000, id, stopAt: stop ? Number(stop[1]) : null };
     return true;
   };
 

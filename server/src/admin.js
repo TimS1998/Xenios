@@ -1,5 +1,6 @@
 // Anmeldung, Ersteinrichtung im Browser und Server-Einstellungen (alles, was früher nur in config.json ging).
 import fs from 'node:fs';
+import net from 'node:net';
 import crypto from 'node:crypto';
 import { hashPassword, verifyPassword, passwordProblem, sessionCookie } from './auth.js';
 import { updateConfigFile, setPath, getPath, applyTimezone, isTimezone } from './config.js';
@@ -100,17 +101,35 @@ export const FIELDS = {
   'lan.enabled': bool('Heimnetz-HTTP'),
   'lan.host': host('Heimnetz-HTTP: Adresse'),
   'lan.port': int('Heimnetz-HTTP-Port', 1, 65535),
+  'gbs.enabled': bool('Grind-by-Sync-Vermittler'),
+  'gbs.host': host('Grind-by-Sync: Adresse'),
+  'gbs.port': int('Grind-by-Sync-Port', 1, 65535),
+  'gbs.grinderIp': (v) => {
+    if (v === null || v === '') return null;
+    const s = String(v).trim();
+    if (!net.isIP(s)) throw bad('IP der Mühle: z. B. 192.168.178.54');
+    return s;
+  },
 };
 const SECRET_FIELDS = ['grinder.password'];
-const LISTENER_FIELDS = Object.keys(FIELDS).filter((p) => /^(http|https|lan)\.(enabled|host|port)$/.test(p));
+const LISTENER_FIELDS = Object.keys(FIELDS).filter((p) => /^(http|https|lan|gbs)\.(enabled|host|port)$/.test(p));
 
 // Prüft, ob die Ports nach der Änderung zusammenpassen und mindestens ein Zugang offen bleibt.
 function checkListeners(cfg, clean) {
   const v = (p) => (p in clean ? clean[p] : getPath(cfg, p));
   const on = ['http', 'https', 'lan'].filter((k) => v(`${k}.enabled`));
   if (!on.length) throw bad('Mindestens ein Zugang (Tunnel-Port, HTTPS oder Heimnetz-HTTP) muss an bleiben');
+  if (v('gbs.enabled')) on.push('gbs');
   const ports = on.map((k) => v(`${k}.port`));
-  if (new Set(ports).size !== ports.length) throw bad('Jeder Zugang braucht einen eigenen Port');
+  if (new Set(ports).size !== ports.length) {
+    const lanClash = v('gbs.enabled') && v('lan.enabled') && v('gbs.port') === v('lan.port');
+    throw bad(lanClash ? 'Grind-by-Sync und Heimnetz-HTTP brauchen verschiedene Ports (die Mühle fragt immer Port 80 ab)' : 'Jeder Zugang braucht einen eigenen Port');
+  }
+  if (v('gbs.enabled') && !v('gbs.grinderIp')) {
+    let h = '';
+    try { h = new URL(v('grinder.url')).hostname.replace(/^\[|\]$/g, ''); } catch { /* leer */ }
+    if (!net.isIP(h)) throw bad('Grind-by-Sync: IP der Mühle eintragen (die Adresse der Mühle ist keine IP)');
+  }
 }
 
 // --- Setup-Code ---------------------------------------------------------------------------------

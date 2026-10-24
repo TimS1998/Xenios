@@ -16,6 +16,7 @@ ENV NODE_ENV=production \
     XENIOS_HTTPS_HOST=0.0.0.0 \
     XENIOS_HTTPS_PORT=8443 \
     XENIOS_LAN_PORT=8081 \
+    XENIOS_GBS_PORT=8082 \
     XENIOS_TRUST_PROXY=private
 
 WORKDIR /app
@@ -27,7 +28,7 @@ RUN mkdir -p /data && chown node:node /data && chmod 700 /data
 
 USER node
 VOLUME ["/data"]
-EXPOSE 8080 8081 8443
+EXPOSE 8080 8081 8082 8443
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q -O /dev/null "http://127.0.0.1:${XENIOS_HTTP_PORT}/healthz" || exit 1
 CMD ["node", "src/index.js"]

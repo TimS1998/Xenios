@@ -17,6 +17,7 @@ import { deviceRoutes, createRouter } from '../web/shared/routes.js';
 import { Grinder } from './grinder.js';
 import { Scheduler, SCHEDULE_ACTIONS } from './schedule.js';
 import { Wake } from './wake.js';
+import { GbsProxy, gbsRoutes } from './gbs.js';
 import { JsonStore } from './store.js';
 import { securityHeaders, sendJson, readJson, makeStatic } from './http-util.js';
 import { ensureCert, certFingerprint } from './tls.js';
@@ -49,6 +50,7 @@ export function createApp(cfg, hooks = {}) {
   const push = new PushService(cfg);
   const machine = new Machine(cfg);
   const grinder = new Grinder(cfg, { pinStore: new JsonStore(path.join(cfg.dataDir, 'grinder-pin.json'), {}) });
+  const gbs = new GbsProxy(cfg, machine);
   const serveStatic = makeStatic(path.join(ROOT, 'web'));
   const streams = new Set();
   const setup = { code: cfg.auth.passwordHash ? null : makeSetupCode() };
@@ -111,6 +113,7 @@ export function createApp(cfg, hooks = {}) {
     scheduler.stop();
     wake.stop();
     wake.store.flush();
+    gbs.store.flush();
     for (const s of streams) s.end();
   }
 
@@ -158,6 +161,8 @@ export function createApp(cfg, hooks = {}) {
   deviceRoutes(route, { machine, grinder, cfg });
   // Profile aus der Community von visualizer.coffee
   communityRoutes(route, { version: VERSION, fetchImpl: hooks.fetch });
+  // Grind-by-Sync-Vermittler: Profil für den Drehknopf der Mühle
+  gbsRoutes(route, { gbs });
 
   // Zusätzliche Schaltzeiten (führt der Server aus)
   route('GET', '/api/schedule', async () => ({ rules: scheduler.list(), actions: SCHEDULE_ACTIONS }));
@@ -318,15 +323,16 @@ export function createApp(cfg, hooks = {}) {
     log.debug(`Stream geöffnet von ${ip} (${streams.size} aktiv)`);
   }
 
-  return { handle, machine, grinder, push, sessions, streams, scheduler, wake, setup, instance, startDevices, stop };
+  return { handle, machine, grinder, gbs, push, sessions, streams, scheduler, wake, setup, instance, startDevices, stop };
 }
 
 // --- Zugänge (Ports) ------------------------------------------------------------
 // Werden beim Start geöffnet und nach Änderungen in den Server-Einstellungen ohne Neustart neu gebunden.
-class Listeners {
-  constructor(cfg, handler) {
+export class Listeners {
+  constructor(cfg, handler, gbs) {
     this.cfg = cfg;
     this.handler = handler;
+    this.gbs = gbs;
     this.servers = new Map();
   }
 
@@ -335,7 +341,7 @@ class Listeners {
   }
 
   apply() {
-    for (const kind of ['http', 'lan', 'https']) {
+    for (const kind of ['http', 'lan', 'https', 'gbs']) {
       const c = this.cfg[kind];
       const spec = c?.enabled ? `${c.host}|${c.port}` : null;
       const cur = this.servers.get(kind);
@@ -362,6 +368,21 @@ class Listeners {
         req.lanPort = true;
         this.handler(req, res);
       });
+    } else if (kind === 'gbs') {
+      const gbs = this.gbs;
+      server = http.createServer((req, res) => {
+        gbs.handle(req, res).catch((e) => {
+          log.error(e.stack || e.message);
+          try { res.end(); } catch { /* egal */ }
+        });
+      });
+      // Nur die Mühle: andere Geräte werden vor dem ersten Byte getrennt
+      server.on('connection', (socket) => {
+        if (!gbs.allowed(socket.remoteAddress)) {
+          gbs.refuse(socket.remoteAddress);
+          socket.destroy();
+        }
+      });
     } else {
       server = http.createServer(this.handler);
       if (!['127.0.0.1', '::1', 'localhost'].includes(c.host)) {
@@ -379,6 +400,10 @@ class Listeners {
     server.listen(c.port, c.host, () => {
       entry.ok = true;
       const scheme = kind === 'https' ? 'https' : 'http';
+      if (kind === 'gbs') {
+        log.info(`Grind-by-Sync-Vermittler auf http://${c.host}:${c.port} (nur für ${this.gbs.grinderIp() || '– IP der Mühle fehlt –'}) → ${this.cfg.machine.url}`);
+        return;
+      }
       const what = { http: 'für Cloudflare-Tunnel', lan: 'Heimnetz, unverschlüsselt', https: `Heimnetz, Zertifikat SHA-256 ${certFingerprint(c.cert)}` }[kind];
       log.info(`${scheme.toUpperCase()} (${what}) auf ${scheme}://${c.host}:${c.port}`);
     });
@@ -441,7 +466,7 @@ async function main() {
       try { res.end(); } catch { /* egal */ }
     });
   };
-  const listeners = new Listeners(cfg, handler);
+  const listeners = new Listeners(cfg, handler, app.gbs);
   hooks.onListeners = () => listeners.apply();
   hooks.onTls = () => listeners.reloadTls();
   hooks.listenerStatus = () => listeners.status();

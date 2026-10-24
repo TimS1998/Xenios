@@ -28,6 +28,8 @@ services:
     ports:
       - "${XENIOS_HTTPS_PORT:-8443}:8443"  # HTTPS im Heimnetz (mit IP davor nur auf dieser Netzwerkkarte)
       # - "80:8081"                        # optional: Heimnetz-HTTP (in der App unter Server einschalten) – unverschlüsselt
+      # - "80:8082"                        # optional: Grind-by-Sync-Vermittler (App → Server); Xenios nimmt nur die IP der Mühle an.
+      #                                      Nur eine der beiden 80er-Zeilen geht.
       # Port 8080 (Tunnel) bleibt bewusst intern: nur cloudflared im selben Compose-Netz erreicht ihn.
     volumes:
       - xenios-data:/data                  # Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge

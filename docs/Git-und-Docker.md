@@ -155,6 +155,8 @@ Wichtige Werte in `docker/.env`:
 | `TUNNEL_TOKEN=…` und `COMPOSE_PROFILES=tunnel` | Cloudflare-Tunnel im selben Compose starten; im Cloudflare-Dashboard den Public Hostname auf `http://xenios:8080` setzen |
 | `TZ=Europe/Berlin` | Zeitzone für Zeitplan und Wecker |
 
+Für Grind-by-Sync mit Druckprofilen zusätzlich in `compose.yaml` die Zeile `- "80:8082"` aktivieren (siehe [Einrichtung, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional)).
+
 ### 3.3 Alltag
 | Was | Befehl (im Ordner `docker/`) |
 |---|---|

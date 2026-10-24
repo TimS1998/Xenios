@@ -210,6 +210,28 @@ export class XeniaClient {
 
   get(p) { return this.request('GET', p); }
   post(p, body) { return this.request('POST', p, body ?? {}); }
+
+  // Unveränderte Weitergabe (Grind-by-Sync-Vermittler), in derselben Warteschlange wie alle anderen Anfragen.
+  raw(method, apiPath, body, contentType) {
+    if (this.pending > 20) return Promise.reject(new Error('Maschine überlastet (Warteschlange voll)'));
+    this.pending++;
+    const run = async () => {
+      try {
+        const res = await this.fetch(this.url + apiPath, {
+          method,
+          headers: body !== undefined && contentType ? { 'Content-Type': contentType } : {},
+          body,
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+        return { status: res.status, type: res.headers.get('content-type'), body: new Uint8Array(await res.arrayBuffer()) };
+      } finally {
+        this.pending--;
+      }
+    };
+    const p = this.chain.then(run, run);
+    this.chain = p.catch(() => {});
+    return p;
+  }
 }
 
 export class Machine extends Emitter {
@@ -813,12 +835,17 @@ export class Machine extends Emitter {
   async runScript(id) {
     this._lastAppAction = Date.now();
     await this.client.post('/api/v2/scripts/execute', { ID: Number(id) });
-    // Merken, damit der gleich erkannte Bezug weiß, welches Skript lief; Titel und Schritte kommen nach (Zielkurve)
-    const pending = { id: Number(id), at: Date.now() };
-    this._pendingScript = pending;
-    this.readScript(id).then((r) => { pending.title = r.title || BUILTIN_SCRIPTS[id] || null; pending.steps = r.steps; }).catch(() => {});
+    this.noteScript(id);
     this._acted();
     return { ok: true };
+  }
+
+  // Merken, damit der gleich erkannte Bezug weiß, welches Skript lief; Titel und Schritte kommen nach (Zielkurve)
+  noteScript(id, { title, steps } = {}) {
+    const pending = { id: Number(id), at: Date.now(), title, steps };
+    this._pendingScript = pending;
+    if (steps) return;
+    this.readScript(id).then((r) => { pending.title = title ?? (r.title || BUILTIN_SCRIPTS[id] || null); pending.steps = r.steps; }).catch(() => {});
   }
 
   async stopScript() {
@@ -835,6 +862,12 @@ export class Machine extends Emitter {
     if (!this.features.scriptEditor) throw httpError(403, 'Skript-Editor ist deaktiviert');
     if (!isScriptNameValid(name)) throw httpError(400, 'Name: nur Buchstaben, Ziffern, Leerzeichen, - _ # (max. 40 Zeichen)');
     const instruction = buildScript(steps);
+    await this.writeScript({ id, name, instruction, kind });
+    return { ok: true, instruction };
+  }
+
+  // Schreibt ein Skript ohne Prüfung der Funktions-Schalter (auch vom Grind-by-Sync-Vermittler genutzt).
+  async writeScript({ id, name, instruction, kind }) {
     const body = { Edit: '', script_id: '', switch: '', script: kind === 'paddle' ? 'paddle' : 'none', name, instruction };
     if (id !== undefined && id !== null && id !== '') {
       // Bearbeiten: wie die Original-UI erst "scriptsedit" setzen, dann speichern.
