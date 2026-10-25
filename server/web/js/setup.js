@@ -317,10 +317,13 @@ export function tunnelGuide(env) {
     h('li', {}, 'Cloudflare-Konto und eine eigene Domain, die bei Cloudflare verwaltet wird.'),
     h('li', {}, 'Auf ', link('https://one.dash.cloudflare.com', 'one.dash.cloudflare.com'), ' unter ', h('b', {}, 'Networks → Tunnels → Create a tunnel → Cloudflared'), ' einen Tunnel „xenios“ anlegen.'),
     env.docker
-      ? h('li', {}, 'Bei „Install and run a connector“ die Zeile ', h('b', {}, 'sudo cloudflared service install …'), ' kopieren und unten einfügen. Den Befehl nicht ausführen. Xenios startet cloudflared selbst.')
+      ? h('li', {}, 'Bei „Install and run a connector“ die Zeile ', h('b', {}, 'sudo cloudflared service install …'), ' kopieren. Den Befehl nicht ausführen.')
       : h('li', {}, 'Bei „Install and run a connector“ dein Betriebssystem wählen und den angezeigten Befehl auf diesem Rechner ausführen. Er richtet cloudflared als Dienst ein.'),
+    env.docker
+      ? h('li', {}, 'Die Zeile unten bei ', h('b', {}, 'Befehl aus Cloudflare'), ' einfügen und ', h('b', {}, 'Token übernehmen'), ' wählen. Xenios schreibt den Token und startet cloudflared. Der Befehl wird nicht ausgeführt.')
+      : null,
     h('li', {}, 'Beim Tunnel einen ', h('b', {}, 'Public Hostname'), ' anlegen: Subdomain und Domain wählen, als ', h('b', {}, 'Service URL'), ' genau das eintragen:', copyBlock(env.service)),
-    h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.deine-domain.de) eintragen und testen.'));
+    h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.deine-domain.de) eintragen und ', h('b', {}, 'Testen'), '.'));
 }
 
 function copyBlock(text) {
