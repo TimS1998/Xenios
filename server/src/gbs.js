@@ -23,16 +23,21 @@ const PASS = new Set([
   'POST /api/v2/brewratio', 'POST /api/v2/scripts/execute',
 ]);
 
-// Schritte des Ersatz-Skripts: eigene Stopp-Bedingungen raus, Stopp beim Zielgewicht der Mühle an den Anfang.
-// extend: nach der letzten Druckstufe den Druck bis zu 30 s halten, damit der Bezug am Gewicht endet und nicht
-// nach der festen Zeit des Profils (sonst wäre die Bezugszeit immer gleich und die Mühle lernt nichts).
+// Schritte des Ersatz-Skripts. Befehl 27 („Bezug stoppen bei“) ist in der Firmware ein
+// blockierendes Warten auf das Gewicht – vorn, vor Ventil und Pumpe, läuft kein Wasser
+// (56 s bei 0 bar). Wie in den Original-Beispielen deshalb erst Pumpe, 27 direkt vor „Pumpe aus“.
+// extend: letzte Druckstufe +30 s, damit 27 noch Gewicht sehen kann, statt nach fester Profilzeit.
 export function gbsSteps(steps, weight, { extend = true } = {}) {
   const out = steps.filter((s) => s.op !== 27).map((s) => ({ op: s.op, args: [...(s.args || [])] }));
   if (extend) {
     const last = out.findLastIndex((s) => s.op === 4);
     if (last >= 0) out.splice(last + 1, 0, { op: 4, args: [out[last].args[0], HOLD_S] });
   }
-  return [{ op: 27, args: [Math.round(weight)] }, ...out];
+  const stop = { op: 27, args: [Math.round(weight)] };
+  const off = out.findLastIndex((s) => s.op === 6);
+  if (off >= 0) out.splice(off, 0, stop);
+  else out.push(stop);
+  return out;
 }
 
 // Körper der Mühle: JSON-Text (bei jQuery-Art mit Formular-Content-Type), notfalls ID=9 als Formular

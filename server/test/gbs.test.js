@@ -78,10 +78,10 @@ after(() => {
 test('Ersatz-Skript: Stopp beim Zielgewicht vorn, letzte Druckstufe verlängert', () => {
   const steps = [{ op: 13, args: [] }, { op: 27, args: [50] }, { op: 4, args: [9, 6] }, { op: 4, args: [6, 18] }, { op: 6, args: [] }];
   assert.deepEqual(gbsSteps(steps, 36.5), [
-    { op: 27, args: [37] }, { op: 13, args: [] }, { op: 4, args: [9, 6] }, { op: 4, args: [6, 18] }, { op: 4, args: [6, 30] }, { op: 6, args: [] },
+    { op: 13, args: [] }, { op: 4, args: [9, 6] }, { op: 4, args: [6, 18] }, { op: 4, args: [6, 30] }, { op: 27, args: [37] }, { op: 6, args: [] },
   ]);
-  assert.deepEqual(gbsSteps(steps, 40, { extend: false }).map((s) => s.op), [27, 13, 4, 4, 6]);
-  assert.deepEqual(gbsSteps([{ op: 3, args: [60, 20] }], 40).map((s) => s.op), [27, 3]); // ohne Druckstufe nichts anhängen
+  assert.deepEqual(gbsSteps(steps, 40, { extend: false }).map((s) => s.op), [13, 4, 4, 27, 6]);
+  assert.deepEqual(gbsSteps([{ op: 3, args: [60, 20] }], 40).map((s) => s.op), [3, 27]); // ohne Druckstufe nichts anhängen, 27 ans Ende
   assert.deepEqual(parseBody('{"ID":9}'), { ID: 9 });
   assert.deepEqual(parseBody('ID=9'), { ID: '9' });
   assert.deepEqual(parseBody('[1]'), {});
@@ -119,7 +119,7 @@ test('mit Profil: Drehknopf startet das Profil mit Stopp am Zielgewicht', async 
   assert.equal(v.scriptId, 17);
   assert.ok(await until(() => app.gbs.view().helperId !== null));
   const id = app.gbs.view().helperId;
-  assert.deepEqual(xenia.state.scripts[id], { title: HELPER_NAME, content: '1;27 20;13;4 6000 30000;4 6000 30000;6;7;' });
+  assert.deepEqual(xenia.state.scripts[id], { title: HELPER_NAME, content: '1;13;4 6000 30000;4 6000 30000;27 20;6;7;' });
 
   assert.equal((await grinder('POST', '/api/v2/scripts/execute', { ID: 9 })).status, 200);
   assert.equal(xenia.state.brewing?.id, id);
@@ -145,7 +145,7 @@ test('mit Profil: Drehknopf startet das Profil mit Stopp am Zielgewicht', async 
 
   // Anderes Zielgewicht: Hilfsskript wird überschrieben, nicht neu angelegt
   await grinder('POST', '/api/v2/brewratio', { SYNC_BEVERAGE_WEIGHT: '42' });
-  assert.ok(await until(() => xenia.state.scripts[id].content.startsWith('1;27 42;')));
+  assert.ok(await until(() => xenia.state.scripts[id].content.includes(';27 42;')));
   assert.equal(Object.values(xenia.state.scripts).filter((s) => s.title === HELPER_NAME).length, 1);
 });
 
