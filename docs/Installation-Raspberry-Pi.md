@@ -4,8 +4,6 @@ Von der leeren Karte bis zur eingerichteten Xenios-Seite. Welches Modell, welche
 
 Die Befehle ab Abschnitt 4 gehören in das Terminal **auf dem Pi** (per SSH). Etwa eine Stunde, das meiste davon ist Warten: Karte schreiben, erster Start, Docker und das Image.
 
-Bilder sind verlinkt und erscheinen, sobald die PNG-Datei am genannten Ort liegt.
-
 ## 1. Was bereitliegt
 
 - Raspberry Pi 5 (4 GB ist die bequeme Wahl) oder Pi 4 mit 2 GB oder mehr. Offizielles Netzteil, Gehäuse, Ethernet-Kabel zum Router. Details und ungeeignete Modelle: [Hardware](Hardware.md).
@@ -27,7 +25,7 @@ Auf dem anderen Rechner den [Raspberry Pi Imager](https://www.raspberrypi.com/so
 
 ![Raspberry Pi Imager: Pi 5, Raspberry Pi OS Lite (64-bit), microSD](bilder/raspberry-pi/01-imager.png)
 
-*Bild 1. Gerät, 64-Bit-Lite, Karte. Ablegen als `docs/bilder/raspberry-pi/01-imager.png`.*
+*Bild 1. Gerät, 64-Bit-Lite, Karte.*
 
 4. Weiter, dann die Einstellungen zur Installation öffnen (Zahnrad oder die Frage nach der Anpassung). Vor dem Schreiben setzen:
 
@@ -44,7 +42,7 @@ Auf dem anderen Rechner den [Raspberry Pi Imager](https://www.raspberrypi.com/so
 
 ![Imager-Einstellungen: Hostname xenios, Benutzer, SSH an, Zeitzone Europe/Berlin, WLAN leer](bilder/raspberry-pi/02-imager-einstellungen.png)
 
-*Bild 2. Anpassung vor dem Schreiben. Ablegen als `docs/bilder/raspberry-pi/02-imager-einstellungen.png`.*
+*Bild 2. Anpassung vor dem Schreiben.*
 
 5. Schreiben, das Löschen bestätigen, warten, die Karte sicher entfernen.
 
@@ -54,7 +52,7 @@ Karte in den Pi, Netzwerkkabel zum Router, dann das offizielle Netzteil. Der ers
 
 ![Pi mit Karte, Ethernet-Kabel und offiziellem Netzteil, ohne Bildschirm](bilder/raspberry-pi/03-verkabelung.png)
 
-*Bild 3. Karte, Kabel, offizielles Netzteil. Ablegen als `docs/bilder/raspberry-pi/03-verkabelung.png`.*
+*Bild 3. Karte, Kabel, offizielles Netzteil.*
 
 Die Adresse steht in der Geräteliste des Routers (Name `xenios`). Vom anderen Rechner geht oft auch:
 
@@ -72,7 +70,7 @@ Beim ersten Mal nach dem Fingerabdruck: `yes` eintippen und Enter. Danach das Pa
 
 ![SSH-Anmeldung, die Eingabeaufforderung des Pi](bilder/raspberry-pi/04-ssh.png)
 
-*Bild 4. Angemeldet per SSH. Ablegen als `docs/bilder/raspberry-pi/04-ssh.png`.*
+*Bild 4. Angemeldet per SSH.*
 
 Antwortet SSH mit „Connection refused“ oder läuft der Versuch ins Leere: noch eine Minute warten. Bleibt es so, war SSH im Imager aus. Die Karte erneut beschreiben, diesmal mit SSH an. Eine leere Datei namens `ssh` auf der Boot-Partition ersetzt die Benutzeranlage im Imager nicht.
 
@@ -80,7 +78,7 @@ Im Router der gefundenen Adresse eine feste Zuordnung geben (DHCP-Reservierung).
 
 ![Router: der Pi mit fester Adresse](bilder/raspberry-pi/05-router-reservierung.png)
 
-*Bild 5. Feste Adresse im Router. Ablegen als `docs/bilder/raspberry-pi/05-router-reservierung.png`.*
+*Bild 5. Feste Adresse im Router.*
 
 ## 4. Xenios mit dem Skript
 
@@ -108,7 +106,7 @@ Das dauert auf einem Pi einige Minuten (Docker, dann das Image für arm64). Am E
 
 ![Ende von install.sh: Adresse und Einrichtungscode](bilder/raspberry-pi/08-einrichtungscode.png)
 
-*Bild 8. Ausgabe des Skripts. Im veröffentlichten Bild den Code abdecken. Ablegen als `docs/bilder/raspberry-pi/08-einrichtungscode.png`.*
+*Bild 8. Ausgabe des Skripts. Im veröffentlichten Bild den Code abdecken.*
 
 Das Skript legt `~/xenios/docker/.env` an und ändert eine vorhandene Datei nicht noch einmal. Darin stehen die Zeitzone des Pi, die Heimnetz-Adresse vor dem Port (`192.168.178.32:8443`, Docker öffnet Ports sonst an der Firewall vorbei), das Image `ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always`.
 
@@ -118,7 +116,7 @@ cat ~/xenios/docker/.env
 
 ![Inhalt von docker/.env nach dem Skript](bilder/raspberry-pi/07-env.png)
 
-*Bild 7. `.env` nach `install.sh`. Ablegen als `docs/bilder/raspberry-pi/07-env.png`.*
+*Bild 7. `.env` nach `install.sh`.*
 
 Steht am Ende „Docker-Gruppe gilt in dieser Sitzung noch nicht“: `exit`, neu per SSH anmelden. Der Server läuft schon. Prüfen:
 
@@ -150,7 +148,7 @@ https://192.168.178.32:8443
 
 ![Browser-Warnung zum Zertifikat des Pi](bilder/raspberry-pi/09-zertifikatswarnung.png)
 
-*Bild 9. Zertifikatswarnung. Ablegen als `docs/bilder/raspberry-pi/09-zertifikatswarnung.png`.*
+*Bild 9. Zertifikatswarnung.*
 
 Assistent:
 
@@ -163,15 +161,15 @@ Assistent:
 
 ![Assistent: Einrichtungscode](bilder/raspberry-pi/10-assistent-code.png)
 
-*Bild 10. Schritt Code. Ablegen als `docs/bilder/raspberry-pi/10-assistent-code.png`.*
+*Bild 10. Schritt Code.*
 
 ![Assistent: Xenia, Test grün](bilder/raspberry-pi/11-assistent-xenia.png)
 
-*Bild 11. Verbindungstest, dazu die Wahl Neue oder Alte Xenia. Ablegen als `docs/bilder/raspberry-pi/11-assistent-xenia.png`.*
+*Bild 11. Verbindungstest, dazu die Wahl Neue oder Alte Xenia.*
 
 ![Assistent: Mühle mit https, oder Schalter aus](bilder/raspberry-pi/12-assistent-muehle.png)
 
-*Bild 12. Mühle. Ablegen als `docs/bilder/raspberry-pi/12-assistent-muehle.png`.*
+*Bild 12. Mühle.*
 
 Bei der **alten Xenia** blendet Xenios Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Die Bezugszeit zählt Xenios selbst. Eco- und Ausschalt-Timer und die Schaltzeiten des Servers bleiben. Die Endpunkte stehen in [API der Xenia, alte API](API-Xenia.md#15-alte-xenia-dbl-offizielle-api).
 
@@ -208,13 +206,13 @@ Die Domain liegt bei Cloudflare und gilt dort als aktiv.
 
 ![Cloudflare: Tunnel xenios anlegen](bilder/raspberry-pi/14-cloudflare-tunnel.png)
 
-*Bild 14. Tunnel anlegen. Ablegen als `docs/bilder/raspberry-pi/14-cloudflare-tunnel.png`.*
+*Bild 14. Tunnel anlegen.*
 
 2. Bei *Install and run a connector* die Zeile `sudo cloudflared service install …` kopieren. Den Befehl nicht ausführen.
 
 ![Cloudflare: Zeile sudo cloudflared service install, der Token dahinter](bilder/raspberry-pi/15-cloudflare-token.png)
 
-*Bild 15. Die Installationszeile, nicht ausgeführt. Ablegen als `docs/bilder/raspberry-pi/15-cloudflare-token.png`.*
+*Bild 15. Die Installationszeile, nicht ausgeführt.*
 
 3. Im Einrichten von Xenios, Schritt **Unterwegs**, die Zeile in *Befehl aus Cloudflare* einfügen und **Token übernehmen**. Xenios schreibt den Token und startet `cloudflared`. Nach ein paar Sekunden:
 
@@ -234,7 +232,7 @@ http://xenios:8080
 
 ![Cloudflare: Add route, Published Application, URL http://xenios:8080](bilder/raspberry-pi/16-cloudflare-hostname.png)
 
-*Bild 16. Published Application mit `http://xenios:8080`. Ablegen als `docs/bilder/raspberry-pi/16-cloudflare-hostname.png`.*
+*Bild 16. Published Application mit `http://xenios:8080`.*
 
 5. In der App *Einstellungen → Server & Sicherheit → Von unterwegs*: `https://xenios.deine-domain.de` eintragen und **Testen**.
 
@@ -248,7 +246,7 @@ Nach `install.sh` läuft auf dem Pi der Dienst `xenios-update.timer`. Der Knopf 
 
 ![Einstellungen, Block Aktualisierung, Knopf und Versionszeile](bilder/raspberry-pi/17-aktualisieren.png)
 
-*Bild 17. Aktualisieren, mit erkennbarer neuer Version oder dem Hinweis, dass der Stand aktuell ist. Ablegen als `docs/bilder/raspberry-pi/17-aktualisieren.png`.*
+*Bild 17. Aktualisieren, mit erkennbarer neuer Version oder dem Hinweis, dass der Stand aktuell ist.*
 
 Zeigt die Seite stattdessen den `curl`-Befehl, fehlt der Dienst. Einmal, auch auf einer Installation von Hand:
 

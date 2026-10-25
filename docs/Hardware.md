@@ -34,7 +34,7 @@ Gastnetz, „WLAN-Geräte isolieren“ und ein zweites VLAN trennen Xenios von d
 
 ![Pi 5 mit offiziellem Netzteil, Gehäuse, 32-GB-Karte und Netzwerkkabel](bilder/hardware/01-raspberry-pi-set.png)
 
-*Bild 1. Ein passendes Pi-Set: Board, offizielles Netzteil, Gehäuse, Karte, Kabel. Ablegen als `docs/bilder/hardware/01-raspberry-pi-set.png`.*
+*Bild 1. Ein passendes Pi-Set: Board, offizielles Netzteil, Gehäuse, Karte, Kabel.*
 
 Dazu immer:
 
@@ -55,7 +55,7 @@ Ein Mini-PC mit SSD ist die ruhigere Wahl, wenn er schon vorhanden ist. Xenios n
 
 ![Rückseite eines Mini-PCs: Ethernet-Buchse, Strombuchse, USB](bilder/hardware/02-mini-pc.png)
 
-*Bild 2. Rückseite eines passenden Mini-PCs mit Ethernet und Netzteilanschluss. Ablegen als `docs/bilder/hardware/02-mini-pc.png`.*
+*Bild 2. Rückseite eines passenden Mini-PCs mit Ethernet und Netzteilanschluss.*
 
 **Neu, klein, sparsam.** Ein Rechner mit Intel N100 oder N150, 8 GB RAM, SSD und Gigabit-Ethernet. Leerlauf liegt typisch bei 6–15 W. Beelink, Minisforum, Trigkey und ähnliche bauen solche Gehäuse. Das konkrete Modell ist egal, solange SSD, Ethernet und ein 64-Bit-System dabei sind. Zwei Netzwerkbuchsen sind ein Bonus, eine genügt.
 

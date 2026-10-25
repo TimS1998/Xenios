@@ -4,8 +4,6 @@ Von einem laufenden Debian oder Ubuntu bis zur eingerichteten Xenios-Seite. Geda
 
 Linux selbst steht bei Ubuntu und Debian. Hier nur die Downloads. Die Befehle ab Abschnitt 3 gehören in das Terminal **auf dem Server** (Monitor oder SSH).
 
-Bilder sind verlinkt und erscheinen, sobald die PNG-Datei am genannten Ort liegt.
-
 ## 1. Was bereitliegt
 
 - Rechner aus der [Hardware-Übersicht](Hardware.md): 64-Bit, mindestens 2 GB RAM, SSD oder 32 GB Speicher, Ethernet. Debian oder Ubuntu ist installiert, mit einem Benutzer, der `sudo` darf.
@@ -54,7 +52,7 @@ Optional: im Router dieser Adresse eine feste Zuordnung geben (DHCP-Reservierung
 
 ![Router: Xenios steht in der Geräteliste mit fester Adresse](bilder/linux-docker/04-router-reservierung.png)
 
-*Bild 4. Feste Adresse im Router. Die Oberfläche ist je nach Router anders. Ablegen als `docs/bilder/linux-docker/04-router-reservierung.png`.*
+*Bild 4. Feste Adresse im Router. Die Oberfläche ist je nach Router anders.*
 
 Optional, vor dem Skript: System aktualisieren. `install.sh` holt sich, was es zum Start braucht, auch ohne diesen Schritt. Erscheint ein lila Fenster (*Pending kernel upgrade* / Dienste neu starten), mit der Tabulatortaste auf Ok und Enter bestätigen.
 
@@ -75,7 +73,7 @@ Das dauert einige Minuten. Am Ende steht die Zeile **Im Browser**. Die Adresse d
 
 ![Ende von install.sh: Adresse und Einrichtungscode](bilder/linux-docker/07-einrichtungscode.png)
 
-*Bild 7. Ausgabe des Skripts. Im echten Bild den Code abdecken. Ablegen als `docs/bilder/linux-docker/07-einrichtungscode.png`.*
+*Bild 7. Ausgabe des Skripts. Im echten Bild den Code abdecken.*
 
 Das Skript gibt den Pfad aus, zum Beispiel `/home/test/xenios/docker/.env`. Diesen Pfad nehmen. Eine vorhandene `.env` bleibt beim nächsten Lauf unverändert. Darin stehen die Zeitzone, die Heimnetz-Adresse vor dem Port (`192.168.178.57:8443`, Docker öffnet Ports sonst an der Firewall vorbei), das Image `ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always`.
 
@@ -94,7 +92,7 @@ sh /home/test/xenios/install.sh
 
 ![Inhalt von docker/.env nach dem Skript](bilder/linux-docker/06-env.png)
 
-*Bild 6. `.env` nach `install.sh`. Ablegen als `docs/bilder/linux-docker/06-env.png`.*
+*Bild 6. `.env` nach `install.sh`.*
 
 Steht am Ende „Docker-Gruppe gilt in dieser Sitzung noch nicht“: neu anmelden (bei SSH: `exit` und erneut verbinden). Der Server läuft schon. Prüfen:
 
@@ -128,7 +126,7 @@ Der Browser warnt, weil das Zertifikat vom Server selbst ausgestellt ist. Das is
 
 ![Browser-Warnung zum selbstsignierten Zertifikat, davor das Protokoll mit dem SHA-256-Fingerabdruck](bilder/linux-docker/08-zertifikatswarnung.png)
 
-*Bild 8. Zertifikatswarnung. Ablegen als `docs/bilder/linux-docker/08-zertifikatswarnung.png`.*
+*Bild 8. Zertifikatswarnung.*
 
 Der Assistent hat sechs Schritte: Code, Passwort, Xenia, Mühle, Unterwegs, Fertig.
 
@@ -141,15 +139,15 @@ Der Assistent hat sechs Schritte: Code, Passwort, Xenia, Mühle, Unterwegs, Fert
 
 ![Assistent, Schritt Code, Feld XXXX-XXXX](bilder/linux-docker/09-assistent-code.png)
 
-*Bild 9. Einrichtungscode im Assistenten. Ablegen als `docs/bilder/linux-docker/09-assistent-code.png`.*
+*Bild 9. Einrichtungscode im Assistenten.*
 
 ![Assistent, Xenia, Verbindungstest grün](bilder/linux-docker/10-assistent-xenia.png)
 
-*Bild 10. Verbindungstest grün, Name und Firmware. Ablegen als `docs/bilder/linux-docker/10-assistent-xenia.png`.*
+*Bild 10. Verbindungstest grün, Name und Firmware.*
 
 ![Assistent, Mühle, Adresse mit https und Owner-Passwort](bilder/linux-docker/11-assistent-muehle.png)
 
-*Bild 11. Mühle mit grünem Test, oder der Schalter aus. Ablegen als `docs/bilder/linux-docker/11-assistent-muehle.png`.*
+*Bild 11. Mühle mit grünem Test, oder der Schalter aus.*
 
 Bei der **alten Xenia** blendet Xenios Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Die Bezugszeit zählt Xenios selbst. Eco- und Ausschalt-Timer und die Schaltzeiten des Servers bleiben. Die Endpunkte stehen in [API der Xenia, alte API](API-Xenia.md#15-alte-xenia-dbl-offizielle-api).
 
@@ -181,13 +179,13 @@ Voraussetzung: die Domain liegt bei Cloudflare und gilt dort als aktiv. Im Assis
 
 ![Cloudflare: Tunnel anlegen, Typ Cloudflared, Name xenios](bilder/linux-docker/14-cloudflare-tunnel.png)
 
-*Bild 14. Tunnel anlegen. Ablegen als `docs/bilder/linux-docker/14-cloudflare-tunnel.png`.*
+*Bild 14. Tunnel anlegen.*
 
 2. Bei *Install and run a connector* die Zeile `sudo cloudflared service install …` kopieren. Den Befehl nicht ausführen.
 
 ![Cloudflare: Zeile sudo cloudflared service install, der Token dahinter](bilder/linux-docker/15-cloudflare-token.png)
 
-*Bild 15. Die Installationszeile, nicht ausgeführt. Ablegen als `docs/bilder/linux-docker/15-cloudflare-token.png`.*
+*Bild 15. Die Installationszeile, nicht ausgeführt.*
 
 3. Im Einrichten von Xenios, Schritt **Unterwegs**, die Zeile in *Befehl aus Cloudflare* einfügen und **Token übernehmen**. Den Befehl nicht ausführen. Xenios schreibt den Token und startet `cloudflared`.
 
@@ -211,7 +209,7 @@ http://xenios:8080
 
 ![Cloudflare: Add route, Published Application, Service-URL http://xenios:8080](bilder/linux-docker/16-cloudflare-hostname.png)
 
-*Bild 16. Published Application mit `http://xenios:8080`. Ablegen als `docs/bilder/linux-docker/16-cloudflare-hostname.png`.*
+*Bild 16. Published Application mit `http://xenios:8080`.*
 
 5. Die öffentliche Adresse eintragen, zum Beispiel `https://xenios.deine-domain.de`, und **Testen**. Der Server ruft sich selbst über diese Adresse auf. Noch nicht fertig: *Weiter*. Eintragen und testen geht jederzeit unter *Einstellungen → Server & Sicherheit*.
 
@@ -225,7 +223,7 @@ Nach `install.sh` läuft der Dienst `xenios-update.timer`. Der Knopf holt dann G
 
 ![Einstellungen, Block Aktualisierung, Knopf und Versionszeile](bilder/linux-docker/17-aktualisieren.png)
 
-*Bild 17. Aktualisieren. Ablegen als `docs/bilder/linux-docker/17-aktualisieren.png`.*
+*Bild 17. Aktualisieren.*
 
 Zeigt die Seite stattdessen den `curl`-Befehl, fehlt der Dienst. Einmal, auch wenn Xenios schon von Hand läuft:
 
