@@ -124,7 +124,7 @@ Normal startet der Drehknopf der E64 WS nach einem GbS-Mahlvorgang das fest eing
 
 **Einrichten:**
 1. *Server & Sicherheit → Grind-by-Sync mit Druckprofilen*: Vermittler einschalten. Die IP der Mühle wird aus der Adresse der Mühle übernommen; steht dort ein Name, die IP eintragen (am besten im Router fest vergeben).
-2. An der Mühle (Web-Oberfläche als Owner): *Connectivity → Machine To Machine → Xenia → Configuration*, als Host die IP des Xenios-Servers eintragen.
+2. Am Display der Mühle (nicht in der Web-Oberfläche): unten links **Settings** → *Connectivity → Machine To Machine → Xenia* (eingeschaltet lassen) → *Configuration*. Die Suche findet Xenios nicht, also die IP des Xenios-Servers von Hand als Host eintragen.
 3. Unter **Skripte → Grind-by-Sync** das Profil wählen. Dort steht auch, wann sich die Mühle zuletzt gemeldet hat und was beim letzten Drehknopf gestartet wurde.
 
 **Sicherheit:** Die Mühle fragt immer unverschlüsselt und ohne Anmeldung Port 80 ab; anders geht es nicht. Xenios nimmt auf diesem Port deshalb nur Verbindungen von der IP der Mühle an und trennt alle anderen sofort. Weitergereicht werden nur die Abfragen, die die Mühle braucht (`machine`, `mako`, `info`, `status`, `overview`, `diagram/get`, `brewratio`, `scripts/execute` mit ID 9). Skripte löschen, Einstellungen oder WLAN erreicht man darüber nicht, auch nicht mit gefälschter Absender-IP.

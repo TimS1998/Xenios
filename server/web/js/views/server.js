@@ -203,8 +203,8 @@ export function serverView(root) {
       h('details', { class: 'adv' }, h('summary', {}, 'Mühle umstellen', icon('more', 's20')),
         h('ol', { class: 'small' },
           h('li', {}, 'Vermittler einschalten und speichern.'),
-          h('li', {}, 'An der Mühle (Web-Oberfläche als Owner): Connectivity → Machine To Machine → Xenia → Configuration.'),
-          h('li', {}, 'Als Host die IP dieses Servers eintragen statt der IP der Xenia.'),
+          h('li', {}, 'Am Display der Mühle (nicht in der Web-Oberfläche): unten links Settings → Connectivity → Machine To Machine → Xenia → Configuration.'),
+          h('li', {}, 'Die Suche findet Xenios nicht: als Host die IP dieses Servers von Hand eintragen statt der IP der Xenia.'),
           h('li', {}, 'Unter Skripte das Profil für den Drehknopf wählen.')),
         h('p', { class: 'small muted' }, 'Läuft Xenios nicht, findet die Mühle keine Xenia. Zurück: in der Mühle wieder die IP der Xenia eintragen.')));
 
