@@ -1,0 +1,44 @@
+name: Image
+
+# Baut das Docker-Image und schiebt es nach GitHub Packages (ghcr.io/tims1998/xenios:latest).
+# Läuft bei Änderungen an Server oder Docker und lässt sich von Hand starten:
+#   gh workflow run image.yml
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'docker/**'
+      - '.github/workflows/image.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image bauen und veröffentlichen
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/xenios"
+          docker buildx build server \
+            --file docker/Dockerfile \
+            --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "${IMAGE}:latest" \
+            --push
+          { echo "### Docker-Image"; echo "${IMAGE}:latest"; } >> "$GITHUB_STEP_SUMMARY"
