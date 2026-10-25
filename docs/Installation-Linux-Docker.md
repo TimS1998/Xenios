@@ -217,27 +217,32 @@ Der Token in `.env` ist ein Geheimnis. Die Datei wird nicht ins Git-Repository �
 
 ## 8. Aktualisieren und sichern
 
-Unter *Einstellungen → Server & Sicherheit* steht die installierte Version. Gibt es auf GitHub ein neueres Release, heißt der Knopf **Auf x.y.z aktualisieren**, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
+Eine schon laufende Installation holt den neuen Server, ohne Einrichtung, Passwort, Maschine, Mühle oder Bezüge neu anzulegen. Die Datei `docker/.env` bleibt, das Volume `xenios_xenios-data` auch.
 
-Nach `install.sh` läuft der Dienst `xenios-update.timer`. Der Knopf holt dann Git und das Image und startet neu. Konfiguration, Sitzungen und Bezüge bleiben im Volume `xenios_xenios-data`. Die Seite kommt danach von selbst zurück.
+1. In der App *Einstellungen → Server & Sicherheit* öffnen. Dort steht die installierte Version. Der Knopf heißt **Auf x.y.z aktualisieren**, wenn auf GitHub ein neueres Release liegt, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
+2. Den Knopf drücken. Der Dienst `xenios-update.timer` holt Git und das Image und startet neu. Die Seite kommt danach von selbst zurück.
 
 ![Einstellungen, Block Aktualisierung, Knopf und Versionszeile](bilder/linux-docker/17-aktualisieren.png)
 
 *Bild 17. Aktualisieren.*
 
-Zeigt die Seite stattdessen den `curl`-Befehl, fehlt der Dienst. Einmal, auch wenn Xenios schon von Hand läuft:
+Zeigt die Seite den `curl`-Befehl, fehlt der Dienst. Einmal auf dem Server, im Ordner der Installation. Als root zeigt `~` auf `/root`.
 
 ```bash
 sh /home/test/xenios/install.sh
 ```
 
-Eine vorhandene `docker/.env` bleibt. Nur holen und neu starten:
+Danach geht der Knopf. Nur holen und neu starten, ohne den Dienst neu zu schreiben:
 
 ```bash
 sh /home/test/xenios/install.sh --update
 ```
 
+Am Ende ist `xenios` `healthy`. Im Browser die Seite neu laden. Unter *Server & Sicherheit* steht die neue Version. Die Android-App am Server zeigt dieselbe Oberfläche, dafür ist kein neues APK nötig.
+
 Eine feste Version: in `.env` zum Beispiel `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`, danach `--update`. Auf einem Windows-PC ohne dieses Skript prüft der Knopf nur, ob eine neuere Version da ist. Geholt wird sie dort mit `git pull` und einem Neustart des Servers, siehe [Einrichtung](Einrichtung.md#1-server-installieren-windows-pc-läuft-dauerhaft).
+
+Der **Direkt-Modus** der Android-App spricht die Maschine ohne diesen Server an. Die Oberfläche und die Wahl **Alte Xenia** stecken in der APK. Dafür die App aus Release 2.2.0 installieren, siehe [Android-App](Android-App.md#direkt-modus-ohne-server-nur-im-heimnetz).
 
 | Was | Befehl |
 |---|---|

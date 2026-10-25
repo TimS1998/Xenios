@@ -70,8 +70,10 @@ Ordner `app/` in Android Studio öffnen und *Run* drücken. Für eine Release-AP
 
 ## Installieren
 1. APK auf das Handy laden (Artefakt-ZIP entpacken bzw. aus dem Release).
-2. Öffnen und „Aus unbekannten Quellen installieren“ für den Browser bzw. Dateimanager erlauben.
-3. App starten, Server-Adresse und App-Passwort eingeben.
+2. Öffnen und „Aus unbekannten Quellen installieren“ für den Browser bzw. Dateimanager erlauben. Neuere Android-Versionen geben das erst in den Entwickleroptionen frei, oft mit einem Fenster von 24 Stunden. Der Weg unterscheidet sich je nach Handy.
+3. App starten und eine der beiden Arten wählen.
+   - **Mit Server:** Adresse und App-Passwort. Die Oberfläche kommt vom Server. Nach einem Server-Update reicht die vorhandene App, siehe [Linux, Aktualisieren](Installation-Linux-Docker.md#8-aktualisieren-und-sichern).
+   - **Direkt im Heimnetz:** **Neue Xenia** oder **Alte Xenia**, dazu die IP der Maschine und optional die Mühle. Diese Wahl und die Oberfläche dafür liegen in der APK. Ab Release 2.2.0 ist die alte Xenia im Direkt-Modus enthalten.
 4. Widgets: Startbildschirm lange drücken → *Widgets* → *Xenios*. Kachel: Schnelleinstellungen bearbeiten → *Xenios* hineinziehen.
 
 ## Test mit der Simulation

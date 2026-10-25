@@ -240,9 +240,10 @@ Weitere Härtung (Rate-Limit, Länderfilter): [Einrichtung, Cloudflare](Einricht
 
 ## 8. Aktualisieren und sichern
 
-Unter *Einstellungen → Server & Sicherheit* steht die installierte Version. Gibt es auf GitHub ein neueres Release, heißt der Knopf **Auf x.y.z aktualisieren**, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
+Eine schon laufende Installation holt den neuen Server, ohne Einrichtung, Passwort, Maschine, Mühle oder Bezüge neu anzulegen. Die Datei `docker/.env` bleibt.
 
-Nach `install.sh` läuft auf dem Pi der Dienst `xenios-update.timer`. Der Knopf holt dann Git und das Image und startet neu. Konfiguration, Sitzungen und Bezüge bleiben. Die Seite kommt danach von selbst zurück.
+1. In der App *Einstellungen → Server & Sicherheit* öffnen. Dort steht die installierte Version. Der Knopf heißt **Auf x.y.z aktualisieren**, wenn auf GitHub ein neueres Release liegt, sonst **Aktualisieren**.
+2. Den Knopf drücken. Der Dienst `xenios-update.timer` holt Git und das Image und startet neu. Die Seite kommt danach von selbst zurück.
 
 ![Einstellungen, Block Aktualisierung, Knopf und Versionszeile](bilder/raspberry-pi/17-aktualisieren.png)
 
