@@ -159,6 +159,7 @@ export function createApp(cfg, hooks = {}) {
     push: { enabled: push.enabled, publicKey: cfg.push.publicKey, topics: PUSH_TOPICS },
     machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs' },
     grinder: { enabled: cfg.grinder.enabled, databaseDownload: Boolean(cfg.grinder.allowDatabaseDownload) },
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
   // Anmeldung, Einrichtung, Sitzungen, Server-Einstellungen

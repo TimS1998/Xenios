@@ -1,4 +1,5 @@
 // UI-Hilfen: Elemente bauen (ohne innerHTML für Fremddaten), Icons, Snackbar, Sheets, Dialoge, Formatierung.
+import { store } from './api.js';
 
 // replaceChildren/append ignorieren null/false (praktisch für bedingte Elemente)
 for (const proto of [Element.prototype, DocumentFragment.prototype]) {
@@ -96,15 +97,32 @@ export function fromHhmm(s) {
   if (!m) return null;
   return Math.min(23, Number(m[1])) * 60 + Math.min(59, Number(m[2]));
 }
+// Zeitzone der Anzeige: die des Servers (Zeitplan und Wecker). Die WebView der App bleibt sonst auf UTC,
+// dann liegt jede Uhrzeit eine Stunde daneben, sobald die Winterzeit gilt.
+export function clockZone() {
+  try {
+    const z = globalThis.window?.XeniaApp?.timeZone?.();
+    if (typeof z === 'string' && z.includes('/')) return z;
+  } catch { /* keine App-Brücke */ }
+  const server = store.server?.timezone;
+  if (server && server !== 'UTC') return server;
+  return undefined;
+}
+
+export function withZone(opts) {
+  const timeZone = clockZone();
+  return timeZone ? { ...opts, timeZone } : opts;
+}
+
 export function ago(iso) {
   if (!iso) return '–';
   const s = Math.round((Date.now() - Date.parse(iso)) / 1000);
   if (s < 60) return 'gerade eben';
   if (s < 3600) return `vor ${Math.round(s / 60)} min`;
   if (s < 86400) return `vor ${Math.round(s / 3600)} h`;
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleDateString('de-DE', withZone({ day: '2-digit', month: '2-digit' })) + ' ' + new Date(iso).toLocaleTimeString('de-DE', withZone({ hour: '2-digit', minute: '2-digit' }));
 }
-export const dateTime = (iso) => (iso ? new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–');
+export const dateTime = (iso) => (iso ? new Date(iso).toLocaleString('de-DE', withZone({ day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '–');
 
 // --- Bausteine ---
 export function switchEl({ checked, disabled, onChange, label }) {

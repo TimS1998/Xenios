@@ -328,6 +328,10 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun version(): String = BuildConfigInfo.VERSION
 
+        /** IANA-Zeitzone des Handys. Die WebView bleibt sonst auf UTC, dann liegt der Wecker eine Stunde daneben. */
+        @JavascriptInterface
+        fun timeZone(): String = java.util.TimeZone.getDefault().id
+
         /** Nächsten Wecker dieses Handys sofort an den Server melden; gibt den Zeitpunkt (ms) zurück, 0 = keiner. */
         @JavascriptInterface
         fun checkAlarm(): Long {

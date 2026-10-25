@@ -1,5 +1,5 @@
 // Wochen-Timer (Auto-Ein/Aus pro Tag, Brühen/Dampf), Eco- und Abschalt-Timer, Uhr der Maschine.
-import { h, icon, snackbar, switchEl, sliderRow, hhmm, fromHhmm, fmtInt, sheet, pickTimeDialog } from '../ui.js';
+import { h, icon, snackbar, switchEl, sliderRow, hhmm, fromHhmm, fmtInt, sheet, pickTimeDialog, withZone } from '../ui.js';
 import { api, store, isClassic } from '../api.js';
 
 const DAY_DE = { MONDAY: 'Montag', TUESDAY: 'Dienstag', WEDNESDAY: 'Mittwoch', THUSRDAY: 'Donnerstag', FRIDAY: 'Freitag', SATURDAY: 'Samstag', SUNDAY: 'Sonntag' };
@@ -239,7 +239,7 @@ export function timerView(root) {
       checkBtn.disabled = false;
     }
   } }, icon('refresh', 's18'), 'Wecker prüfen');
-  const when = (ms) => (ms ? new Date(ms).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–');
+  const when = (ms) => (ms ? new Date(ms).toLocaleString('de-DE', withZone({ weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '–');
 
   function paintWake() {
     const c = wake.config;
