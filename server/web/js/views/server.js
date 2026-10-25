@@ -146,7 +146,7 @@ export function serverView(root) {
       try {
         await api('/api/admin/tunnel-token', { method: 'POST', body: { token: input.value } });
         input.value = '';
-        snackbar('Token übernommen. cloudflared startet in wenigen Sekunden.');
+        snackbar('Token übernommen. cloudflared startet.');
       } catch (e) {
         note.textContent = e.message;
         shake(input);

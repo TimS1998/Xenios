@@ -34,3 +34,14 @@ export function requestTunnelToken(dataDir, token) {
   fs.writeFileSync(file, `${token}\n`, { mode: 0o600 });
   try { fs.chmodSync(file, 0o600); } catch { /* Windows kennt die Modi nur eingeschränkt */ }
 }
+
+// true, sobald install.sh die Datei nach dem Start von cloudflared gelöscht hat.
+export async function waitForTunnelApplied(dataDir, { timeoutMs = 20000, intervalMs = 400 } = {}) {
+  const file = tunnelTokenFile(dataDir);
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!fs.existsSync(file)) return true;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return !fs.existsSync(file);
+}

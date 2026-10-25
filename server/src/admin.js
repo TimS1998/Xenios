@@ -9,7 +9,7 @@ import { GrinderHttp } from './grinder.js';
 import { ensureCert, certInfo } from './tls.js';
 import { setLogLevel, logger } from './log.js';
 import { updateInfo, requestUpdate, helperAlive, readUpdate } from './update.js';
-import { tunnelTokenFromPaste, requestTunnelToken } from './tunnel-token.js';
+import { tunnelTokenFromPaste, requestTunnelToken, waitForTunnelApplied } from './tunnel-token.js';
 
 const log = logger('admin');
 
@@ -299,12 +299,18 @@ export function authRoutes(route, app) {
   }
 
   // Der Token bleibt im Datenordner, bis install.sh ihn in docker/.env schreibt und cloudflared startet.
-  function storeTunnelToken(pasted, ip) {
+  async function storeTunnelToken(pasted, ip) {
     const token = tunnelTokenFromPaste(pasted);
     if (token === '') throw bad('Token fehlt');
     if (!token) throw bad('Das ist kein Cloudflare-Token. Die Zeile „cloudflared service install …“ einfügen. Den Befehl nicht ausführen.');
+    if (!helperAlive(readUpdate(cfg.dataDir).helper)) {
+      throw httpError(409, 'Der Update-Dienst auf dem Server läuft nicht. Einmal: sh ~/xenios/install.sh');
+    }
     requestTunnelToken(cfg.dataDir, token);
     log.info(`Tunnel-Token für den Host hinterlegt (von ${ip})`);
+    const applied = await waitForTunnelApplied(cfg.dataDir);
+    if (!applied) throw httpError(504, 'cloudflared wurde nicht gestartet. Auf dem Server: sh ~/xenios/install.sh --apply-requested');
+    log.info(`Tunnel-Token vom Host übernommen (von ${ip})`);
     return { ok: true };
   }
 

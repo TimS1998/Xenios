@@ -101,9 +101,12 @@ apply_tunnel_token() {
   printf 'TUNNEL_TOKEN=%s\nCOMPOSE_PROFILES=tunnel\n' "$token" >> "$tmp"
   mv "$tmp" "$envf"
   chmod 600 "$envf" 2>/dev/null || true
-  run_docker exec xenios rm -f /data/tunnel.token 2>/dev/null || true
   say "Tunnel-Token übernommen, starte cloudflared."
-  compose up -d || say "Starten von cloudflared fehlgeschlagen."
+  if compose up -d; then
+    run_docker exec xenios rm -f /data/tunnel.token 2>/dev/null || true
+  else
+    say "Starten von cloudflared fehlgeschlagen."
+  fi
 }
 
 apply_requested() {
@@ -267,7 +270,7 @@ print_done() {
   if [ -n "$code" ]; then
     say "$code"
   else
-    say "Einrichtungscode:  compose logs xenios   (im Ordner $DIR/docker)"
+    say "Einrichtungscode:  docker compose -f $DIR/docker/compose.yaml logs xenios"
   fi
   say "────────────────────────────────────────"
   if ! docker_ok; then

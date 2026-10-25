@@ -14,7 +14,7 @@ import { createSelfSignedCert } from '../src/tls.js';
 import { unzip } from '../src/grinder.js';
 import { makeZip, packBackup, readBackup } from '../src/backup.js';
 import { compareVersions, helperAlive, requestUpdate, readUpdate, resetLatestCache, fetchLatest } from '../src/update.js';
-import { tunnelTokenFromPaste, requestTunnelToken, tunnelTokenFile } from '../src/tunnel-token.js';
+import { tunnelTokenFromPaste, requestTunnelToken, tunnelTokenFile, waitForTunnelApplied } from '../src/tunnel-token.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -171,6 +171,20 @@ test('Tunnel-Token wird aus dem cloudflared-Befehl gelesen, der Befehl bleibt Te
   try {
     requestTunnelToken(dir, token);
     assert.equal(fs.readFileSync(tunnelTokenFile(dir), 'utf8'), `${token}\n`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Token übernehmen wartet, bis das Host-Skript die Datei löscht', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xenios-token-wait-'));
+  const token = Buffer.from(JSON.stringify({ a: 'acct', t: '11111111-1111-1111-1111-111111111111', s: 'secret' })).toString('base64');
+  try {
+    requestTunnelToken(dir, token);
+    setTimeout(() => fs.rmSync(tunnelTokenFile(dir)), 50);
+    assert.equal(await waitForTunnelApplied(dir, { timeoutMs: 1000, intervalMs: 20 }), true);
+    requestTunnelToken(dir, token);
+    assert.equal(await waitForTunnelApplied(dir, { timeoutMs: 80, intervalMs: 20 }), false);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

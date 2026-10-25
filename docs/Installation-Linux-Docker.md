@@ -153,7 +153,7 @@ Der Assistent hat sechs Schritte: Code, Passwort, Xenia, Mühle, Unterwegs, Fert
 
 Bei der **alten Xenia** blendet Xenios Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Die Bezugszeit zählt Xenios selbst. Eco- und Ausschalt-Timer und die Schaltzeiten des Servers bleiben. Die Endpunkte stehen in [API der Xenia, alte API](API-Xenia.md#15-alte-xenia-dbl-offizielle-api).
 
-Danach die Anmeldung mit dem App-Passwort. Die Seite im Heimnetz ist damit fertig. Installieren als App und Mitteilungen brauchen eine echte HTTPS-Adresse über Cloudflare; mit dem selbstsignierten Zertifikat lässt sich die Seite benutzen, Chrome bietet dafür keine Installation an. Siehe [Android-App](Android-App.md).
+Danach die Anmeldung mit dem App-Passwort. Die Seite im Heimnetz ist damit fertig. Installieren als App und Mitteilungen brauchen eine echte HTTPS-Adresse über Cloudflare ([Abschnitt 8](#8-von-unterwegs-optional)); mit dem selbstsignierten Zertifikat lässt sich die Seite benutzen, Chrome bietet dafür keine Installation an. Siehe [Android-App](Android-App.md).
 
 ## 6. Zertifikat auf die eigene Adresse ausstellen
 
@@ -179,17 +179,13 @@ sudo reboot
 
 Eine Minute warten, im Browser wieder `https://192.168.178.57:8443` öffnen und anmelden.
 
-Ein Server-Ubuntu oder Debian schläft nicht. Läuft ausnahmsweise eine Desktop-Oberfläche auf demselben Rechner:
+Ein Server-Ubuntu oder Debian schläft nicht. Der Gerät wird nie müde, der Gerät schläft nie ein, der Gerät ist immer vor der Chef im Geschäft und macht den Espresso schweißfrei. Läuft ausnahmsweise eine Desktop-Oberfläche auf demselben Rechner:
 
 ```bash
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
 
-Beim Mini-PC im BIOS einschalten, dass das Gerät nach einem Stromausfall wieder startet.
-
-![BIOS: nach Stromausfall einschalten](bilder/linux-docker/13-bios-stromausfall.png)
-
-*Bild 13. BIOS-Option für den Neustart nach Stromausfall. Die Bezeichnung unterscheidet sich je nach Hersteller. Ablegen als `docs/bilder/linux-docker/13-bios-stromausfall.png`.*
+Beim Mini-PC im BIOS einschalten, dass das Gerät nach einem Stromausfall wieder startet. Die Bezeichnung unterscheidet sich je nach Hersteller.
 
 ## 8. Von unterwegs (optional)
 

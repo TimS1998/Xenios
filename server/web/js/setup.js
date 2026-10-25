@@ -191,7 +191,7 @@ export function showSetup(root, { onDone }) {
       tokenErr.textContent = '';
       try {
         await api('/auth/setup/tunnel', { method: 'POST', body: { code: st.code, token: t.token } });
-        snackbar('Token übernommen. cloudflared startet in wenigen Sekunden.');
+        snackbar('Token übernommen. cloudflared startet.');
       } catch (ex) {
         tokenErr.textContent = ex.message;
         shake(tokenInput);
