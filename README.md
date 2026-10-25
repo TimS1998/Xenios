@@ -15,7 +15,7 @@ Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Wid
 | [`server/`](server) | Node.js-Server ohne npm-Abhängigkeiten (`src/`), die Web-App (`web/`), Simulation der Geräte (`mock/`), Tests (`test/`), Start ohne Docker (`deploy/`: Windows, systemd, cloudflared) |
 | [`app/`](app) | Android-App (Kotlin); packt `server/web` für den Direkt-Modus mit ein |
 | [`docker/`](docker) | `Dockerfile`, `compose.yaml`, `.env.example` |
-| [`docs/`](docs) | Einrichtung, Hardware, Installation (Raspberry Pi und Linux/Docker), Git- und Docker-Anleitung, APIs von Maschine, Mühle und Server |
+| [`docs/`](docs) | [Einrichtung](docs/Einrichtung.md), Hardware, Installation (Raspberry Pi und Linux/Docker), Git- und Docker-Anleitung, APIs von Maschine, Mühle und Server |
 
 ## Schnellstart
 
@@ -36,11 +36,11 @@ docker compose logs xenios       # zeigt den Einrichtungscode
 cd server
 npm start                        # zeigt den Einrichtungscode
 ```
-Dann `https://<IP-des-Rechners>:8443` öffnen (Zertifikatswarnung einmal bestätigen), den Code eingeben und der Einrichtung folgen: App-Passwort, neue oder alte Xenia, optional die Mühle, jeweils mit Verbindungstest. Ohne Mühle bleiben die Mühlenseiten aus; Dosis und Mahlgrad trägt man bei einem Bezug von Hand ein. Alles Weitere unter **Einstellungen → Server & Sicherheit**, ohne Neustart.
+Dann `https://<IP-des-Rechners>:8443` öffnen (Zertifikatswarnung einmal bestätigen), den Code eingeben und der [Einrichtung](docs/Einrichtung.md) folgen: App-Passwort, neue oder alte Xenia, optional die Mühle, jeweils mit Verbindungstest. Ohne Mühle bleiben die Mühlenseiten aus; Dosis und Mahlgrad trägt man bei einem Bezug von Hand ein. Alles Weitere unter **Einstellungen → Server & Sicherheit**, ohne Neustart.
 
 Von einem frischen System an: [welcher Rechner](docs/Hardware.md), [Raspberry Pi](docs/Installation-Raspberry-Pi.md), [Linux mit Docker](docs/Installation-Linux-Docker.md).
 
-Ausführlich: [Einrichtung](docs/Einrichtung.md) (Docker, Windows-Autostart, Cloudflare-Tunnel, Android) und [Git und Docker Schritt für Schritt](docs/Git-und-Docker.md) (erster Upload, Releases mit signierter APK, Docker-Betrieb, Sicherung).
+[Einrichtung](docs/Einrichtung.md): [Windows-PC](docs/Einrichtung.md#1-server-installieren-windows-pc-läuft-dauerhaft), [Cloudflare-Tunnel](docs/Einrichtung.md#2-cloudflare-tunnel), [Android-App](docs/Einrichtung.md#3-android-app-installieren), [Linux, Raspberry Pi oder NAS](docs/Einrichtung.md#4-alternativ-linux-server-raspberry-pi-oder-nas-mit-docker), [Einstellungen](docs/Einrichtung.md#5-einstellungen), [Grind-by-Sync](docs/Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional). Daneben [Git und Docker Schritt für Schritt](docs/Git-und-Docker.md) (erster Upload, Releases mit signierter APK, Docker-Betrieb, Sicherung).
 
 ## Releases
 

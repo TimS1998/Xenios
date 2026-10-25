@@ -158,7 +158,7 @@ export async function probeTunnel(url, instance, { fetchImpl = globalThis.fetch 
   if (res.status === 200 && id === instance) return { ok: true, name: 'Tunnel funktioniert', detail: `${new URL(url).host} → dieser Server` };
   if (id) throw httpError(502, 'Unter dieser Adresse antwortet ein anderer Xenios-Server');
   if ([502, 503, 530].includes(res.status)) throw httpError(502, `Cloudflare erreicht den Server nicht (HTTP ${res.status}) – läuft cloudflared, stimmt die Service URL?`);
-  throw httpError(502, `Unerwartete Antwort (HTTP ${res.status}) – zeigt der Public Hostname auf den Tunnel?`);
+  throw httpError(502, `Unerwartete Antwort (HTTP ${res.status}) – zeigt die Published Application auf den Tunnel?`);
 }
 
 export async function probeDevice({ kind, url, password }, { pinned = null, instance = null } = {}) {
@@ -291,7 +291,7 @@ export function authRoutes(route, app) {
     return clean;
   }
 
-  // Service URL für den Public Hostname in Cloudflare: im Container der Compose-Dienstname, sonst Loopback
+  // Service URL für die Published Application in Cloudflare: im Container der Compose-Dienstname, sonst Loopback
   function tunnelEnv() {
     const docker = fs.existsSync('/.dockerenv');
     const helper = helperAlive(readUpdate(cfg.dataDir).helper);
@@ -304,12 +304,12 @@ export function authRoutes(route, app) {
     if (token === '') throw bad('Token fehlt');
     if (!token) throw bad('Das ist kein Cloudflare-Token. Die Zeile „cloudflared service install …“ einfügen. Den Befehl nicht ausführen.');
     if (!helperAlive(readUpdate(cfg.dataDir).helper)) {
-      throw httpError(409, 'Der Update-Dienst auf dem Server läuft nicht. Einmal: sh ~/xenios/install.sh');
+      throw httpError(409, 'Der Update-Dienst auf dem Server läuft nicht. Einmal im Ordner der Installation: sh install.sh');
     }
     requestTunnelToken(cfg.dataDir, token);
     log.info(`Tunnel-Token für den Host hinterlegt (von ${ip})`);
     const applied = await waitForTunnelApplied(cfg.dataDir);
-    if (!applied) throw httpError(504, 'cloudflared wurde nicht gestartet. Auf dem Server: sh ~/xenios/install.sh --apply-requested');
+    if (!applied) throw httpError(504, 'cloudflared wurde nicht gestartet. Auf dem Server im Ordner der Installation: sh install.sh --apply-requested');
     log.info(`Tunnel-Token vom Host übernommen (von ${ip})`);
     return { ok: true };
   }

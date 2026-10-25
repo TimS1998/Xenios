@@ -160,7 +160,7 @@ export function serverView(root) {
       note,
       tunnel.helper
         ? h('p', { class: 'muted small' }, 'Die Zeile einfügen. Xenios führt sie nicht aus, sondern startet cloudflared selbst.')
-        : h('p', { class: 'muted small' }, 'Die Zeile einfügen. Damit sie ankommt, einmal auf dem Server: ', h('code', {}, 'sh ~/xenios/install.sh')));
+        : h('p', { class: 'muted small' }, 'Die Zeile einfügen. Damit sie ankommt, einmal auf dem Server im Ordner der Installation: ', h('code', {}, 'sh install.sh'), '. Als root zeigt ~ auf /root.'));
   }
 
   function probeButton(kind, getBody) {

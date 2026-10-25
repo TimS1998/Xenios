@@ -158,7 +158,7 @@ Assistent:
 2. **Passwort.** Mindestens 10 Zeichen, zweimal. Gilt für alle Geräte. Gespeichert wird nur ein Hash.
 3. **Xenia.** Oben **Neue Xenia** (Brew-by-Sync, aktuelle Firmware) oder **Alte Xenia** (DBL, ältere offizielle API). Adresse `http://192.168.x.x`, ohne Pfad. *Verbindung testen*. Passt die Wahl nicht zur Maschine, steht unter dem Ergebnis: „Die Maschine antwortet wie die alte API – oben Alte Xenia wählen.“ oder der Satz für die neue API. Dann die andere Schaltfläche und noch einmal testen. Ist die Maschine aus, geht *Weiter* trotzdem; ändern später unter *Einstellungen → Server & Sicherheit*. Dieselbe Umschaltung hat die Android-App im Direkt-Modus ([Android-App](Android-App.md)).
 4. **Mühle.** Ohne E64 WS den Schalter aus. Dann fehlen Menüpunkt Mühle, Mühlen-Kacheln und Grind-by-Sync; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Mit Mühle: `https://192.168.x.x` und das **Owner-Passwort** (dieselbe Rolle Owner wie auf der Webseite der Mühle). *Verbindung testen*. Das Passwort wird verschlüsselt gespeichert. Grind-by-Sync gibt es nur zusammen mit der neuen Xenia.
-5. **Unterwegs.** Aus lassen, bis [Abschnitt 8](#8-von-unterwegs-optional) dran ist.
+5. **Unterwegs.** Aus lassen, bis [Abschnitt 7](#7-von-unterwegs-optional) dran ist.
 6. **Fertig.** *Einrichtung abschließen*, danach mit dem App-Passwort anmelden.
 
 ![Assistent: Einrichtungscode](bilder/raspberry-pi/10-assistent-code.png)
@@ -175,22 +175,9 @@ Assistent:
 
 Bei der **alten Xenia** blendet Xenios Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Die Bezugszeit zählt Xenios selbst. Eco- und Ausschalt-Timer und die Schaltzeiten des Servers bleiben. Die Endpunkte stehen in [API der Xenia, alte API](API-Xenia.md#15-alte-xenia-dbl-offizielle-api).
 
-Die Seite im Heimnetz ist benutzbar. Als App installieren und Mitteilungen gehen erst über die öffentliche HTTPS-Adresse aus Abschnitt 8. Siehe [Android-App](Android-App.md).
+Die Seite im Heimnetz ist benutzbar. Als App installieren und Mitteilungen gehen erst über die öffentliche HTTPS-Adresse aus [Abschnitt 7](#7-von-unterwegs-optional). Siehe [Android-App](Android-App.md).
 
-## 6. Zertifikat auf die eigene Adresse ausstellen
-
-*Einstellungen → Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat*: `192.168.178.32` eintragen, ohne `https://` und ohne Port. Das Zertifikat wird neu erzeugt. Die Browser-Warnung einmal erneut bestätigen.
-
-```bash
-cd ~/xenios/docker
-docker compose logs --tail 30 xenios | grep SHA-256
-```
-
-![Feld Weitere Namen/IPs fürs Zertifikat](bilder/raspberry-pi/13-zertifikat-namen.png)
-
-*Bild 13. Heimnetz-Adresse im Zertifikat. Ablegen als `docs/bilder/raspberry-pi/13-zertifikat-namen.png`.*
-
-## 7. Dauerbetrieb
+## 6. Dauerbetrieb
 
 Der Pi startet nach Stromausfall von selbst. Docker startet Xenios danach (`restart: unless-stopped`).
 
@@ -211,7 +198,7 @@ Nach einem Reboot ist er wieder an. Ein Pi, der immer erreichbar sein soll, hän
 
 Ein Blitzsymbol oder die Meldung `Undervoltage detected` im Protokoll (`dmesg | grep -i under`) heißt: Netzteil zu schwach. Das offizielle Netzteil einsetzen.
 
-## 8. Von unterwegs (optional)
+## 7. Von unterwegs (optional)
 
 Im Heimnetz ist die Installation hier fertig. Handy außer Haus, installierbare Web-App und Mitteilungen brauchen eine öffentliche HTTPS-Adresse. Kostenloser Cloudflare-Tarif, keine Portfreigabe im Router.
 
@@ -237,24 +224,23 @@ docker compose -f ~/xenios/docker/compose.yaml ps
 
 `xenios` ist `healthy`, `cloudflared` läuft. Dasselbe Feld gibt es später unter *Einstellungen → Server & Sicherheit → Von unterwegs*.
 
-4. **Public Hostname:** Subdomain `xenios`, eigene Domain, Typ **HTTP**, URL:
+4. Im Tunnel **Add route → Published Application**: Subdomain `xenios`, eigene Domain, Typ **HTTP**, URL:
 
 ```text
-xenios:8080
+http://xenios:8080
 ```
 
 `localhost` erreicht den Container nicht.
 
-![Public Hostname, URL xenios:8080](bilder/raspberry-pi/16-cloudflare-hostname.png)
+![Cloudflare: Add route, Published Application, URL http://xenios:8080](bilder/raspberry-pi/16-cloudflare-hostname.png)
 
-*Bild 16. Service-URL `xenios:8080`. Ablegen als `docs/bilder/raspberry-pi/16-cloudflare-hostname.png`.*
+*Bild 16. Published Application mit `http://xenios:8080`. Ablegen als `docs/bilder/raspberry-pi/16-cloudflare-hostname.png`.*
 
-5. *SSL/TLS* → *Edge Certificates*: **Always Use HTTPS**, **Minimum TLS 1.2**.
-6. In der App *Einstellungen → Server & Sicherheit → Von unterwegs*: `https://xenios.deine-domain.de` eintragen und **Testen**.
+5. In der App *Einstellungen → Server & Sicherheit → Von unterwegs*: `https://xenios.deine-domain.de` eintragen und **Testen**.
 
 Weitere Härtung (Rate-Limit, Länderfilter): [Einrichtung, Cloudflare](Einrichtung.md#2-cloudflare-tunnel).
 
-## 9. Aktualisieren und sichern
+## 8. Aktualisieren und sichern
 
 Unter *Einstellungen → Server & Sicherheit* steht die installierte Version. Gibt es auf GitHub ein neueres Release, heißt der Knopf **Auf x.y.z aktualisieren**, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
 
@@ -300,7 +286,7 @@ Von Windows-PowerShell:
 scp dein-benutzer@192.168.178.32:xenios/docker/xenios-backup.tgz .
 ```
 
-Wiederherstellen auf einem frischen Pi, nachdem `install.sh` gelaufen ist (oder Abschnitt 11) und die Sicherungsdatei im Ordner `docker/` liegt. Liegt schon eine `.env` aus dem Skript, bleibt sie beim erneuten Lauf unverändert; die Sicherung ersetzt nur das Datenvolume:
+Wiederherstellen auf einem frischen Pi, nachdem `install.sh` gelaufen ist und die Sicherungsdatei im Ordner `docker/` liegt. Liegt schon eine `.env` aus dem Skript, bleibt sie beim erneuten Lauf unverändert; die Sicherung ersetzt nur das Datenvolume:
 
 ```bash
 cd ~/xenios/docker
@@ -311,7 +297,7 @@ docker compose up -d
 
 Dieselbe Sicherung läuft auf einem Mini-PC wieder ein. `1000` ist der Benutzer `node` im Container.
 
-## 10. Wenn etwas nicht geht
+## 9. Wenn etwas nicht geht
 
 Befehle mit `docker compose` im Ordner `~/xenios/docker`, oder mit `-f ~/xenios/docker/compose.yaml` von überall.
 
@@ -329,32 +315,5 @@ Befehle mit `docker compose` im Ordner `~/xenios/docker`, oder mit `-f ~/xenios/
 | Xenia nicht erreichbar | Auf dem Pi: `curl -m 5 http://192.168.x.x/api/v2/machine`. Ohne Antwort: Kabel, gleiches Netz, Gast-WLAN aus. |
 | Verbindungstest will die andere Xenia | Im Assistenten oder unter *Server & Sicherheit* Neue bzw. Alte Xenia umschalten und erneut testen. |
 | Pi wird heiß, startet neu, Blitzsymbol | Offizielles Netzteil, Gehäuse mit Lüfter beim Pi 5. |
-| Karte voll oder schreibt nicht mehr | `df -h`. Sicherung aus Abschnitt 9 auf eine neue Karte oder eine SSD mitnehmen. |
+| Karte voll oder schreibt nicht mehr | `df -h`. Sicherung aus Abschnitt 8 auf eine neue Karte oder eine SSD mitnehmen. |
 | Timer zur falschen Zeit | `TZ` in `.env`, `sh ~/xenios/install.sh --update`. Bei der neuen Xenia zusätzlich *Timer → Uhr stellen*. |
-
-## 11. Von Hand, ohne das Skript
-
-`install.sh` ist der normale Weg, auch auf einem Pi, auf dem Docker schon liegt: es überspringt Docker, behält eine vorhandene `.env` und richtet den Update-Dienst ein. Die Schritte einzeln:
-
-```bash
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-rm get-docker.sh
-sudo usermod -aG docker "$USER"
-```
-
-Neu anmelden, dann:
-
-```bash
-git clone --depth 1 https://github.com/TimS1998/Xenios.git ~/xenios
-cd ~/xenios/docker
-cp .env.example .env
-```
-
-In `.env` die Raute vor `XENIOS_IMAGE` und `XENIOS_PULL` entfernen und `XENIOS_HTTPS_PORT` auf `192.168.178.32:8443` setzen. Danach `docker compose up -d`. Den Update-Knopf aktiviert anschließend trotzdem `sh ~/xenios/install.sh`.
-
-![Terminal: docker compose version](bilder/raspberry-pi/06-docker-version.png)
-
-*Bild 6. Nur beim Einrichten von Hand: Docker ist da. Ablegen als `docs/bilder/raspberry-pi/06-docker-version.png`.*
-
-Grind-by-Sync: [Einrichtung, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional). In `docker/compose.yaml` die Zeile `- "80:8082"` aktivieren, dann `docker compose up -d`.

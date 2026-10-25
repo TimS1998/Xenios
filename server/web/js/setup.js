@@ -320,9 +320,16 @@ export function tunnelGuide(env) {
       ? h('li', {}, 'Bei „Install and run a connector“ die Zeile ', h('b', {}, 'sudo cloudflared service install …'), ' kopieren. Den Befehl nicht ausführen.')
       : h('li', {}, 'Bei „Install and run a connector“ dein Betriebssystem wählen und den angezeigten Befehl auf diesem Rechner ausführen. Er richtet cloudflared als Dienst ein.'),
     env.docker
-      ? h('li', {}, 'Die Zeile unten bei ', h('b', {}, 'Befehl aus Cloudflare'), ' einfügen und ', h('b', {}, 'Token übernehmen'), ' wählen. Xenios schreibt den Token und startet cloudflared. Der Befehl wird nicht ausgeführt.')
+      ? h('li', {}, 'Die Zeile unten bei ', h('b', {}, 'Befehl aus Cloudflare'), ' einfügen und ', h('b', {}, 'Token übernehmen'), ' wählen. Den Befehl nicht ausführen. Xenios schreibt den Token und startet cloudflared.')
       : null,
-    h('li', {}, 'Beim Tunnel einen ', h('b', {}, 'Public Hostname'), ' anlegen: Subdomain und Domain wählen, als ', h('b', {}, 'Service URL'), ' genau das eintragen:', copyBlock(env.service)),
+    env.docker
+      ? h('li', {}, 'Startet cloudflared nicht, auf dem Server den Ordner der Installation nehmen. Als root zeigt ~ auf /root. Beispiel:',
+        copyBlock('sh /home/test/xenios/install.sh --apply-requested'),
+        'Danach:',
+        copyBlock('cd /home/test/xenios/docker\ndocker compose ps'),
+        'In der Ausgabe steht „Tunnel-Token übernommen, starte cloudflared.“ xenios ist healthy, cloudflared läuft.')
+      : null,
+    h('li', {}, 'Im Tunnel ', h('b', {}, 'Add route → Published Application'), ': Subdomain und Domain wählen, als ', h('b', {}, 'Service URL'), ' genau das eintragen:', copyBlock(env.service)),
     h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.deine-domain.de) eintragen und ', h('b', {}, 'Testen'), '.'));
 }
 

@@ -158,7 +158,7 @@ Wichtige Werte in `docker/.env`:
 |---|---|
 | `XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always` | fertiges Image aus Packages laden statt selbst zu bauen (schneller, v. a. auf dem Raspberry Pi) |
 | `XENIOS_HTTPS_PORT=192.168.178.32:8443` | Port nur im Heimnetz öffnen (unter Linux umgehen Docker-Ports die Firewall `ufw`) |
-| `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` | setzt die App, wenn man die Zeile `sudo cloudflared service install …` einfügt (der Befehl wird nicht ausgeführt). Public Hostname im Cloudflare-Dashboard: `http://xenios:8080` |
+| `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` | setzt die App, wenn man die Zeile `sudo cloudflared service install …` einfügt (der Befehl wird nicht ausgeführt). Im Tunnel **Add route → Published Application**, Service-URL `http://xenios:8080` |
 | `TZ=Europe/Berlin` | Zeitzone für Zeitplan und Wecker |
 
 Für Grind-by-Sync mit Druckprofilen zusätzlich in `compose.yaml` die Zeile `- "80:8082"` aktivieren (siehe [Einrichtung, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional)).

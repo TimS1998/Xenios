@@ -136,7 +136,7 @@ Der Assistent hat sechs Schritte: Code, Passwort, Xenia, Mühle, Unterwegs, Fert
 2. **Passwort.** App-Passwort, mindestens 10 Zeichen, zweimal. Damit melden sich später alle Geräte an. Gespeichert wird nur ein Hash.
 3. **Xenia.** Adresse `http://192.168.x.x`, ohne Pfad. *Verbindung testen*. Bei der neuen Maschine steht zum Beispiel „Xenia Brew-by-Sync · Firmware 4.226“. Ist die Maschine aus, geht *Weiter* trotzdem.
 4. **Mühle.** Ohne E64 WS den Schalter aus. Dann fehlen Menüpunkt Mühle, Mühlen-Kacheln und Grind-by-Sync; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Mit Mühle: Adresse `https://192.168.x.x` und das **Owner-Passwort** (dasselbe wie auf der Webseite der Mühle unter der Rolle Owner). *Verbindung testen*. Das Passwort liegt danach verschlüsselt in der Konfiguration. Grind-by-Sync gibt es nur zusammen mit der neuen Xenia.
-5. **Unterwegs.** Optional. Die Schritte und Bilder stehen in [Abschnitt 8](#8-von-unterwegs-optional). Noch nicht fertig: *Weiter*. Eintragen und testen geht später unter *Einstellungen → Server & Sicherheit*.
+5. **Unterwegs.** Optional. Die Schritte und Bilder stehen in [Abschnitt 7](#7-von-unterwegs-optional). Noch nicht fertig: *Weiter*. Eintragen und testen geht später unter *Einstellungen → Server & Sicherheit*.
 6. **Fertig.** Zusammenfassung prüfen, *Einrichtung abschließen*.
 
 ![Assistent, Schritt Code, Feld XXXX-XXXX](bilder/linux-docker/09-assistent-code.png)
@@ -153,23 +153,9 @@ Der Assistent hat sechs Schritte: Code, Passwort, Xenia, Mühle, Unterwegs, Fert
 
 Bei der **alten Xenia** blendet Xenios Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Die Bezugszeit zählt Xenios selbst. Eco- und Ausschalt-Timer und die Schaltzeiten des Servers bleiben. Die Endpunkte stehen in [API der Xenia, alte API](API-Xenia.md#15-alte-xenia-dbl-offizielle-api).
 
-Danach die Anmeldung mit dem App-Passwort. Die Seite im Heimnetz ist damit fertig. Installieren als App und Mitteilungen brauchen eine echte HTTPS-Adresse über Cloudflare ([Abschnitt 8](#8-von-unterwegs-optional)); mit dem selbstsignierten Zertifikat lässt sich die Seite benutzen, Chrome bietet dafür keine Installation an. Siehe [Android-App](Android-App.md).
+Danach die Anmeldung mit dem App-Passwort. Die Seite im Heimnetz ist damit fertig. Installieren als App und Mitteilungen brauchen eine echte HTTPS-Adresse über Cloudflare ([Abschnitt 7](#7-von-unterwegs-optional)); mit dem selbstsignierten Zertifikat lässt sich die Seite benutzen, Chrome bietet dafür keine Installation an. Siehe [Android-App](Android-App.md).
 
-## 6. Zertifikat auf die eigene Adresse ausstellen
-
-Im Container sieht der Server die Heimnetz-Adresse des Rechners nicht. Deshalb steht sie noch nicht im Zertifikat.
-
-*Einstellungen → Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat*: die Adresse eintragen, zum Beispiel `192.168.178.57`. Das Zertifikat wird sofort neu erzeugt. Die Browser-Warnung einmal erneut bestätigen. Wer den Fingerabdruck prüft, liest den neuen Wert so:
-
-```bash
-docker compose -f /home/test/xenios/docker/compose.yaml logs --tail 30 xenios | grep SHA-256
-```
-
-![Einstellungen: Feld Weitere Namen/IPs fürs Zertifikat mit der Heimnetz-Adresse](bilder/linux-docker/12-zertifikat-namen.png)
-
-*Bild 12. Adresse im Zertifikat. Ablegen als `docs/bilder/linux-docker/12-zertifikat-namen.png`.*
-
-## 7. Dauerbetrieb
+## 6. Dauerbetrieb
 
 Docker startet Xenios nach dem Hochfahren von selbst (`restart: unless-stopped`). Prüfen:
 
@@ -185,9 +171,7 @@ Ein Server-Ubuntu oder Debian schläft nicht. Der Gerät wird nie müde, der Ger
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
 
-Beim Mini-PC im BIOS einschalten, dass das Gerät nach einem Stromausfall wieder startet. Die Bezeichnung unterscheidet sich je nach Hersteller.
-
-## 8. Von unterwegs (optional)
+## 7. Von unterwegs (optional)
 
 Ohne diesen Abschnitt ist Xenios im Heimnetz fertig. Für Handy außer Haus, installierbare Web-App und Mitteilungen braucht es eine öffentliche HTTPS-Adresse. Dafür reicht der kostenlose Cloudflare-Tarif. Im Router wird kein Port geöffnet; der Tunnel baut nur eine ausgehende Verbindung auf.
 
@@ -205,15 +189,19 @@ Voraussetzung: die Domain liegt bei Cloudflare und gilt dort als aktiv. Im Assis
 
 *Bild 15. Die Installationszeile, nicht ausgeführt. Ablegen als `docs/bilder/linux-docker/15-cloudflare-token.png`.*
 
-3. Im Einrichten von Xenios, Schritt **Unterwegs**, die Zeile in *Befehl aus Cloudflare* einfügen und **Token übernehmen**. Xenios schreibt den Token und startet `cloudflared`. Nach ein paar Sekunden:
+3. Im Einrichten von Xenios, Schritt **Unterwegs**, die Zeile in *Befehl aus Cloudflare* einfügen und **Token übernehmen**. Den Befehl nicht ausführen. Xenios schreibt den Token und startet `cloudflared`.
+
+Kommt die Meldung, `cloudflared` sei nicht gestartet: auf dem Server den Ordner der Installation nehmen. Als root zeigt `~` auf `/root`.
 
 ```bash
-docker compose -f /home/test/xenios/docker/compose.yaml ps
+sh /home/test/xenios/install.sh --apply-requested
+cd /home/test/xenios/docker
+docker compose ps
 ```
 
-`xenios` ist `healthy`, `cloudflared` läuft.
+In der Ausgabe steht **Tunnel-Token übernommen, starte cloudflared.** `xenios` ist `healthy`, `cloudflared` läuft.
 
-4. Im Tunnel einen **Public Hostname** anlegen: Subdomain zum Beispiel `xenios`, die eigene Domain, Typ **HTTP**, URL genau:
+4. Im Tunnel **Add route → Published Application**: Subdomain zum Beispiel `xenios`, die eigene Domain, Typ **HTTP**, URL genau:
 
 ```text
 http://xenios:8080
@@ -221,16 +209,15 @@ http://xenios:8080
 
 `localhost` oder `127.0.0.1` erreicht den Container nicht. Port 8080 ist absichtlich nur innerhalb von Docker erreichbar.
 
-![Cloudflare: Public Hostname, Service-URL http://xenios:8080](bilder/linux-docker/16-cloudflare-hostname.png)
+![Cloudflare: Add route, Published Application, Service-URL http://xenios:8080](bilder/linux-docker/16-cloudflare-hostname.png)
 
-*Bild 16. Public Hostname mit `http://xenios:8080`. Ablegen als `docs/bilder/linux-docker/16-cloudflare-hostname.png`.*
+*Bild 16. Published Application mit `http://xenios:8080`. Ablegen als `docs/bilder/linux-docker/16-cloudflare-hostname.png`.*
 
-5. Unter *SSL/TLS* → *Edge Certificates*: **Always Use HTTPS** und **Minimum TLS 1.2**.
-6. Die öffentliche Adresse eintragen, zum Beispiel `https://xenios.deine-domain.de`, und **Testen**. Der Server ruft sich selbst über diese Adresse auf. Noch nicht fertig: *Weiter*. Eintragen und testen geht jederzeit unter *Einstellungen → Server & Sicherheit*.
+5. Die öffentliche Adresse eintragen, zum Beispiel `https://xenios.deine-domain.de`, und **Testen**. Der Server ruft sich selbst über diese Adresse auf. Noch nicht fertig: *Weiter*. Eintragen und testen geht jederzeit unter *Einstellungen → Server & Sicherheit*.
 
 Der Token in `.env` ist ein Geheimnis. Die Datei wird nicht ins Git-Repository übernommen. Rate-Limits und Länderfilter: [Einrichtung, Cloudflare](Einrichtung.md#2-cloudflare-tunnel).
 
-## 9. Aktualisieren und sichern
+## 8. Aktualisieren und sichern
 
 Unter *Einstellungen → Server & Sicherheit* steht die installierte Version. Gibt es auf GitHub ein neueres Release, heißt der Knopf **Auf x.y.z aktualisieren**, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
 
@@ -285,7 +272,7 @@ docker compose -f /home/test/xenios/docker/compose.yaml up -d
 
 `1000` ist der Benutzer `node` im Container.
 
-## 10. Wenn etwas nicht geht
+## 9. Wenn etwas nicht geht
 
 Die `docker compose`-Befehle enthalten den langen Pfad und gelten von jedem Ordner aus.
 
@@ -301,14 +288,3 @@ Die `docker compose`-Befehle enthalten den langen Pfad und gelten von jedem Ordn
 | Maschine nicht erreichbar | Auf dem Server: `curl -m 5 http://192.168.x.x/api/v2/machine` (Adresse der Xenia). Antwortet das nicht, sieht der Server die Maschine nicht: Kabel, gleiches Netz, kein Gast-WLAN. |
 | Verbindungstest will die andere Xenia | Im Assistenten oder unter *Server & Sicherheit* Neue bzw. Alte Xenia umschalten und erneut testen. |
 | Falsche Uhr bei Timern | `TZ` in `.env`, danach `sh /home/test/xenios/install.sh --update`. Bei der neuen Xenia zusätzlich *Timer → Uhr stellen*. |
-| Zertifikatswarnung bleibt nach Abschnitt 6 | Seite neu laden und die Warnung erneut bestätigen. Im Feld steht die Adresse ohne `https://` und ohne Port. |
-
-## 11. Von Hand, ohne das Skript
-
-`install.sh` überspringt Docker, wenn es schon da ist, behält eine vorhandene `.env` und richtet den Update-Dienst ein. Die Schritte einzeln stehen in [Git und Docker, Teil 3](Git-und-Docker.md#teil-3-docker). Danach einmal `sh /home/test/xenios/install.sh`, damit der Knopf in der App aktualisieren kann.
-
-![Terminal: docker compose version](bilder/linux-docker/05-docker-version.png)
-
-*Bild 5. Nur beim Einrichten von Hand: Docker ist da. Ablegen als `docs/bilder/linux-docker/05-docker-version.png`.*
-
-Grind-by-Sync mit Druckprofilen gibt es mit Mühle und neuer Xenia. Anleitung: [Einrichtung, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional). Dafür in `/home/test/xenios/docker/compose.yaml` die Zeile `- "80:8082"` aktivieren und `docker compose -f /home/test/xenios/docker/compose.yaml up -d` ausführen.

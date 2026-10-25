@@ -48,8 +48,7 @@ Mit Docker: siehe [Abschnitt 4](#4-alternativ-linux-server-raspberry-pi-oder-nas
 1. <https://one.dash.cloudflare.com> → *Networks* → *Tunnels* → **Create a tunnel** → *Cloudflared* → Name `xenios`.
 2. cloudflared auf dem PC installieren: `winget install --id Cloudflare.cloudflared`
 3. Den angezeigten Befehl `cloudflared.exe service install <TOKEN>` als Administrator ausführen. Damit läuft der Tunnel als Windows-Dienst.
-4. *Public Hostname* anlegen: Subdomain z. B. `xenios`, Domain `deine-domain.de`, **Service URL `http://127.0.0.1:8080`**.
-5. In Cloudflare unter *SSL/TLS* → *Edge Certificates*: **Always Use HTTPS** einschalten und **Minimum TLS 1.2** setzen.
+4. Im Tunnel **Add route → Published Application**: Subdomain z. B. `xenios`, Domain `deine-domain.de`, **Service URL `http://127.0.0.1:8080`**.
 
 **Variante B – Konfigurationsdatei:** siehe [`server/deploy/cloudflared/config.yml`](../server/deploy/cloudflared/config.yml).
 
@@ -92,7 +91,7 @@ Dann `https://<IP-des-Servers>:8443` öffnen und der Einrichtung folgen (wie obe
 - **Daten** (Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge) liegen im Volume `xenios_xenios-data`. In der App unter *Server & Sicherheit → Sicherung* als ZIP herunterladen oder einspielen. Zusätzlich das ganze Volume: `docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .` (beides enthält `secret.key`, also sicher aufbewahren).
 - **Zertifikat:** Im Container kennt der Server die LAN-IP des Rechners nicht. In der App unter *Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP bzw. den Hostnamen eintragen; das Zertifikat wird sofort neu erzeugt.
 - **Ports und Pfade** sind im Container fest (Umgebungsvariablen im `Dockerfile`) und in der App als gesperrt markiert. Den HTTPS-Port auf dem Rechner ändert `XENIOS_HTTPS_PORT` in `.env`. Unter Linux umgehen Docker-Ports `ufw`; mit `XENIOS_HTTPS_PORT=<LAN-IP>:8443` lauscht der Port nur im Heimnetz.
-- **Cloudflare-Tunnel** im selben Compose: im Einrichten oder unter *Server & Sicherheit* die Zeile `sudo cloudflared service install …` einfügen. Den Befehl nicht ausführen. `install.sh` schreibt `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` und startet `cloudflared`. Im Dashboard den Public Hostname auf **`http://xenios:8080`** setzen (Container-Name statt localhost). Port 8080 ist bewusst nicht nach außen veröffentlicht.
+- **Cloudflare-Tunnel** im selben Compose: im Einrichten oder unter *Server & Sicherheit* die Zeile `sudo cloudflared service install …` einfügen. Den Befehl nicht ausführen. `install.sh` schreibt `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` und startet `cloudflared`. Im Tunnel **Add route → Published Application** auf **`http://xenios:8080`** setzen (Container-Name statt localhost). Port 8080 ist bewusst nicht nach außen veröffentlicht.
 - **Aktualisieren:** in der App unter *Einstellungen → Server & Sicherheit → Aktualisieren*. `install.sh` richtet dafür den Dienst `xenios-update.timer` ein (Debian, Ubuntu, Raspberry Pi OS 64-Bit). Der Knopf holt Git und das Image und startet neu; Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den `curl`-Befehl. Einmal `sh ~/xenios/install.sh` richtet ihn nach, eine vorhandene `.env` bleibt. Nur holen: `sh ~/xenios/install.sh --update`. Ohne das Skript: `git pull && docker compose up -d`.
 - Härtung: schreibgeschütztes Dateisystem, eigener Benutzer statt root, keine Linux-Capabilities, Speicher- und Prozessgrenzen (siehe `compose.yaml`).
 
