@@ -127,6 +127,9 @@ echo <TOKEN> | docker login ghcr.io -u TimS1998 --password-stdin
 ## Teil 3: Docker
 
 ### 3.1 Docker installieren
+
+Von einem frischen System an, inklusive Karte beschreiben und Mini-PC: [Hardware](Hardware.md), [Raspberry Pi](Installation-Raspberry-Pi.md), [Linux mit Docker](Installation-Linux-Docker.md). Die folgenden Befehle sind die Kurzform.
+
 - **Linux / Raspberry Pi** (Raspberry Pi OS 64 Bit, Debian, Ubuntu):
   ```bash
   curl -fsSL https://get.docker.com | sh
@@ -137,6 +140,9 @@ echo <TOKEN> | docker login ghcr.io -u TimS1998 --password-stdin
 - **Synology/QNAP:** Container Manager bzw. Container Station; dort ein „Projekt“ aus `docker/compose.yaml` anlegen.
 
 ### 3.2 Starten
+
+Der übliche Weg auf Linux und dem Raspberry Pi ist [`install.sh`](Installation-Raspberry-Pi.md#4-xenios-mit-dem-skript): Docker, `~/xenios`, Start und der Update-Dienst. Die Befehle hier sind dasselbe von Hand. Im Assistenten **Neue Xenia** oder **Alte Xenia** wählen; ohne Mühle bleiben Mühlen-Seiten und Grind-by-Sync aus.
+
 ```bash
 git clone https://github.com/TimS1998/Xenios.git xenios
 cd xenios/docker
@@ -152,7 +158,7 @@ Wichtige Werte in `docker/.env`:
 |---|---|
 | `XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always` | fertiges Image aus Packages laden statt selbst zu bauen (schneller, v. a. auf dem Raspberry Pi) |
 | `XENIOS_HTTPS_PORT=192.168.178.32:8443` | Port nur im Heimnetz öffnen (unter Linux umgehen Docker-Ports die Firewall `ufw`) |
-| `TUNNEL_TOKEN=…` und `COMPOSE_PROFILES=tunnel` | Cloudflare-Tunnel im selben Compose starten; im Cloudflare-Dashboard den Public Hostname auf `http://xenios:8080` setzen |
+| `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` | setzt die App, wenn man die Zeile `sudo cloudflared service install …` einfügt (der Befehl wird nicht ausgeführt). Public Hostname im Cloudflare-Dashboard: `http://xenios:8080` |
 | `TZ=Europe/Berlin` | Zeitzone für Zeitplan und Wecker |
 
 Für Grind-by-Sync mit Druckprofilen zusätzlich in `compose.yaml` die Zeile `- "80:8082"` aktivieren (siehe [Einrichtung, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional)).
@@ -168,16 +174,22 @@ Für Grind-by-Sync mit Druckprofilen zusätzlich in `compose.yaml` die Zeile `- 
 | **Alles löschen, auch die Daten** | `docker compose down -v` (Vorsicht) |
 
 ### 3.4 Aktualisieren
+In der App unter *Einstellungen → Server & Sicherheit* prüft **Aktualisieren**, ob GitHub ein neueres Release hat. Nach `install.sh` holt der Knopf Image und Git und startet neu (Dienst `xenios-update.timer`). Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den Einrichtungsbefehl; `sh ~/xenios/install.sh` richtet ihn nach, ohne eine vorhandene `.env` zu überschreiben.
+
+```bash
+sh ~/xenios/install.sh --update
+```
+Von Hand:
 ```bash
 cd xenios/docker
 git pull                          # holt auch neue compose.yaml
 docker compose up -d              # baut neu bzw. lädt das neue Image (je nach XENIOS_PULL)
 docker image prune -f             # alte Images aufräumen
 ```
-Einstellungen, Sitzungen und Bezüge bleiben erhalten; sie liegen im Volume, nicht im Image. Eine bestimmte Version festhalten: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`.
+Eine bestimmte Version festhalten: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`. Unter Windows ohne das Skript bleibt das Holen bei `git pull` und einem Neustart; der Knopf zeigt trotzdem, ob eine neue Version da ist.
 
 ### 3.5 Sichern und wiederherstellen
-Sicherung (enthält `secret.key` und damit den Schlüssel zum Mühlen-Passwort, also sicher aufbewahren):
+In der App unter *Server & Sicherheit* gibt es **Sichern** / **Einspielen** (ZIP). Zusätzlich das Volume (enthält `secret.key` und damit den Schlüssel zum Mühlen-Passwort, also sicher aufbewahren):
 ```bash
 docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .
 ```

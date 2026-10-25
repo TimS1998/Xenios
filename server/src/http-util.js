@@ -55,6 +55,22 @@ export function sendJson(res, status, data, extraHeaders = {}) {
   res.end(body);
 }
 
+export function readBuffer(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(Object.assign(new Error('Anfrage zu groß'), { status: 413, expose: true }));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 export function readJson(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
     const ct = String(req.headers['content-type'] || '');

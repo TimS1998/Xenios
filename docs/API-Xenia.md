@@ -432,3 +432,28 @@ Die Mahlkönig E64 WS ist mit der Xenia gekoppelt (`M2m.CoffeeMachinesConfig` in
 5. Die Mühle übernimmt `REAL_EXTRACTION_TIME_MS` beim Übergang auf `MA_STATUS 4`. Ihr Algorithmus passt den Mahlgrad an. Bezüge über 80 s oder mit `MA_EXTRACTION_STATUS 2` werden verworfen, bei ≤ 10 s wird nichts angepasst. Bezüge, die nicht die Mühle gestartet hat, zählen als Spülung.
 
 Details zur Mühlenseite: [API-Muehle-E64WS.md](API-Muehle-E64WS.md). Druckprofile über den Drehknopf: Xenios kann zwischen Mühle und Xenia vermitteln und Skript 9 gegen ein Profil mit Stopp beim Zielgewicht (Befehl 27) tauschen, siehe [Einrichtung.md, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional).
+
+---
+
+## 15. Alte Xenia (DBL / offizielle API)
+
+Die Dokumentation oben gilt für die **aktuelle** Firmware (Brew-by-Sync, `machine.api = bbs`). Die ältere DBL-API ist auf [xenia-espresso.de/api.html](https://www.xenia-espresso.de/api.html) und in [xenia-home](https://github.com/Knoedelauflauf/xenia-home) beschrieben. Beim Einrichten „Alte Xenia“ wählen (`machine.api = classic`).
+
+| Thema | Neue Xenia (`bbs`) | Alte Xenia (`classic`) |
+|---|---|---|
+| Live-Daten | `GET /api/v2/diagram/get` (inkl. `EXTRACTION_TIME_MS`, Waage `PU_LOADCELL_*`) | `GET /api/v2/overview` (Waage `SCALE_WEIGHT` / `PU_SENS_SCALE_*`; Bezugszeit zählt Xenios selbst) |
+| Einstellungen | `GET/POST /api/v2/general` | Temperatur `POST /api/v2/inc_dec`, Dampfdruck `POST /api/v2/inc_dec_sb` |
+| Ein/Aus/Eco | `POST /api/v2/machine/control` + `POST /api/v2/toggle/sb` | dieselben `control`-Aktionen; Dampf über Aktion 3/4/5 |
+| Skriptliste | `GET /api/v2/scriptslist` | `GET /api/v2/scripts/list` |
+| Wochen-Timer, Uhr, Paddle, `/info` | vorhanden | nicht über die API; Eco/Aus-Timer über `POST /api/v2/machine` |
+
+Maschine ein/aus/Eco und Dampf (alte API, laut [API-Beispiel](https://www.xenia-espresso.de/api-beispiel/)):
+
+| `action` | Wirkung |
+|---|---|
+| 0 | aus |
+| 1 | an (mit Dampfkessel) |
+| 2 | Eco |
+| 3 | Dampfkessel aus |
+| 4 | Dampfkessel an |
+| 5 | an ohne Dampfkessel |

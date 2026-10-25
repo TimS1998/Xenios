@@ -181,6 +181,28 @@
                     android:text="@string/direct_help" />
             </LinearLayout>
 
+            <RadioGroup
+                android:id="@+id/machine_api"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/api_bbs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/direct_api_new"
+                    android:textColor="@color/on_surface" />
+
+                <RadioButton
+                    android:id="@+id/api_classic"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/direct_api_old"
+                    android:textColor="@color/on_surface" />
+            </RadioGroup>
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

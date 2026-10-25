@@ -27,7 +27,7 @@ Widgets aktualisieren sich beim Schalten, beim Verlassen der App, alle 30 min un
 - „Abmelden“ in der App oder ein widerrufenes Token führt zurück zur Anmeldung der App.
 
 ## Direkt-Modus (ohne Server, nur im Heimnetz)
-Bei der Einrichtung „Direkt im Heimnetz“ wählen und die IP-Adressen von Maschine und Mühle eintragen, dazu optional das Owner-Passwort der Mühle. Die App bringt die Web-Oberfläche selbst mit und nutzt denselben Geräte-Code wie der Server (`public/shared/`). Sie spricht Maschine (http) und Mühle (https mit gemerktem Zertifikat) direkt an. Widgets, Kachel und Shortcuts funktionieren ebenfalls.
+Bei der Einrichtung „Direkt im Heimnetz“ wählen und dieselbe Umschaltung wie am Server: **Neue Xenia** (Brew-by-Sync) oder **Alte Xenia** (DBL / offizielle API). Die IP-Adressen von Maschine und optional der Mühle eintragen, dazu optional das Owner-Passwort der Mühle. Ohne Mühle bleiben Mühlen-Navigation, Kacheln und Grind-by-Sync aus; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Bei der alten API blendet die App Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus und zählt die Bezugszeit selbst. Die App bringt die Web-Oberfläche selbst mit und nutzt denselben Geräte-Code wie der Server (`public/shared/`). Sie spricht Maschine (http) und Mühle (https mit gemerktem Zertifikat) direkt an. Widgets, Kachel und Shortcuts funktionieren ebenfalls.
 
 Ohne Server entfallen Push-Benachrichtigungen, die weiteren Schaltzeiten, das Einschalten vor dem Wecker und der Zugriff von unterwegs.
 

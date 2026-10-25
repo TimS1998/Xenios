@@ -19,7 +19,8 @@ import { Scheduler, SCHEDULE_ACTIONS } from './schedule.js';
 import { Wake } from './wake.js';
 import { GbsProxy, gbsRoutes } from './gbs.js';
 import { JsonStore } from './store.js';
-import { securityHeaders, sendJson, readJson, makeStatic } from './http-util.js';
+import { securityHeaders, sendJson, readJson, readBuffer, makeStatic } from './http-util.js';
+import { packBackup, applyBackupFiles, refreshLiveConfig, BACKUP_MAX } from './backup.js';
 import { ensureCert, certFingerprint } from './tls.js';
 
 const log = logger('server');
@@ -117,6 +118,38 @@ export function createApp(cfg, hooks = {}) {
     for (const s of streams) s.end();
   }
 
+  const stores = [sessions.store, machine.history, scheduler.store, wake.store, gbs.store, push.store, grinder.pinStore].filter(Boolean);
+
+  function takeBackup() {
+    for (const s of stores) s.flush();
+    const { buffer, filename } = packBackup({ configFile: cfg._file, dataDir: cfg.dataDir, version: VERSION });
+    return { download: { data: buffer, filename, type: 'application/zip' } };
+  }
+
+  async function restoreBackup(buf, session) {
+    for (const s of stores) s.flush();
+    const keep = session?.id ? sessions.store.data.sessions[session.id] : null;
+    const { written } = await applyBackupFiles({ buf, configFile: cfg._file, dataDir: cfg.dataDir, box: cfg._box });
+    for (const s of stores) s.reload();
+    if (keep) {
+      sessions.store.data.sessions[session.id] = keep;
+      sessions.store.flush();
+    }
+    refreshLiveConfig(cfg);
+    applyTimezone(cfg.timezone);
+    setLogLevel(cfg.logLevel);
+    sessions.days = cfg.auth.sessionDays;
+    machine.client.url = cfg.machine.url;
+    machine.client.timeoutMs = cfg.machine.timeoutMs;
+    if (started && cfg.grinder.enabled) grinder.reconfigure();
+    else grinder._makeTransport();
+    if (started) machine.kick();
+    if (written.includes('tls-cert.pem') || written.includes('tls-key.pem')) hooks.onTls?.();
+    setTimeout(() => hooks.onListeners?.(), 300).unref?.();
+    broadcast('server', serverInfo());
+    return { ok: true, files: written };
+  }
+
   // --- Routing ----------------------------------------------------------------
   const { route, match } = createRouter();
 
@@ -124,15 +157,18 @@ export function createApp(cfg, hooks = {}) {
     version: VERSION,
     features: cfg.features,
     push: { enabled: push.enabled, publicKey: cfg.push.publicKey, topics: PUSH_TOPICS },
+    machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs' },
     grinder: { enabled: cfg.grinder.enabled, databaseDownload: Boolean(cfg.grinder.allowDatabaseDownload) },
   });
 
   // Anmeldung, Einrichtung, Sitzungen, Server-Einstellungen
   authRoutes(route, {
-    cfg, sessions, limiter, machine, grinder, setup, hooks, instance, version: VERSION,
+    cfg, sessions, limiter, machine, grinder, setup, hooks, instance, version: VERSION, fetchImpl: hooks.fetchImpl,
     devicesStarted: () => started,
     startDevices,
     broadcastServer: () => broadcast('server', serverInfo()),
+    takeBackup,
+    restoreBackup,
   });
 
   // Zustand
@@ -261,7 +297,9 @@ export function createApp(cfg, hooks = {}) {
           // CSRF-Schutz: eigener Header (nur per fetch setzbar) + Origin-Prüfung
           if (req.headers['x-xenia'] !== '1' || !originOk(req, secure, trusted)) return sendJson(res, 403, { error: 'Ungültige Anfrage-Herkunft' });
         }
-        const body = req.method === 'GET' || req.method === 'HEAD' ? {} : await readJson(req);
+        const body = req.method === 'GET' || req.method === 'HEAD' ? {}
+          : r.body === 'raw' ? await readBuffer(req, BACKUP_MAX)
+          : await readJson(req);
         const result = await r.handler({ req, res, ip, secure, session, token, params, body, rawMatch, query: url.searchParams });
         if (result?.download) return download(res, result.download);
         if (result !== undefined && !res.headersSent) sendJson(res, 200, result);
@@ -474,7 +512,7 @@ async function main() {
 
   if (app.setup.code) printSetupBanner(cfg, app.setup.code);
   else app.startDevices();
-  log.info(`Xenios ${VERSION} · Konfiguration: ${cfg._file} · Xenia: ${cfg.machine.url} · Mühle: ${cfg.grinder.enabled ? cfg.grinder.url : 'aus'}`);
+  log.info(`Xenios ${VERSION} · Konfiguration: ${cfg._file} · Xenia: ${cfg.machine.url} (${cfg.machine.api === 'classic' ? 'alte API' : 'neue API'}) · Mühle: ${cfg.grinder.enabled ? cfg.grinder.url : 'aus'}`);
 
   const shutdown = () => {
     log.info('Beende …');

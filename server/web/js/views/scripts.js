@@ -1,6 +1,6 @@
 // Skripte: Liste, Start/Stopp, Editor, Export/Import.
 import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl, ago } from '../ui.js';
-import { api, store, subscribe, machineOn, directMode } from '../api.js';
+import { api, store, subscribe, machineOn, directMode, hasGrinder, isClassic } from '../api.js';
 import { setTopActions, navigate } from '../app.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
@@ -61,6 +61,7 @@ function listTab(root) {
 
   // Grind-by-Sync: welches Profil der Drehknopf der Mühle startet (nur mit Server)
   function paintGbs() {
+    if (!hasGrinder() || isClassic()) return gbsBox.replaceChildren();
     if (!gbs) return gbsBox.replaceChildren();
     if (!gbs.enabled) {
       return gbsBox.replaceChildren(h('div', { class: 'section-title' }, 'Grind-by-Sync'),
@@ -150,7 +151,7 @@ function listTab(root) {
   }
 
   async function load() {
-    if (!directMode) gbs = await api('/api/gbs').catch(() => null);
+    if (!directMode && hasGrinder() && !isClassic()) gbs = await api('/api/gbs').catch(() => null);
     try {
       data = await api('/api/machine/scripts');
       paint();

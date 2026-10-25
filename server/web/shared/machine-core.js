@@ -3,6 +3,9 @@
 import { Emitter, MemoryStore } from './emitter.js';
 import { logger } from './log.js';
 import { dialIn, STRENGTH } from './shot-analysis.js';
+import { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId, normalizeLive } from './machine-api.js';
+
+export { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId } from './machine-api.js';
 
 let log = logger('xenia');
 
@@ -273,8 +276,17 @@ export class Machine extends Emitter {
     this._paddleUntil = 0;
     this._liveStarts = [];    // Startzeiten live erkannter Bezüge, die der Bezugszähler noch nicht mitgezählt hat
     this._lastDiag = null;
+    this._shotClock = null;   // Fallback, wenn die Firmware keine EXTRACTION_TIME_MS liefert (alte Xenia)
     this._repairHistory();
     this.state.lastShot = this.history.data.shots?.[0] || null;
+  }
+
+  get apiId() {
+    return machineApiId(this.cfg.api);
+  }
+
+  get api() {
+    return MACHINE_API[this.apiId];
   }
 
   // --- Polling --------------------------------------------------------------
@@ -315,8 +327,8 @@ export class Machine extends Emitter {
         await this.refreshSlow();
         this._slowAt = Date.now() + this.cfg.slowPollMs;
       }
-      const d = await this.client.get('/api/v2/diagram/get');
-      this._applyLive(d);
+      const d = await this.client.get(this.api.livePath);
+      this._applyLive(normalizeLive(d));
       this._markOnline();
     } catch (e) {
       this._markOffline(e);
@@ -327,15 +339,21 @@ export class Machine extends Emitter {
   }
 
   async refreshSlow() {
-    const [single, general, overview] = [
-      await this.client.get('/api/v2/overview_single'),
-      await this.client.get('/api/v2/general'),
-      await this.client.get('/api/v2/overview'),
-    ];
+    const single = await this.client.get('/api/v2/overview_single');
+    let general = {};
+    if (this.api.general) {
+      try { general = await this.client.get('/api/v2/general'); } catch (e) { log.debug(`general nicht lesbar: ${e.message}`); }
+    }
+    // Live-Abfrage der alten API ist schon /overview; ein zweites Mal nur, wenn wir diagram/get pollen
+    const overview = this.api.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
     this._applySlow(single, general, overview);
     if (!this.state.info) {
       try {
-        const [machine, info] = [await this.client.get('/api/v2/machine'), await this.client.get('/api/v2/info')];
+        const machine = await this.client.get('/api/v2/machine');
+        let info = {};
+        if (this.api.info) {
+          try { info = await this.client.get('/api/v2/info'); } catch { /* ältere Firmware */ }
+        }
         this.state.info = {
           type: machine.MA_TYPE, typeName: MA_TYPE[machine.MA_TYPE] || `Typ ${machine.MA_TYPE}`,
           subtype: machine.MA_SUBTYPE,
@@ -346,21 +364,27 @@ export class Machine extends Emitter {
           fixWaterSupply: machine.MA_FIX_WATER_SUPPLY,
           view: info.VIEW,
           tzIndex: info.TZ_IND,
+          api: this.apiId,
         };
       } catch (e) {
         log.debug(`Info nicht lesbar: ${e.message}`);
       }
     }
-    try {
-      const i = await this.client.get('/api/v2/info');
-      const iso = clockToIso(i.MA_CLOCK, i.MA_CALENDAR);
-      this.state.clock = { machine: iso, readAt: new Date().toISOString(), tzIndex: i.TZ_IND };
-    } catch { /* optional */ }
+    if (this.api.info) {
+      try {
+        const i = await this.client.get('/api/v2/info');
+        const iso = clockToIso(i.MA_CLOCK, i.MA_CALENDAR);
+        this.state.clock = { machine: iso, readAt: new Date().toISOString(), tzIndex: i.TZ_IND };
+      } catch { /* optional */ }
+    }
   }
 
   _applySlow(single, general, overview) {
     const s = this.state;
-    this._offsets = { bg: num(general.BG_TEMPERATURE_OFFSET) || 0, bb: num(general.BB_TEMPERATURE_OFFSET) || 0 };
+    this._offsets = {
+      bg: num(general.BG_TEMPERATURE_OFFSET ?? single.BG_TEMPERATURE_OFFSET) || 0,
+      bb: num(general.BB_TEMPERATURE_OFFSET ?? single.BB_TEMPERATURE_OFFSET) || 0,
+    };
     s.settings = {};
     for (const k of [...GENERAL_FIELDS, 'BB_FILL_LEVEL', 'MA_FIX_WATER_SUPPLY', 'VIEW']) s.settings[k] = num(general[k]);
     s.temp.groupSet = num(single.BG_SET_TEMP ?? general.BG_SET_TEMP);
@@ -405,12 +429,13 @@ export class Machine extends Emitter {
     s.power = { group: num(d.BG_LEVEL_PW_CONTROL), boiler: num(d.BB_LEVEL_PW_CONTROL), pump: num(d.PU_LEVEL_PW_CONTROL) };
     s.scale = { weight: round(num(d.PU_LOADCELL_VOLUME), 1), rate: round(num(d.PU_LOADCELL_RATE), 1) };
     s.flow = { volume: round(num(d.PU_SENS_FLOW_METER_VOLUME), 1), rate: round(num(d.PU_SENS_FLOW_METER_FLOWRATE), 1), ml: round(num(d.PU_SENS_FLOW_METER_ML), 1) };
-    const extractionMs = num(d.EXTRACTION_TIME_MS) || 0;
+    let extractionMs = num(d.EXTRACTION_TIME_MS);
 
     // Bezug erkennen (Status 3)
     if (status === 3) {
       if (!s.shot.running) {
-        this._liveStarts.push(Date.now());
+        this._shotClock = Date.now();
+        this._liveStarts.push(this._shotClock);
         s.shot = { running: true, timeMs: 0, startedAt: new Date().toISOString(), curve: [] };
         // Hat die App kurz vorher ein Skript gestartet, gehört es zu diesem Bezug (für die Zielkurve in der Analyse)
         const p = this._pendingScript;
@@ -418,11 +443,14 @@ export class Machine extends Emitter {
         this._pendingScript = null;
         this.kick(this.cfg.pollActiveMs);
       }
+      if (extractionMs == null || extractionMs === 0) extractionMs = Date.now() - (this._shotClock || Date.now());
       s.shot.timeMs = extractionMs;
       if (s.shot.curve.length < 600) {
         s.shot.curve.push([round(extractionMs / 1000, 1), s.pressure.pump, s.scale.weight, s.flow.ml]);
       }
     } else if (s.shot.running) {
+      if (extractionMs == null || extractionMs === 0) extractionMs = Date.now() - (this._shotClock || Date.now());
+      this._shotClock = null;
       this._finishShot(extractionMs);
     }
 
@@ -522,7 +550,7 @@ export class Machine extends Emitter {
   }
 
   snapshot() {
-    return { ...this.state, shot: { ...this.state.shot, curve: this.state.shot.curve.slice(-120) } };
+    return { ...this.state, api: this.apiId, shot: { ...this.state.shot, curve: this.state.shot.curve.slice(-120) } };
   }
 
   // Bezugs-Protokoll: bis zu 2000 Einträge, Druckkurven nur für die neuesten 100 (Speicherplatz)
@@ -838,6 +866,14 @@ export class Machine extends Emitter {
     const action = { off: '0', on: '1', eco: '2' }[mode];
     if (action === undefined) throw new Error('Ungültiger Modus');
     this._lastAppAction = Date.now();
+    if (!this.api.toggleSb) {
+      // Alte API: Dampf über dieselben control-Aktionen (3 aus, 4 an, 5 an ohne Dampf)
+      let act = action;
+      if (mode === 'on' && steam === false) act = '5';
+      await this.client.post('/api/v2/machine/control', { action: act });
+      this._acted();
+      return { ok: true };
+    }
     await this.client.post('/api/v2/machine/control', { action });
     // Wie die offizielle Oberfläche: Dampfkessel passend mitschalten
     let sb;
@@ -851,14 +887,34 @@ export class Machine extends Emitter {
 
   async steam(on) {
     this._lastAppAction = Date.now();
-    await this.client.post('/api/v2/toggle/sb', { TOGGLE: on ? 1 : 0 });
+    if (!this.api.toggleSb) {
+      await this.client.post('/api/v2/machine/control', { action: on ? '4' : '3' });
+    } else {
+      await this.client.post('/api/v2/toggle/sb', { TOGGLE: on ? 1 : 0 });
+    }
     this._acted();
     return { ok: true };
   }
 
-  // Ändert Werte über POST /api/v2/general: aktuelle Werte lesen, ändern, alle Felder senden (wie die Original-UI).
+  async readSettings() {
+    if (this.api.general) return this.client.get('/api/v2/general');
+    const single = await this.client.get('/api/v2/overview_single');
+    let machine = {};
+    try { machine = await this.client.get('/api/v2/machine'); } catch { /* optional */ }
+    return {
+      BG_SET_TEMP: num(single.BG_SET_TEMP), BB_SET_TEMP: num(single.BB_SET_TEMP),
+      SB_SET_PRESS: num(single.SB_SET_PRESS), PU_SET_PRESS: num(single.PU_SET_PRESS),
+      MA_SET_TIMER_ECO_MA: num(machine.MA_SET_TIMER_ECO_MA),
+      MA_SET_TIMER_POWERDOWN: num(machine.MA_SET_TIMER_POWERDOWN),
+      MA_FIX_WATER_SUPPLY: num(machine.MA_FIX_WATER_SUPPLY),
+      MA_HEATUP_FLUSH_EN: num(machine.MA_HEATUP_FLUSH_EN),
+    };
+  }
+
+  // Neue Xenia: POST /api/v2/general (alle Felder). Alte Xenia: inc_dec / inc_dec_sb.
   async updateSettings(changes) {
     if (!this.features.settings) throw httpError(403, 'Einstellungen ändern ist deaktiviert');
+    if (!this.api.general) return this._updateClassicSettings(changes);
     const current = await this.client.get('/api/v2/general');
     const body = {};
     for (const k of GENERAL_FIELDS) {
@@ -877,6 +933,28 @@ export class Machine extends Emitter {
     return { ok: true };
   }
 
+  async _updateClassicSettings(changes) {
+    for (const k of Object.keys(changes)) {
+      if (!CLASSIC_SETTING_FIELDS.includes(k)) throw httpError(400, `Unbekannte Einstellung ${k}`);
+      const [min, max] = SETTING_LIMITS[k];
+      const v = Number(changes[k]);
+      if (!Number.isFinite(v) || v < min || v > max) throw httpError(400, `${SETTING_LABELS[k] || k} muss zwischen ${min} und ${max} liegen`);
+    }
+    if ('BG_SET_TEMP' in changes || 'BB_SET_TEMP' in changes) {
+      const cur = await this.client.get('/api/v2/overview_single');
+      await this.client.post('/api/v2/inc_dec', {
+        BG_SET_TEMP: String(changes.BG_SET_TEMP ?? cur.BG_SET_TEMP),
+        BB_SET_TEMP: String(changes.BB_SET_TEMP ?? cur.BB_SET_TEMP),
+      });
+    }
+    if ('SB_SET_PRESS' in changes) {
+      await this.client.post('/api/v2/inc_dec_sb', { SB_SET_PRESS: String(changes.SB_SET_PRESS) });
+    }
+    this._slowAt = 0;
+    this._acted();
+    return { ok: true };
+  }
+
   async setTemperature(group, boiler) {
     const g = Number(group);
     if (!Number.isFinite(g) || g < 60 || g > 96) throw httpError(400, 'Brühgruppe muss zwischen 60 und 96 °C liegen');
@@ -886,7 +964,12 @@ export class Machine extends Emitter {
   }
 
   async scripts() {
-    const d = await this.client.get('/api/v2/scriptslist');
+    let last;
+    let d;
+    for (const p of this.api.scriptsList) {
+      try { d = await this.client.get(p); break; } catch (e) { last = e; }
+    }
+    if (!d) throw last || httpError(502, 'Skriptliste nicht lesbar');
     const list = (d.index_list || []).map((id, i) => ({ id: Number(id), title: d.title_list?.[i] ?? `Skript ${id}`, type: scriptType(Number(id)) }));
     list.sort((a, b) => a.id - b.id);
     return list;
@@ -934,12 +1017,18 @@ export class Machine extends Emitter {
   // Schreibt ein Skript ohne Prüfung der Funktions-Schalter (auch vom Grind-by-Sync-Vermittler genutzt).
   async writeScript({ id, name, instruction, kind }) {
     const body = { Edit: '', script_id: '', switch: '', script: kind === 'paddle' ? 'paddle' : 'none', name, instruction };
-    if (id !== undefined && id !== null && id !== '') {
-      // Bearbeiten: wie die Original-UI erst "scriptsedit" setzen, dann speichern.
-      await this.client.post('/api/v2/scriptsedit', { SCRIPT_ID: Number(id) });
+    const edit = id !== undefined && id !== null && id !== '';
+    if (edit) {
+      if (this.api.general) {
+        // Neue Xenia: wie die Original-UI erst "scriptsedit" setzen, dann speichern.
+        await this.client.post('/api/v2/scriptsedit', { SCRIPT_ID: Number(id) });
+      }
       body.Edit = 'Enabled';
       body.script_id = Number(id);
       body.switch = null;
+    } else if (!this.api.general) {
+      body.script_id = null;
+      body.Edit = 'Disabled';
     }
     try {
       await this.client.post('/api/v2/scripts/create', body);
@@ -962,10 +1051,13 @@ export class Machine extends Emitter {
 
   // Export wie die Original-UI: Datei "Xenia-<Titel>.script" mit {"<Titel>":"<Inhalt>"}.
   async exportScript(id) {
-    const d = await this.client.post('/api/v2/scripts/iddownload', { ID: String(id).padStart(3, '0') });
-    const title = Object.keys(d || {})[0];
-    if (!title) throw httpError(404, 'Skript nicht gefunden');
-    return { title, content: d[title], file: JSON.stringify({ [title]: d[title] }) };
+    try {
+      const d = await this.client.post('/api/v2/scripts/iddownload', { ID: String(id).padStart(3, '0') });
+      const title = Object.keys(d || {})[0];
+      if (title) return { title, content: d[title], file: JSON.stringify({ [title]: d[title] }) };
+    } catch { /* ältere Firmware: nur scripts/read */ }
+    const r = await this.readScript(id);
+    return { title: r.title, content: r.content, file: JSON.stringify({ [r.title]: r.content }) };
   }
 
   // Import einer .script-Datei. Der Inhalt wird geparst und neu aufgebaut, damit nur gültige Befehle die Maschine erreichen.
@@ -986,6 +1078,7 @@ export class Machine extends Emitter {
   }
 
   async timezones() {
+    if (!this.api.clock) throw httpError(409, 'Die alte Xenia hat keine Zeitzonenliste über die API');
     const [tz, info] = await Promise.all([this.client.get('/tz/tz.json'), this.client.get('/api/v2/info')]);
     const list = Object.entries(tz || {}).map(([index, e]) => ({ index: Number(index), name: Array.isArray(e) ? String(e[0]) : String(index) }));
     list.sort((a, b) => a.name.localeCompare(b.name));
@@ -1028,6 +1121,19 @@ export class Machine extends Emitter {
   }
 
   async timers() {
+    if (!this.api.weeklyTimers) {
+      let eco = null, off = null, type = this.state.info?.type ?? null;
+      try {
+        const m = await this.client.get('/api/v2/machine');
+        eco = num(m.MA_SET_TIMER_ECO_MA);
+        off = num(m.MA_SET_TIMER_POWERDOWN);
+        type = num(m.MA_TYPE);
+      } catch { /* Eco/Aus-Timer sind auf mancher alten Firmware nicht lesbar */ }
+      return {
+        days: DAYS.map((day) => ({ day, on: null, off: null, brew: false, steam: false, enabled: false })),
+        ecoAfterMin: eco, offAfterMin: off, machineType: type, clock: null, weekly: false,
+      };
+    }
     const d = await this.client.get('/api/v2/timer2');
     const days = DAYS.map((day) => {
       const on = timerToMinutes(d[`TI_${day}_ON1`]);
@@ -1041,10 +1147,22 @@ export class Machine extends Emitter {
       offAfterMin: num(d.MA_SET_TIMER_POWERDOWN),
       machineType: num(d.MA_TYPE),
       clock: clockToIso(d.MA_CLOCK, d.MA_CALENDAR),
+      weekly: true,
     };
   }
 
   async saveTimers({ days, ecoAfterMin, offAfterMin }) {
+    if (!this.api.weeklyTimers) {
+      const cur = await this.client.get('/api/v2/machine');
+      await this.client.post('/api/v2/machine', {
+        MA_HEATUP_FLUSH_EN: String(cur.MA_HEATUP_FLUSH_EN ?? 0),
+        MA_SET_TIMER_ECO_MA: String(ecoAfterMin === undefined ? (cur.MA_SET_TIMER_ECO_MA ?? 0) : clampInt(ecoAfterMin, 0, 240)),
+        MA_SET_TIMER_POWERDOWN: String(offAfterMin === undefined ? (cur.MA_SET_TIMER_POWERDOWN ?? 0) : clampInt(offAfterMin, 0, 240)),
+        MA_FIX_WATER_SUPPLY: String(cur.MA_FIX_WATER_SUPPLY ?? 0),
+        MA_MAX_AMPERE: String(cur.MA_MAX_AMPERE ?? 10),
+      });
+      return { ok: true };
+    }
     if (!Array.isArray(days) || days.length !== 7) throw httpError(400, '7 Tage erwartet');
     const msg = {};
     days.forEach((d, i) => {
@@ -1064,6 +1182,7 @@ export class Machine extends Emitter {
 
   // Uhr stellen; mit tzIndex wird zugleich die Zeitzone gewählt (wie Seite „System“ der Original-UI).
   async syncClock(tzIndex) {
+    if (!this.api.clock) throw httpError(409, 'Die alte Xenia hat keine API zum Stellen der Uhr');
     if (!this.features.clockSync) throw httpError(403, 'Uhrzeit stellen ist deaktiviert');
     const info = await this.client.get('/api/v2/info');
     const tz = await this.client.get('/tz/tz.json');
@@ -1079,6 +1198,7 @@ export class Machine extends Emitter {
 
   // Paddle (direkte Pumpensteuerung) – nur auf ausdrücklichen Wunsch aus der App.
   async paddleState() {
+    if (!this.api.paddle) throw httpError(409, 'Paddle gibt es auf der alten Xenia nicht über die API');
     if (!this.features.paddle) throw httpError(403, 'Paddle ist deaktiviert');
     const d = await this.client.get('/api/v2/paddle/press');
     this._paddleUntil = Date.now() + 5000;
@@ -1089,6 +1209,7 @@ export class Machine extends Emitter {
   }
 
   async paddlePower(level) {
+    if (!this.api.paddle) throw httpError(409, 'Paddle gibt es auf der alten Xenia nicht über die API');
     if (!this.features.paddle) throw httpError(403, 'Paddle ist deaktiviert');
     const lv = clampInt(level, 0, 100);
     this._lastAppAction = Date.now();
@@ -1105,7 +1226,9 @@ export class Machine extends Emitter {
 
   async details() {
     const out = {};
-    for (const [k, p] of [['machine', '/api/v2/machine'], ['info', '/api/v2/info'], ['network', '/api/v2/network']]) {
+    const paths = [['machine', '/api/v2/machine'], ['network', '/api/v2/network']];
+    if (this.api.info) paths.splice(1, 0, ['info', '/api/v2/info']);
+    for (const [k, p] of paths) {
       try { out[k] = await this.client.get(p); } catch (e) { out[k] = { error: e.message }; }
     }
     // Seriennummer/MACs/SSID nicht vollständig an die App geben

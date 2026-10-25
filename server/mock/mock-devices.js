@@ -5,16 +5,17 @@ import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createSelfSignedCert } from '../src/tls.js';
 import { openSqlite } from '../src/sqlite-read.js';
+import { makeZip } from '../src/backup.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THUSRDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
-export function createMockXenia({ speed = 1 } = {}) {
+export function createMockXenia({ speed = 1, api = 'bbs' } = {}) {
+  const classic = api === 'classic';
   const s = {
     MA_STATUS: 0, SB_STATUS: 1, bg: 24.0, bb: 24.5, sb: 0, pump: 0, pumpPw: 0, extractionMs: 0, scale: 0, flowMl: 0,
     general: {
@@ -106,18 +107,47 @@ export function createMockXenia({ speed = 1 } = {}) {
       if (s.log.length > 500) s.log.shift();
       const json = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
       const ok = () => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end(); };
+      const htmlPage = () => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(html); };
       const g = s.general;
       const GET = req.method === 'GET';
-      switch (`${req.method} ${p}`) {
+      const key = `${req.method} ${p}`;
+      const BBS_ONLY = new Set([
+        'GET /api/v2/diagram/get', 'GET /api/v2/general', 'POST /api/v2/general', 'GET /api/v2/info',
+        'GET /api/v2/timer2', 'POST /api/v2/timer2', 'POST /api/v2/timer2/sync', 'POST /api/v2/toggle/sb',
+        'GET /api/v2/scriptslist', 'POST /api/v2/scriptsedit', 'GET /api/v2/paddle', 'GET /api/v2/paddle/press',
+        'POST /api/v2/paddle/pumppower', 'GET /api/v2/paddle/stop', 'GET /api/v2/mako',
+      ]);
+      if (classic && BBS_ONLY.has(key)) return htmlPage();
+      switch (key) {
         case 'GET /api/v2/status': return json({ MA_STATUS: s.MA_STATUS });
         case 'GET /api/v2/diagram/get': case 'GET /api/v2/diagram_get': return json(live());
-        case 'GET /api/v2/overview': return json({ MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 20, MA_STATUS: s.MA_STATUS, MA_CLOCK: clock(), MA_CUR_PWR: 0, MA_MAX_PWR: 10, MA_ENERGY_TOTAL_KWH: s.energy, BG_SENS_TEMP_A: r1(s.bg), BG_LEVEL_PW_CONTROL: 0, PU_SENS_PRESS: r1(s.pump), PU_LEVEL_PW_CONTROL: s.pumpPw, PU_SET_LEVEL_PW_CONTROL: 0, PU_SENS_FLOW_METER_ML: 0, SB_SENS_PRESS: r1(s.sb), BB_SENS_TEMP_A: r1(s.bb), BB_LEVEL_PW_CONTROL: 0, SB_STATUS: s.SB_STATUS, MA_LAST_EXTRACTION_ML: '', MA_SET_TIMER_POWERDOWN: s.timers.MA_SET_TIMER_POWERDOWN, PU_SENS_SCALE_VOLUME: 0, SCALE_WEIGHT: 0, PU_SENS_SCALE_RATE: 0, PU_SENS_FLOW_METER_VOLUME: 0, PU_SENS_FLOW_METER_FLOWRATE: 0 });
+        case 'GET /api/v2/overview': return json({ MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 20, MA_STATUS: s.MA_STATUS, MA_CLOCK: clock(), MA_CUR_PWR: 0, MA_MAX_PWR: 10, MA_ENERGY_TOTAL_KWH: s.energy, BG_SENS_TEMP_A: r1(s.bg), BG_LEVEL_PW_CONTROL: 0, PU_SENS_PRESS: r1(s.pump), PU_LEVEL_PW_CONTROL: s.pumpPw, PU_SET_LEVEL_PW_CONTROL: 0, PU_SENS_FLOW_METER_ML: r1(s.flowMl), SB_SENS_PRESS: r1(s.sb), BB_SENS_TEMP_A: r1(s.bb), BB_LEVEL_PW_CONTROL: 0, SB_STATUS: s.SB_STATUS, MA_LAST_EXTRACTION_ML: '', MA_SET_TIMER_POWERDOWN: s.timers.MA_SET_TIMER_POWERDOWN, PU_SENS_SCALE_VOLUME: r1(s.scale), SCALE_WEIGHT: r1(s.scale), PU_SENS_SCALE_RATE: s.brewing && s.brewing.t > 6000 ? 1.8 : 0, PU_SENS_FLOW_METER_VOLUME: r1(s.flowMl), PU_SENS_FLOW_METER_FLOWRATE: s.brewing ? 2 : 0 });
         case 'GET /api/v2/overview_single': return json({ BG_SET_TEMP: g.BG_SET_TEMP, BG_TEMPERATURE_OFFSET: 3, PU_SET_PRESS: 9, BB_OFFSET_TO_BG: 0, BB_TEMPERATURE_OFFSET: 3, PU_SENS_WATER_TANK_LEVEL: s.tank, SB_SET_PRESS: g.SB_SET_PRESS, BB_SET_TEMP: g.BB_SET_TEMP, PSP: 70, MA_MAC: '00:11:22:33:44:55', MA_EXTRACTIONS_START: 0, POP_UP: 0 });
         case 'GET /api/v2/general': return json({ ...g, SB_STATUS: s.SB_STATUS, MA_STATUS: s.MA_STATUS, VIEW: s.view });
         case 'POST /api/v2/general':
           for (const [k, v] of Object.entries(j)) if (k in g) g[k] = Number(v);
           return ok();
-        case 'GET /api/v2/machine': return json({ MA_TYPE: 3, MA_SUBTYPE: 1, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 20, MA_EXTRACTIONS_START: 0, MA_FIX_WATER_SUPPLY: 0, MA_HEATUP_FLUSH_DURATION: 0, MA_BOILER_START_MODE: g.MA_BOILER_START_MODE, MA_EXTENDED_THERMAL_STABILITY: 0, MA_SET_TIMER_ECO_MA: s.timers.MA_SET_TIMER_ECO_MA, MA_SET_TIMER_POWERDOWN: s.timers.MA_SET_TIMER_POWERDOWN, MA_MAX_AMPERE: 10, MA_ENERGY_TOTAL_KWH: s.energy, PU_SET_BREW_TIMER_1: 37, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 226, PU_SET_QUANTITY_MEASUREMENT: 3, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 87, BLE: 0, MA_DELAY: -1, BT_SCALE_NAME: '', MA_SN: '000000001234' });
+        case 'GET /api/v2/machine': return json(classic
+          ? { MA_TYPE: 2, MA_FIX_WATER_SUPPLY: 0, MA_HEATUP_FLUSH_EN: 0, MA_SET_TIMER_ECO_MA: s.timers.MA_SET_TIMER_ECO_MA, MA_SET_TIMER_POWERDOWN: s.timers.MA_SET_TIMER_POWERDOWN, MA_MAX_AMPERE: 10, MA_ENERGY_TOTAL_KWH: s.energy, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 22, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 22, MA_SN: 'none' }
+          : { MA_TYPE: 3, MA_SUBTYPE: 1, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 20, MA_EXTRACTIONS_START: 0, MA_FIX_WATER_SUPPLY: 0, MA_HEATUP_FLUSH_DURATION: 0, MA_BOILER_START_MODE: g.MA_BOILER_START_MODE, MA_EXTENDED_THERMAL_STABILITY: 0, MA_SET_TIMER_ECO_MA: s.timers.MA_SET_TIMER_ECO_MA, MA_SET_TIMER_POWERDOWN: s.timers.MA_SET_TIMER_POWERDOWN, MA_MAX_AMPERE: 10, MA_ENERGY_TOTAL_KWH: s.energy, PU_SET_BREW_TIMER_1: 37, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 226, PU_SET_QUANTITY_MEASUREMENT: 3, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 87, BLE: 0, MA_DELAY: -1, BT_SCALE_NAME: '', MA_SN: '000000001234' });
+        case 'POST /api/v2/machine':
+          if ('MA_SET_TIMER_ECO_MA' in j) s.timers.MA_SET_TIMER_ECO_MA = Number(j.MA_SET_TIMER_ECO_MA);
+          if ('MA_SET_TIMER_POWERDOWN' in j) s.timers.MA_SET_TIMER_POWERDOWN = Number(j.MA_SET_TIMER_POWERDOWN);
+          return ok();
+        case 'POST /api/v2/inc_dec':
+          if ('BG_SET_TEMP' in j) g.BG_SET_TEMP = Number(j.BG_SET_TEMP);
+          if ('BB_SET_TEMP' in j) g.BB_SET_TEMP = Number(j.BB_SET_TEMP);
+          return ok();
+        case 'POST /api/v2/inc_dec_bb':
+          if ('BB_SET_TEMP' in j) g.BB_SET_TEMP = Number(j.BB_SET_TEMP);
+          return ok();
+        case 'POST /api/v2/inc_dec_sb':
+          if ('SB_SET_PRESS' in j) g.SB_SET_PRESS = Number(j.SB_SET_PRESS);
+          return ok();
+        case 'GET /api/v2/scripts/list': {
+          const ids = Object.keys(s.scripts).map(Number);
+          return json({ index_list: ids, title_list: ids.map((i) => s.scripts[i].title) });
+        }
         case 'GET /api/v2/info': return json({ MSN: '', FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 226, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 87, MA_TYPE: 3, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 5, MA_MAC: '4455', MA_TIMEZONE: 1, TZ_IND: s.tz, MA_CLOCK: clock(), MA_CALENDAR: cal(), VIEW: s.view });
         case 'GET /tz/tz.json': return json({ 322: ['Europe/Berlin', 'CET-1CEST,M3.5.0,M10.5.0/3', 'DE', 1] });
         case 'POST /api/v2/timer2/sync': s.lastSync = j; return ok();
@@ -127,7 +157,12 @@ export function createMockXenia({ speed = 1 } = {}) {
         case 'GET /api/v2/upload/status': return json({ status: 'good' });
         case 'POST /api/v2/machine/control': {
           const a = Number(j.action);
-          if (a === 0) { s.MA_STATUS = 0; s.brewing = null; } else if (a === 1) s.MA_STATUS = 1; else if (a === 2) s.MA_STATUS = 2;
+          if (a === 0) { s.MA_STATUS = 0; s.SB_STATUS = 1; s.brewing = null; }
+          else if (a === 1) { s.MA_STATUS = 1; s.SB_STATUS = 2; }
+          else if (a === 2) { s.MA_STATUS = 2; s.SB_STATUS = 1; }
+          else if (a === 3) s.SB_STATUS = 1;
+          else if (a === 4) s.SB_STATUS = 2;
+          else if (a === 5) { s.MA_STATUS = 1; s.SB_STATUS = 1; }
           return ok();
         }
         case 'POST /api/v2/toggle/sb': s.SB_STATUS = Number(j.TOGGLE) ? 2 : 1; return ok();
@@ -215,39 +250,7 @@ export function createMockXenia({ speed = 1 } = {}) {
 }
 
 // --- Mühle ------------------------------------------------------------------
-function crc32(buf) {
-  let c, crc = 0xffffffff;
-  for (let n = 0; n < buf.length; n++) {
-    c = (crc ^ buf[n]) & 0xff;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    crc = (crc >>> 8) ^ c;
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-export function makeZip(files) {
-  const locals = [];
-  const centrals = [];
-  let offset = 0;
-  for (const [name, data] of Object.entries(files)) {
-    const nameBuf = Buffer.from(name);
-    const comp = zlib.deflateRawSync(data);
-    const crc = crc32(data);
-    const lh = Buffer.alloc(30);
-    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6); lh.writeUInt16LE(8, 8);
-    lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(nameBuf.length, 26);
-    locals.push(lh, nameBuf, comp);
-    const ch = Buffer.alloc(46);
-    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(8, 10);
-    ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(data.length, 24); ch.writeUInt16LE(nameBuf.length, 28); ch.writeUInt32LE(offset, 42);
-    centrals.push(ch, nameBuf);
-    offset += 30 + nameBuf.length + comp.length;
-  }
-  const cd = Buffer.concat(centrals);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(Object.keys(files).length, 8); end.writeUInt16LE(Object.keys(files).length, 10);
-  end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, cd, end]);
-}
+export { makeZip };
 
 export function createMockGrinder({ password = 'mockpass' } = {}) {
   const dbFile = path.join(HERE, 'fixtures', 'grinder-mock.db');

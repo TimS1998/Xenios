@@ -25,7 +25,8 @@ export function h(tag, attrs, ...children) {
   }
   for (const c of children.flat(Infinity)) {
     if (c === null || c === undefined || c === false) continue;
-    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    const text = c instanceof Node ? c : document.createTextNode(tag === 'option' ? String(c).replace(/ /g, '\u00a0') : String(c));
+    el.append(text);
   }
   return el;
 }

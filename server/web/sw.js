@@ -3,7 +3,7 @@ const VERSION = 'xenios-v2.1.0';
 const SHELL = [
   '/', '/index.html', '/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/api.js', '/js/ui.js', '/js/gauge.js', '/js/setup.js',
-  '/js/views/dashboard.js', '/js/views/shot-detail.js', '/js/views/community.js', '/shared/shot-analysis.js', '/shared/visualizer.js', '/shared/machine-core.js', '/shared/grinder-core.js', '/shared/emitter.js', '/shared/sqlite-read.js', '/shared/log.js',
+  '/js/views/dashboard.js', '/js/views/shot-detail.js', '/js/views/community.js', '/shared/shot-analysis.js', '/shared/visualizer.js', '/shared/machine-core.js', '/shared/machine-api.js', '/shared/grinder-core.js', '/shared/emitter.js', '/shared/sqlite-read.js', '/shared/log.js',
   '/js/views/home.js', '/js/views/scripts.js', '/js/views/controls.js', '/js/views/shots.js', '/js/views/timer.js', '/js/views/grinder.js', '/js/views/settings.js', '/js/views/server.js',
   '/icons/icon.svg', '/icons/icon-192.png', '/icons/badge-96.png',
 ];

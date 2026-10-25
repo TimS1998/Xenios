@@ -29,6 +29,7 @@ export const DEFAULTS = {
   trustProxy: 'loopback',
   machine: {
     url: 'http://192.168.178.55',
+    api: 'bbs',               // 'bbs' = neue Xenia (Brew-by-Sync), 'classic' = alte Xenia (DBL-API)
     timeoutMs: 6000,
     pollActiveMs: 1000,       // App offen und Maschine an / Bezug läuft
     pollIdleMs: 4000,         // App offen, Maschine aus
@@ -126,12 +127,16 @@ function decodeKey(text) {
   return crypto.createHash('sha256').update(s, 'utf8').digest(); // beliebige Passphrase
 }
 
-export function secretBox(dataDir) {
+export function secretBox(dataDir, keyText) {
   let key = null;
   const keyFile = path.join(dataDir, 'secret.key');
   const source = () => (process.env.XENIOS_SECRET_KEY ? 'env' : process.env.XENIOS_SECRET_KEY_FILE ? 'file-env' : 'file');
   function getKey(create) {
     if (key) return key;
+    if (keyText) {
+      key = decodeKey(String(keyText).trim());
+      return key;
+    }
     if (process.env.XENIOS_SECRET_KEY) key = decodeKey(process.env.XENIOS_SECRET_KEY);
     else if (process.env.XENIOS_SECRET_KEY_FILE) key = decodeKey(fs.readFileSync(process.env.XENIOS_SECRET_KEY_FILE, 'utf8'));
     else if (fs.existsSync(keyFile)) key = decodeKey(fs.readFileSync(keyFile, 'utf8'));

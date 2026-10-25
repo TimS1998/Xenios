@@ -72,7 +72,7 @@ body {
   overscroll-behavior-y: contain;
 }
 [hidden] { display: none !important; }
-button, input, select, textarea { font: inherit; color: inherit; }
+button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .muted { color: var(--on-surface-variant); }
@@ -210,7 +210,17 @@ svg.icon.s20 { width: 20px; height: 20px; }
   width: 100%; min-width: 0;
 }
 .field input:focus, .field select:focus, input.text:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
-select { appearance: auto; }
+/* Native Listen: Roboto + font: 14px/1.43 lässt Chrome unter Windows die Leerzeichen verschlucken. */
+select, select.text, option {
+  appearance: auto;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: normal;
+  word-spacing: normal;
+  color: inherit;
+}
 .check { display: flex; align-items: center; gap: 10px; }
 .check input { width: 18px; height: 18px; accent-color: var(--primary); }
 .error { color: var(--danger); min-height: 1.2em; margin: 4px 0; }

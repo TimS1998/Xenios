@@ -42,6 +42,7 @@ class SetupActivity : Activity() {
         val machineIp = findViewById<EditText>(R.id.machine_ip)
         val grinderIp = findViewById<EditText>(R.id.grinder_ip)
         val grinderPw = findViewById<EditText>(R.id.grinder_pw)
+        val apiGroup = findViewById<RadioGroup>(R.id.machine_api)
         val modeGroup = findViewById<RadioGroup>(R.id.mode)
         val serverBox = findViewById<View>(R.id.server_box)
         val directBox = findViewById<View>(R.id.direct_box)
@@ -55,6 +56,7 @@ class SetupActivity : Activity() {
         machineIp.setText(prefs.machineIp ?: "")
         grinderIp.setText(prefs.grinderIp ?: "")
         grinderPw.setText(prefs.grinderPassword ?: "")
+        apiGroup.check(if (prefs.machineApi == "classic") R.id.api_classic else R.id.api_bbs)
 
         fun showMode(direct: Boolean) {
             serverBox.visibility = if (direct) View.GONE else View.VISIBLE
@@ -116,6 +118,7 @@ class SetupActivity : Activity() {
             if (direct) {
                 val m = machineIp.text.toString().trim()
                 val g = grinderIp.text.toString().trim()
+                val api = if (apiGroup.checkedRadioButtonId == R.id.api_classic) "classic" else "bbs"
                 if (!isPrivateIp(m)) return@setOnClickListener done("Maschine: bitte eine IP-Adresse im Heimnetz eingeben, z. B. 192.168.178.55")
                 if (g.isNotEmpty() && !isPrivateIp(g)) return@setOnClickListener done("Mühle: bitte eine IP-Adresse im Heimnetz eingeben, z. B. 192.168.178.54")
                 thread(name = "xenia-setup") {
@@ -123,6 +126,7 @@ class SetupActivity : Activity() {
                     if (code != 200 || !text.contains("MA_STATUS")) return@thread done("Unter $m antwortet keine Xenia. Gleiches WLAN? IP richtig?")
                     prefs.mode = "direct"
                     prefs.machineIp = m
+                    prefs.machineApi = api
                     prefs.grinderIp = g.ifBlank { null }
                     prefs.grinderPassword = grinderPw.text.toString().ifBlank { null }
                     done(null)

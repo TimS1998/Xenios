@@ -9,6 +9,9 @@ export const store = {
   lastUpdate: 0,
 };
 
+export const hasGrinder = () => Boolean(store.server?.grinder?.enabled);
+export const isClassic = () => (store.server?.machine?.api || store.machine?.api) === 'classic';
+
 export function subscribe(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -51,20 +54,23 @@ if (backend) {
   });
 }
 
-export async function api(path, { method = 'GET', body, raw = false } = {}) {
+export async function api(path, { method = 'GET', body, raw = false, binary = false } = {}) {
   if (backend) {
     const r = await backend.handle(method, path, body ?? {});
     if (r.status >= 400) throw new ApiError(r.status, r.data?.error || `Fehler ${r.status}`);
     return r.data;
   }
-  const headers = { Accept: 'application/json' };
+  const headers = { Accept: raw ? '*/*' : 'application/json' };
   if (method !== 'GET') {
     headers['X-Xenia'] = '1';
-    headers['Content-Type'] = 'application/json';
+    headers['Content-Type'] = binary ? 'application/zip' : 'application/json';
   }
+  const payload = body === undefined
+    ? (method !== 'GET' && !binary ? '{}' : undefined)
+    : (binary ? body : JSON.stringify(body));
   let res;
   try {
-    res = await fetch(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : method !== 'GET' ? '{}' : undefined, credentials: 'same-origin', cache: 'no-store' });
+    res = await fetch(path, { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store' });
   } catch {
     throw new ApiError(0, 'Keine Verbindung zum Server');
   }

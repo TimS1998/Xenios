@@ -1,6 +1,6 @@
 // Wochen-Timer (Auto-Ein/Aus pro Tag, Brühen/Dampf), Eco- und Abschalt-Timer, Uhr der Maschine.
 import { h, icon, snackbar, switchEl, sliderRow, hhmm, fromHhmm, fmtInt, sheet, pickTimeDialog } from '../ui.js';
-import { api, store } from '../api.js';
+import { api, store, isClassic } from '../api.js';
 
 const DAY_DE = { MONDAY: 'Montag', TUESDAY: 'Dienstag', WEDNESDAY: 'Mittwoch', THUSRDAY: 'Donnerstag', FRIDAY: 'Freitag', SATURDAY: 'Samstag', SUNDAY: 'Sonntag' };
 
@@ -112,15 +112,16 @@ export function timerView(root) {
   }
 
   function paintAll() {
+    const weekly = data.weekly !== false && !isClassic();
     box.replaceChildren(
-      clockCard(),
-      h('div', { class: 'section-title' }, 'Wochenplan (Maschine)'),
-      ...data.days.map(dayCard),
+      weekly ? clockCard() : h('div', { class: 'card low muted small' }, 'Die alte Xenia hat keinen Wochenplan über die API. Eco- und Ausschalt-Timer unten, zusätzliche Zeiten über den Server.'),
+      weekly ? h('div', { class: 'section-title' }, 'Wochenplan (Maschine)') : null,
+      ...(weekly ? data.days.map(dayCard) : []),
       ...(direct ? [h('div', { class: 'section-title' }, 'Weitere Schaltzeiten & Wecker'), h('div', { class: 'card low muted small' }, 'Zusätzliche Schaltzeiten und das Einschalten vor dem Wecker übernimmt der Server. Im Direkt-Modus der App gibt es nur den Wochenplan der Maschine.')]
         : [h('div', { class: 'section-title' }, 'Weitere Schaltzeiten (Server)'), scheduleBox, h('div', { class: 'section-title' }, 'Wecker'), wakeBox]),
       h('div', { class: 'section-title' }, 'System-Timer'),
       sysCard(),
-      h('p', { class: 'muted small' }, 'Hinweis: Eine Ausschaltzeit gilt nur an aktiven Tagen. „Brühen“ heizt den Brühkessel, „Dampf“ den Dampfkessel.'));
+      weekly ? h('p', { class: 'muted small' }, 'Hinweis: Eine Ausschaltzeit gilt nur an aktiven Tagen. „Brühen“ heizt den Brühkessel, „Dampf“ den Dampfkessel.') : null);
   }
 
   async function load() {

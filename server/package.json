@@ -12,7 +12,7 @@
     "start": "node src/index.js",
     "mock": "node mock/mock-devices.js",
     "dev": "node src/index.js --config mock/dev-config.json",
-    "test": "node --test --test-force-exit test/unit.test.js test/integration.test.js test/direct.test.js test/admin.test.js test/shots.test.js test/analysis.test.js test/community.test.js test/gbs.test.js"
+    "test": "node --test --test-force-exit test/unit.test.js test/integration.test.js test/direct.test.js test/admin.test.js test/shots.test.js test/analysis.test.js test/community.test.js test/gbs.test.js test/classic.test.js"
   },
   "license": "Apache-2.0"
 }

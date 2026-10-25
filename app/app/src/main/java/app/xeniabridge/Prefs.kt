@@ -50,6 +50,11 @@ class Prefs(context: Context) {
         get() = p.getString("grinderPw", null)
         set(v) = p.edit().putString("grinderPw", v).apply()
 
+    /** "bbs" = neue Xenia (Brew-by-Sync), "classic" = alte Xenia (DBL-API). */
+    var machineApi: String
+        get() = p.getString("machineApi", null) ?: "bbs"
+        set(v) = p.edit().putString("machineApi", v).apply()
+
     val configured: Boolean
         get() = if (direct) !machineIp.isNullOrBlank()
         else (!baseUrl.isNullOrBlank() || !localUrl.isNullOrBlank()) && !token.isNullOrBlank()

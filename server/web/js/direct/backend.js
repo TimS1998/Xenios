@@ -123,9 +123,9 @@ class LocalStore {
 export function createDirectBackend() {
   const conf = JSON.parse(window.XeniaApp.directConfig());
   const cfg = {
-    machine: { url: conf.machineUrl, timeoutMs: 6000, pollActiveMs: 1000, pollIdleMs: 4000, pollBackgroundMs: 10000, slowPollMs: 60000 },
+    machine: { url: conf.machineUrl, api: conf.machineApi === 'classic' ? 'classic' : 'bbs', timeoutMs: 6000, pollActiveMs: 1000, pollIdleMs: 4000, pollBackgroundMs: 10000, slowPollMs: 60000 },
     grinder: { enabled: Boolean(conf.grinderUrl), url: conf.grinderUrl || 'https://0.0.0.0', password: conf.grinderPassword || '', timeoutMs: 8000, pollMs: 30000, allowDatabaseDownload: false },
-    features: { paddle: true, scriptEditor: true, settings: true, clockSync: true },
+    features: { paddle: conf.machineApi !== 'classic', scriptEditor: true, settings: true, clockSync: conf.machineApi !== 'classic' },
   };
   const machine = new Machine(cfg, { fetch: machineFetch, history: new LocalStore('shots', { shots: [] }) });
   const grinder = new Grinder(cfg, { http: new GrinderBridgeHttp(cfg.grinder.url, cfg.grinder.timeoutMs) });
@@ -133,6 +133,7 @@ export function createDirectBackend() {
     version: conf.version || 'App',
     mode: 'direct',
     features: cfg.features,
+    machine: { api: cfg.machine.api },
     push: { enabled: false, topics: {} },
     grinder: { enabled: cfg.grinder.enabled, databaseDownload: false },
   });

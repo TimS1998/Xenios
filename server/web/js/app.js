@@ -1,6 +1,6 @@
 // App-Start: Login, Navigation, Live-Verbindung, Service Worker, Shortcuts.
 import { h, icon, snackbar } from './ui.js';
-import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode } from './api.js';
+import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder } from './api.js';
 import { homeView } from './views/home.js';
 import { dashboardView } from './views/dashboard.js';
 import { scriptsView } from './views/scripts.js';
@@ -45,11 +45,15 @@ export function localStorageSet(k, v) {
 applyTheme();
 
 // --- Navigation ---------------------------------------------------------------
+function navRoutes() {
+  return ROUTES.filter((r) => r.nav !== false && (r.path !== '/muehle' || hasGrinder()));
+}
+
 function buildNav() {
   $('settings-btn').replaceChildren(icon('settings'));
   $('back-btn').replaceChildren(icon('left'));
   $('settings-btn').onclick = () => navigate('/einstellungen');
-  const inner = h('div', { class: 'navbar-inner' }, ROUTES.filter((r) => r.nav !== false).map((r) =>
+  const inner = h('div', { class: 'navbar-inner' }, navRoutes().map((r) =>
     h('button', { class: 'nav-item', dataset: { path: r.path }, onclick: () => navigate(r.path) },
       h('span', { class: 'pill' }, icon(r.icon)), r.label)));
   $('navbar').replaceChildren(inner);
@@ -75,6 +79,7 @@ export function setTabs(tabs, active, onSelect) {
 }
 
 function render() {
+  if (location.pathname === '/muehle' && !hasGrinder()) return navigate('/', { replace: true });
   const route = ROUTES.find((r) => r.path === location.pathname) || ROUTES.find((r) => r.path === '/');
   current?.dispose?.();
   $('app').classList.toggle('wide', Boolean(route.wide));
@@ -97,6 +102,10 @@ function render() {
   current = { route, dispose: route.view(view) };
 }
 window.addEventListener('popstate', render);
+
+subscribe((part) => {
+  if (part === 'server' || part === 'all') buildNav();
+});
 
 // Verbindungspunkt oben rechts
 subscribe(() => {

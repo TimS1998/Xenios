@@ -8,11 +8,14 @@
 #   XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest
 #   XENIOS_PULL=always
 #
-# Mit Cloudflare-Tunnel (Zugriff von unterwegs, ohne Portfreigabe): in .env
-#   TUNNEL_TOKEN=…   und   COMPOSE_PROFILES=tunnel
+# Mit Cloudflare-Tunnel (Zugriff von unterwegs, ohne Portfreigabe):
+#   Im Einrichten die Zeile „sudo cloudflared service install …“ einfügen.
+#   install.sh schreibt TUNNEL_TOKEN und COMPOSE_PROFILES=tunnel und startet cloudflared.
 #   Im Cloudflare-Dashboard: Public Hostname → Service HTTP → xenios:8080
 #
-# Aktualisieren:  git pull && docker compose up -d      (mit fertigem Image: docker compose up -d)
+# Einrichten:     curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh
+# Aktualisieren:  in der App (Einstellungen → Server) oder  sh ~/xenios/install.sh --update
+#                 von Hand: git pull && docker compose up -d
 name: xenios
 
 services:

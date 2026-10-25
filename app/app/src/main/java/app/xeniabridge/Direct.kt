@@ -165,21 +165,24 @@ object DirectMachine {
     private fun JSONObject.num(k: String): Double? = if (!has(k) || isNull(k)) null else optString(k).toDoubleOrNull()
 
     fun state(context: Context): Api.State {
-        val d = try { get(context, "/api/v2/diagram/get") } catch (e: Api.ApiException) {
+        val classic = Prefs(context).machineApi == "classic"
+        val d = try { get(context, if (classic) "/api/v2/overview" else "/api/v2/diagram/get") } catch (e: Api.ApiException) {
             if (e.status == 0) throw e
             return Api.State(false, null, null, false, false, false, true, null, null, null, false)
         }
         val single = get(context, "/api/v2/overview_single")
-        val general = get(context, "/api/v2/general")
+        val general = if (classic) null else try { get(context, "/api/v2/general") } catch (_: Exception) { null }
         val status = d.num("MA_STATUS")?.toInt()
         val key = when (status) { 0 -> "off"; 1 -> "on"; 2 -> "eco"; 3 -> "brewing"; 4 -> "draining"; 5 -> "paddle"; 6 -> "fault"; else -> "unknown" }
         fun temp(raw: Double?, offset: Double?): Double? = raw?.let { if (it > 40) it - (offset ?: 0.0) else it }
-        val group = temp(d.num("BG_SENS_TEMP_A"), general.num("BG_TEMPERATURE_OFFSET"))
-        val groupSet = single.num("BG_SET_TEMP") ?: general.num("BG_SET_TEMP")
+        val bgOff = general?.num("BG_TEMPERATURE_OFFSET") ?: single.num("BG_TEMPERATURE_OFFSET")
+        val bbOff = general?.num("BB_TEMPERATURE_OFFSET") ?: single.num("BB_TEMPERATURE_OFFSET")
+        val group = temp(d.num("BG_SENS_TEMP_A"), bgOff)
+        val groupSet = single.num("BG_SET_TEMP") ?: general?.num("BG_SET_TEMP")
         val on = status == 1 || status == 3 || status == 4
         val steamOn = d.num("SB_STATUS")?.toInt() == 2
         val steam = d.num("SB_SENS_PRESS")
-        val steamSet = single.num("SB_SET_PRESS") ?: general.num("SB_SET_PRESS")
+        val steamSet = single.num("SB_SET_PRESS") ?: general?.num("SB_SET_PRESS")
         return Api.State(
             online = true,
             status = key,
@@ -192,8 +195,8 @@ object DirectMachine {
             groupSet = groupSet,
             steam = steam,
             shot = status == 3,
-            boiler = temp(d.num("BB_SENS_TEMP_A"), general.num("BB_TEMPERATURE_OFFSET")),
-            boilerSet = single.num("BB_SET_TEMP") ?: general.num("BB_SET_TEMP"),
+            boiler = temp(d.num("BB_SENS_TEMP_A"), bbOff),
+            boilerSet = single.num("BB_SET_TEMP") ?: general?.num("BB_SET_TEMP"),
             steamSet = steamSet,
         )
     }
@@ -202,6 +205,7 @@ object DirectMachine {
     fun power(context: Context, mode: String) {
         val action = when (mode) { "off" -> "0"; "on" -> "1"; "eco" -> "2"; else -> throw Api.ApiException(400, "Ungültiger Modus") }
         post(context, "/api/v2/machine/control", JSONObject().put("action", action))
+        if (Prefs(context).machineApi == "classic") return
         val steam = when (mode) {
             "on" -> if (get(context, "/api/v2/general").num("MA_BOILER_START_MODE")?.toInt() == 2) 0 else 1
             else -> 0

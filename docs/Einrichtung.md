@@ -22,8 +22,8 @@
 4. Im Browser einrichten: am PC <http://127.0.0.1:8080>, im WLAN `https://<IP-des-PCs>:8443` (Zertifikatswarnung einmal bestätigen; den Fingerprint zeigt das Konsolenfenster). Abgefragt werden:
    - der Einrichtungscode
    - das **App-Passwort** (mind. 10 Zeichen, nur als scrypt-Hash gespeichert)
-   - die Adresse der Xenia, mit Verbindungstest
-   - optional Adresse und **Owner-Passwort der Mühle**, mit Test der Anmeldung (verschlüsselt in `config.json`)
+   - welche Xenia und ihre Adresse, mit Verbindungstest. **Neue Xenia** ist Brew-by-Sync (aktuelle Firmware). **Alte Xenia** ist die DBL mit der älteren offiziellen API (`machine.api` = `classic`). Passt die Wahl nicht, sagt der Test das („Die Maschine antwortet wie die alte API – oben Alte Xenia wählen.“ oder umgekehrt). Bei der alten API gibt es kein Paddle, keinen Wochenplan der Maschine und kein „Uhr stellen“; Xenios blendet das aus und zählt die Bezugszeit selbst. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Dieselbe Umschaltung hat die Android-App im Direkt-Modus.
+   - optional Adresse und **Owner-Passwort der Mühle**, mit Test der Anmeldung (verschlüsselt in `config.json`). Ohne Mühle bleiben Mühlen-Navigation, Kacheln und Grind-by-Sync aus; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Grind-by-Sync gibt es nur mit Mühle und neuer Xenia.
 
    Ohne Browser geht es auch im Terminal: `npm run setup`.
 5. **Autostart** (als Administrator in PowerShell):
@@ -31,6 +31,8 @@
    powershell -ExecutionPolicy Bypass -File server\deploy\windows\install-autostart.ps1
    ```
    Das legt die Aufgabe „Xenios“ an. Sie startet beim Hochfahren und bei Abstürzen neu. Das Log liegt in `server\data\server.log`.
+
+   Unter *Einstellungen → Server & Sicherheit* prüft **Aktualisieren**, ob auf GitHub eine neuere Version liegt. Ohne `install.sh` holt der Knopf sie nicht. Auf dem Windows-PC bleibt es bei `git pull` im Projektordner und einem Neustart des Servers (die Aufgabe „Xenios“ startet ihn wieder). Konfiguration, Sitzungen und Bezüge bleiben.
 
 > Tipp: Der PC darf nicht in den Ruhezustand gehen (Energieoptionen). Alternativ läuft der Server auch auf einem Raspberry Pi oder NAS, siehe unten.
 
@@ -69,7 +71,15 @@ Hinweis: Installierbar ist die App nur über eine echte HTTPS-Adresse (Cloudflar
 
 ## 4. Alternativ: Linux-Server, Raspberry Pi oder NAS mit Docker
 
-Voraussetzung: Docker mit Compose-Plugin, der Server steht im selben Heimnetz wie Maschine und Mühle. Alle Befehle im Ordner `docker/`:
+Schritt für Schritt von einem frischen System, mit Stellen für Screenshots: [Hardware](Hardware.md), [Raspberry Pi](Installation-Raspberry-Pi.md), [Linux mit Docker](Installation-Linux-Docker.md).
+
+Kurzfassung, wenn Docker schon läuft. Voraussetzung: Docker mit Compose-Plugin, der Server steht im selben Heimnetz wie Maschine und Mühle. Am kürzesten:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh
+```
+
+Oder alle Befehle im Ordner `docker/`:
 
 ```bash
 cd docker
@@ -79,11 +89,11 @@ docker compose logs xenios           # Einrichtungscode ablesen
 Dann `https://<IP-des-Servers>:8443` öffnen und der Einrichtung folgen (wie oben).
 
 - **Fertiges Image statt selbst bauen:** Jedes Release veröffentlicht das Image in GitHub Packages (amd64 und arm64). In `docker/.env`: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always`.
-- **Daten** (Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge) liegen im Volume `xenios_xenios-data`. Sicherung: `docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .` (enthält `secret.key`, also sicher aufbewahren).
+- **Daten** (Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge) liegen im Volume `xenios_xenios-data`. In der App unter *Server & Sicherheit → Sicherung* als ZIP herunterladen oder einspielen. Zusätzlich das ganze Volume: `docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .` (beides enthält `secret.key`, also sicher aufbewahren).
 - **Zertifikat:** Im Container kennt der Server die LAN-IP des Rechners nicht. In der App unter *Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP bzw. den Hostnamen eintragen; das Zertifikat wird sofort neu erzeugt.
 - **Ports und Pfade** sind im Container fest (Umgebungsvariablen im `Dockerfile`) und in der App als gesperrt markiert. Den HTTPS-Port auf dem Rechner ändert `XENIOS_HTTPS_PORT` in `.env`. Unter Linux umgehen Docker-Ports `ufw`; mit `XENIOS_HTTPS_PORT=<LAN-IP>:8443` lauscht der Port nur im Heimnetz.
-- **Cloudflare-Tunnel** im selben Compose: `cp .env.example .env`, `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` eintragen, dann `docker compose up -d`. Im Dashboard den Public Hostname auf **`http://xenios:8080`** setzen (Container-Name statt localhost). Port 8080 ist bewusst nicht nach außen veröffentlicht.
-- **Aktualisieren:** `git pull && docker compose up -d` (mit fertigem Image nur `docker compose up -d`).
+- **Cloudflare-Tunnel** im selben Compose: im Einrichten oder unter *Server & Sicherheit* die Zeile `sudo cloudflared service install …` einfügen. Den Befehl nicht ausführen. `install.sh` schreibt `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` und startet `cloudflared`. Im Dashboard den Public Hostname auf **`http://xenios:8080`** setzen (Container-Name statt localhost). Port 8080 ist bewusst nicht nach außen veröffentlicht.
+- **Aktualisieren:** in der App unter *Einstellungen → Server & Sicherheit → Aktualisieren*. `install.sh` richtet dafür den Dienst `xenios-update.timer` ein (Debian, Ubuntu, Raspberry Pi OS 64-Bit). Der Knopf holt Git und das Image und startet neu; Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den `curl`-Befehl. Einmal `sh ~/xenios/install.sh` richtet ihn nach, eine vorhandene `.env` bleibt. Nur holen: `sh ~/xenios/install.sh --update`. Ohne das Skript: `git pull && docker compose up -d`.
 - Härtung: schreibgeschütztes Dateisystem, eigener Benutzer statt root, keine Linux-Capabilities, Speicher- und Prozessgrenzen (siehe `compose.yaml`).
 
 Oder ohne Docker mit systemd: [`server/deploy/linux/xenios.service`](../server/deploy/linux/xenios.service).
@@ -95,6 +105,7 @@ Alles lässt sich in der App unter **Einstellungen → Server & Sicherheit** än
 | In der App | Schlüssel in `config.json` | Standard |
 |---|---|---|
 | Adresse der Xenia (mit Verbindungstest) | `machine.url` | `http://192.168.178.55` |
+| Xenia-Modell (neue / alte API) | `machine.api` | `bbs` (`classic` = alte DBL) |
 | Mühle an/aus, Adresse, Owner-Passwort | `grinder.enabled` / `grinder.url` / `grinder.password` (verschlüsselt) | an / `https://192.168.178.54` / – |
 | Gemerktes Zertifikat der Mühle vergessen | `data/grinder-pin.json` | – |
 | Datenbank-Download (enthält das WLAN-Passwort!) | `grinder.allowDatabaseDownload` | aus |
@@ -102,6 +113,7 @@ Alles lässt sich in der App unter **Einstellungen → Server & Sicherheit** än
 | Zeitzone für Zeitplan und Wecker | `timezone` | System bzw. `TZ` |
 | App-Passwort ändern (meldet andere Geräte ab) | `auth.passwordHash` | – |
 | Anmeldedauer | `auth.sessionDays` | 90 |
+| Sicherung herunterladen / einspielen (ZIP) | `config.json` plus Dateien im Datenordner | – |
 | Angemeldete Geräte einzeln oder alle abmelden | `data/sessions.json` | – |
 | HTTPS an/aus, Adresse, Port, weitere Namen/IPs, Zertifikat neu erzeugen | `https.*` | an, `0.0.0.0:8443` |
 | Tunnel-Port für cloudflared | `http.*` | `127.0.0.1:8080` |
@@ -117,6 +129,8 @@ Alles lässt sich in der App unter **Einstellungen → Server & Sicherheit** än
 **Geheimnisse:** Mühlen-Passwort und privater Push-Schlüssel stehen mit AES-256-GCM verschlüsselt in `config.json` (`enc:v1:…`); Klartext aus älteren Versionen wird beim Start automatisch verschlüsselt. Der Schlüssel liegt in `data/secret.key`, außer er kommt per Umgebungsvariable. Liegt er neben der Konfiguration, schützt das vor dem Weitergeben oder Sichern von `config.json` allein, nicht vor jemandem mit Zugriff auf den ganzen Datenordner. Geht der Schlüssel verloren, Mühlen-Passwort neu eingeben (Push-Abos auf den Geräten neu einschalten).
 
 ## 6. Grind-by-Sync mit Druckprofilen (optional)
+
+Grind-by-Sync setzt eine eingebundene Mühle und die **neue** Xenia voraus. Bei alter API oder ohne Mühle zeigt die App den Vermittler nicht.
 
 Normal startet der Drehknopf der E64 WS nach einem GbS-Mahlvorgang das fest eingebaute Skript 9 der Xenia. Mit dem Vermittler startet er stattdessen ein Druckprofil aus der App, und die Mühle lernt trotzdem weiter.
 

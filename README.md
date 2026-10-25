@@ -15,11 +15,17 @@ Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Wid
 | [`server/`](server) | Node.js-Server ohne npm-Abhängigkeiten (`src/`), die Web-App (`web/`), Simulation der Geräte (`mock/`), Tests (`test/`), Start ohne Docker (`deploy/`: Windows, systemd, cloudflared) |
 | [`app/`](app) | Android-App (Kotlin); packt `server/web` für den Direkt-Modus mit ein |
 | [`docker/`](docker) | `Dockerfile`, `compose.yaml`, `.env.example` |
-| [`docs/`](docs) | Einrichtung, Git- und Docker-Anleitung, APIs von Maschine, Mühle und Server |
+| [`docs/`](docs) | Einrichtung, Hardware, Installation (Raspberry Pi und Linux/Docker), Git- und Docker-Anleitung, APIs von Maschine, Mühle und Server |
 
 ## Schnellstart
 
-**Docker** (Linux-Server, Raspberry Pi, NAS):
+**Linux** (Debian, Ubuntu, Raspberry Pi) – ein Skript für Docker, Start und späteres Aktualisieren:
+```bash
+curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh
+```
+Danach `https://<IP>:8443` öffnen. Das Skript gilt für Debian, Ubuntu und Raspberry Pi OS 64-Bit. Updates: in der App unter **Einstellungen → Server & Sicherheit → Aktualisieren**, oder `sh ~/xenios/install.sh --update`.
+
+**Docker** von Hand:
 ```bash
 git clone https://github.com/TimS1998/Xenios.git xenios && cd xenios/docker
 docker compose up -d
@@ -30,7 +36,9 @@ docker compose logs xenios       # zeigt den Einrichtungscode
 cd server
 npm start                        # zeigt den Einrichtungscode
 ```
-Dann `https://<IP-des-Rechners>:8443` öffnen (Zertifikatswarnung einmal bestätigen), den Code eingeben und der Einrichtung folgen: App-Passwort, Adresse der Xenia, optional die Mühle, jeweils mit Verbindungstest. Alles Weitere unter **Einstellungen → Server & Sicherheit**, ohne Neustart.
+Dann `https://<IP-des-Rechners>:8443` öffnen (Zertifikatswarnung einmal bestätigen), den Code eingeben und der Einrichtung folgen: App-Passwort, neue oder alte Xenia, optional die Mühle, jeweils mit Verbindungstest. Ohne Mühle bleiben die Mühlenseiten aus; Dosis und Mahlgrad trägt man bei einem Bezug von Hand ein. Alles Weitere unter **Einstellungen → Server & Sicherheit**, ohne Neustart.
+
+Von einem frischen System an: [welcher Rechner](docs/Hardware.md), [Raspberry Pi](docs/Installation-Raspberry-Pi.md), [Linux mit Docker](docs/Installation-Linux-Docker.md).
 
 Ausführlich: [Einrichtung](docs/Einrichtung.md) (Docker, Windows-Autostart, Cloudflare-Tunnel, Android) und [Git und Docker Schritt für Schritt](docs/Git-und-Docker.md) (erster Upload, Releases mit signierter APK, Docker-Betrieb, Sicherung).
 

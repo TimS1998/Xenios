@@ -1,7 +1,7 @@
 // Dashboard: anpassbare Übersicht nur zum Ansehen (Handy, Tablet hochkant und quer). Bedient nichts an den Geräten.
 // Auswahl, Reihenfolge und Breite der Kacheln speichert jedes Gerät für sich (localStorage).
 import { h, icon, fmt, fmtInt, ago, sheet, switchEl } from '../ui.js';
-import { api, store, subscribe } from '../api.js';
+import { api, store, subscribe, hasGrinder } from '../api.js';
 import { createGauge, ring, shotChart, barChart, targetBar, liveChart } from '../gauge.js';
 import { navigate, setTopActions, localStorageGet, localStorageSet } from '../app.js';
 import { liveHistory, SERIES } from './home.js';
@@ -22,6 +22,7 @@ const TILES = {
   care: { title: 'Pflege', icon: 'check', wide: false, build: careTile, link: '/bezuege' },
   live: { title: 'Verlauf (10 min)', icon: 'history', wide: true, build: liveTile },
 };
+const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
 const LAYOUT_VERSION = 2; // 2: breite Kacheln nur noch oben (Live-Bezug) und unten (Verlauf), sonst entstehen Lücken
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
@@ -50,7 +51,7 @@ export function dashboardView(root) {
   setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Dashboard anpassen', title: 'Dashboard anpassen', onclick: customize }, icon('tune')));
 
   function build() {
-    built = layout.tiles.filter((t) => t.on).map((t) => {
+    built = layout.tiles.filter((t) => t.on && (hasGrinder() || !GRINDER_TILES.has(t.id))).map((t) => {
       const def = TILES[t.id];
       const t0 = def.build({ wide: t.wide });
       const extra = h('span', { class: 'extra' });
@@ -114,12 +115,15 @@ export function dashboardView(root) {
 
   function customize() {
     const list = h('div', { class: 'list dash-cfg' });
-    const paint = () => list.replaceChildren(layout.tiles.map((t, i) => {
+    const visible = () => layout.tiles.filter((t) => hasGrinder() || !GRINDER_TILES.has(t.id));
+    const paint = () => list.replaceChildren(visible().map((t, i, vis) => {
       const def = TILES[t.id];
       const move = (d) => {
-        const j = i + d;
-        if (j < 0 || j >= layout.tiles.length) return;
-        [layout.tiles[i], layout.tiles[j]] = [layout.tiles[j], layout.tiles[i]];
+        const next = vis[i + d];
+        if (!next) return;
+        const a = layout.tiles.indexOf(t);
+        const b = layout.tiles.indexOf(next);
+        [layout.tiles[a], layout.tiles[b]] = [layout.tiles[b], layout.tiles[a]];
         changed();
       };
       return h('div', { class: 'list-item dash-cfg-row' },
@@ -128,7 +132,7 @@ export function dashboardView(root) {
         t.id === 'shot' ? null : [
           h('button', { class: 'chip', 'aria-pressed': String(t.wide), title: 'Über die ganze Breite', onclick: () => { t.wide = !t.wide; changed(); } }, 'Breit'),
           h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
-          h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === layout.tiles.length - 1, onclick: () => move(1) }, icon('more'))]);
+          h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]);
     }));
     const changed = () => {
       saveLayout(layout);
@@ -156,6 +160,7 @@ export function dashboardView(root) {
   // Neue Bezüge erkennt die Seite am Ende-Zeitpunkt des letzten Bezugs (auch nachträglich erkannte)
   const un = subscribe((part) => {
     if (part === 'event') return;
+    if (part === 'server') { build(); return; }
     const m = store.machine;
     if (m?.lastShot?.endedAt && m.lastShot.endedAt !== lastEnded) {
       lastEnded = m.lastShot.endedAt;

@@ -2,7 +2,7 @@
 import { h, icon, snackbar, switchEl, sheet, confirmDialog, ago } from '../ui.js';
 import { api, refreshState } from '../api.js';
 import { logout } from '../app.js';
-import { fillProbe, revealToggle, shake, tunnelGuide } from '../setup.js';
+import { fillProbe, revealToggle, shake, tunnelGuide, apiChoice } from '../setup.js';
 
 const LOCK_HINT = 'per Umgebungsvariable festgelegt';
 
@@ -16,6 +16,63 @@ export function serverView(root) {
     h('button', { class: 'btn text', onclick: () => { for (const k of Object.keys(dirty)) delete dirty[k]; paint(); } }, 'Verwerfen'),
     saveBtn);
   root.append(body, savebar);
+
+  const updateBox = h('div');
+  let updatePoll = null;
+  let updateReady = false;
+  function paintUpdate(u) {
+    const job = u.job || {};
+    const pending = job.state === 'queued' || job.state === 'running';
+    const line = h('div', { class: 'small' },
+      `Installiert: Xenios ${u.current || data?.status?.version || '–'}`,
+      u.latest ? (u.newer ? ` · neu: ${u.latest}` : ' · aktuell') : null,
+      u.latestError ? h('span', { class: 'muted' }, ` · ${u.latestError}`) : null);
+    const progress = pending
+      ? h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), job.state === 'queued'
+        ? ' Der Update-Dienst holt die neue Version …'
+        : ' Aktualisierung läuft, der Server startet gleich neu …')
+      : job.state === 'error' ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, job.error || 'Aktualisierung fehlgeschlagen'))
+      : job.state === 'ok' && job.version ? h('p', { class: 'small' }, `Zuletzt aktualisiert auf ${job.version}.`) : null;
+    const btn = h('button', { type: 'button', class: 'btn tonal', disabled: pending, onclick: requestUpdate },
+      icon('refresh', 's18'), u.newer && u.latest ? `Auf ${u.latest} aktualisieren` : 'Aktualisieren');
+    const hint = u.helper
+      ? h('p', { class: 'small muted' }, 'Holt das neueste Image und startet Xenios neu. Konfiguration, Sitzungen und Bezüge bleiben.')
+      : h('div', { class: 'small muted' },
+        h('p', {}, 'Damit der Knopf selbst aktualisiert, einmal auf dem Linux-Server:'),
+        h('pre', { class: 'hint-code' }, 'curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh'),
+        h('p', {}, 'Ohne den Dienst: ', h('code', {}, 'sh ~/xenios/install.sh --update')));
+    updateBox.replaceChildren(h('div', { class: 'divider' }), h('div', {}, 'Aktualisierung'), line, progress, h('div', { class: 'row', style: { 'margin-top': '8px' } }, btn), hint);
+  }
+  async function refreshUpdate() {
+    try {
+      const u = await api('/api/admin/update');
+      paintUpdate(u);
+      return u.job?.state === 'queued' || u.job?.state === 'running';
+    } catch {
+      updateBox.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Verbindung unterbrochen – warte auf den Neustart …'));
+      return true;
+    }
+  }
+  function startUpdatePoll(immediate = true) {
+    const tick = async () => {
+      const again = await refreshUpdate();
+      updatePoll = again ? setTimeout(tick, 2500) : null;
+    };
+    if (updatePoll) return;
+    if (immediate) tick();
+    else updatePoll = setTimeout(tick, 2500);
+  }
+  async function requestUpdate() {
+    if (!(await confirmDialog(
+      'Xenios aktualisieren?',
+      'Der Server holt die neue Version und startet neu. Die Seite kommt danach von selbst zurück. Konfiguration und Bezüge bleiben.',
+      'Aktualisieren',
+    ))) return;
+    try {
+      paintUpdate(await api('/api/admin/update', { method: 'POST' }));
+      startUpdatePoll(false);
+    } catch (e) { snackbar(e.message); }
+  }
 
   const locked = (p) => data.locked.includes(p);
   const value = (p) => (p in dirty ? dirty[p] : data.values[p]);
@@ -79,6 +136,33 @@ export function serverView(root) {
   const gap = () => h('div', { class: 'gap' });
   const warn = (txt) => h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, txt));
 
+  function tunnelPaste(tunnel) {
+    const input = h('textarea', { class: 'text', rows: 3, spellcheck: 'false', autocomplete: 'off', placeholder: 'sudo cloudflared service install …' });
+    const note = h('p', { class: 'error', role: 'alert' });
+    const btn = h('button', { type: 'button', class: 'btn tonal' }, 'Token übernehmen');
+    btn.onclick = async () => {
+      btn.disabled = true;
+      note.textContent = '';
+      try {
+        await api('/api/admin/tunnel-token', { method: 'POST', body: { token: input.value } });
+        input.value = '';
+        snackbar('Token übernommen. cloudflared startet in wenigen Sekunden.');
+      } catch (e) {
+        note.textContent = e.message;
+        shake(input);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    return h('div', { style: { 'margin-top': '12px' } },
+      h('label', { class: 'field' }, h('span', {}, 'Befehl aus Cloudflare'), input),
+      h('div', { class: 'row', style: { 'margin-top': '8px' } }, btn),
+      note,
+      tunnel.helper
+        ? h('p', { class: 'muted small' }, 'Die Zeile einfügen. Xenios führt sie nicht aus, sondern startet cloudflared selbst.')
+        : h('p', { class: 'muted small' }, 'Die Zeile einfügen. Damit sie ankommt, einmal auf dem Server: ', h('code', {}, 'sh ~/xenios/install.sh')));
+  }
+
   function probeButton(kind, getBody) {
     const box = h('div', { class: 'probe', 'aria-live': 'polite' });
     const btn = h('button', { type: 'button', class: 'btn tonal small-btn' }, icon('wifi', 's18'), 'Testen');
@@ -87,7 +171,7 @@ export function serverView(root) {
       box.className = 'probe show';
       box.replaceChildren(h('span', { class: 'spinner' }), 'Teste …');
       try {
-        fillProbe(box, await api('/api/admin/probe', { method: 'POST', body: { kind, ...getBody() } }));
+        fillProbe(box, await api('/api/admin/probe', { method: 'POST', body: { kind, ...getBody() } }), { selectedApi: kind === 'machine' ? value('machine.api') : undefined });
       } catch (e) {
         fillProbe(box, { ok: false, error: e.message });
       } finally {
@@ -116,10 +200,11 @@ export function serverView(root) {
         s.grinderPin ? h('button', { class: 'btn text', onclick: unpin }, 'Vergessen') : null),
       toggle('Datenbank-Download erlauben', 'Die Datenbank der Mühle enthält das WLAN-Passwort im Klartext.', 'grinder.allowDatabaseDownload'));
     const devices = card('Geräte', 'coffee',
+      apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
       h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
       mBox,
       h('div', { class: 'divider' }),
-      toggle('Mahlkönig-Mühle', 'E64 WS: Rezepte, Mahlvorgänge, Meldungen', 'grinder.enabled', { onChange: (on) => { grinderFields.hidden = !on; } }),
+      toggle('Mahlkönig-Mühle', 'E64 WS: Rezepte, Mahlvorgänge, Meldungen', 'grinder.enabled', { onChange: () => paint() }),
       grinderFields);
 
     // Von unterwegs (Cloudflare-Tunnel)
@@ -128,6 +213,7 @@ export function serverView(root) {
       h('div', { class: 'field-row' }, text('Öffentliche Adresse', 'publicUrl', { type: 'url', placeholder: 'https://xenios.deine-domain.de', parse: (v) => v.trim() || null, format: (v) => v || '' }), tTest),
       tBox,
       s.tunnel.httpEnabled ? null : warn('Der Tunnel-Port ist aus. Unten unter „Tunnel-Port (Cloudflare)“ einschalten, sonst erreicht cloudflared den Server nicht.'),
+      s.tunnel.docker ? tunnelPaste(s.tunnel) : null,
       h('details', { class: 'adv', open: !data.values.publicUrl }, h('summary', {}, 'Anleitung', icon('more', 's20')), tunnelGuide(s.tunnel)));
 
     // Funktionen
@@ -149,6 +235,12 @@ export function serverView(root) {
         h('button', { class: 'btn tonal', onclick: changePassword }, 'Ändern')),
       gap(),
       number('Angemeldet bleiben (Tage)', 'auth.sessionDays', 1, 365),
+      h('div', { class: 'divider' }),
+      h('h4', {}, 'Sicherung'),
+      h('p', { class: 'small muted' }, 'ZIP mit Konfiguration, Bezügen, Zeitplänen und Schlüsseln. Enthält secret.key – wie ein Passwort aufbewahren.'),
+      h('div', { class: 'row', style: { 'margin-top': '8px', 'flex-wrap': 'wrap' } },
+        h('button', { type: 'button', class: 'btn tonal', onclick: downloadBackup }, icon('download', 's18'), 'Sichern'),
+        h('button', { type: 'button', class: 'btn tonal', onclick: restoreBackup }, icon('upload', 's18'), 'Einspielen')),
       h('div', { class: 'divider' }),
       h('div', { class: 'row' }, h('h3', { class: 'grow', style: { margin: 0 } }, 'Angemeldete Geräte'),
         h('button', { class: 'btn text danger-text', onclick: revokeAll }, 'Alle abmelden')),
@@ -223,9 +315,12 @@ export function serverView(root) {
         kv('Daten', s.dataDir),
         kv('Geheimnis-Schlüssel', { env: 'XENIOS_SECRET_KEY', 'file-env': 'XENIOS_SECRET_KEY_FILE', file: 'secret.key im Datenordner' }[s.secretKey])),
       gap(),
+      updateBox,
+      gap(),
       select('Protokoll-Stufe', 'logLevel', [['error', 'nur Fehler'], ['warn', 'Warnungen'], ['info', 'Normal'], ['debug', 'Ausführlich (Fehlersuche)']]));
+    if (!updateReady) { updateReady = true; startUpdatePoll(); }
 
-    body.replaceChildren(h('div', { class: 'stagger' }, devices, remote, features, time, security, network, gbsCard, system));
+    body.replaceChildren(h('div', { class: 'stagger' }, devices, remote, features, time, security, network, value('grinder.enabled') && value('machine.api') !== 'classic' ? gbsCard : null, system));
   }
 
   async function loadSessions(box) {
@@ -249,6 +344,43 @@ export function serverView(root) {
     } catch (e) {
       box.replaceChildren(h('div', { class: 'muted small' }, e.message));
     }
+  }
+
+  async function downloadBackup() {
+    try {
+      const res = await api('/api/admin/backup', { raw: true });
+      const blob = await res.blob();
+      const m = /filename="?([^";]+)"?/.exec(res.headers.get('content-disposition') || '');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = m?.[1] || 'xenios-backup.zip';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      snackbar('Sicherung heruntergeladen');
+    } catch (e) { snackbar(e.message); }
+  }
+
+  async function restoreBackup() {
+    const input = h('input', { type: 'file', accept: '.zip,application/zip' });
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (!(await confirmDialog(
+        'Sicherung einspielen?',
+        'Ersetzt Konfiguration, Bezüge, Zeitpläne und Schlüssel durch die Datei. Das App-Passwort wird das aus der Sicherung. Diese Sitzung bleibt angemeldet.',
+        'Einspielen',
+        'danger',
+      ))) return;
+      try {
+        await api('/api/admin/backup', { method: 'POST', body: await file.arrayBuffer(), binary: true });
+        snackbar('Sicherung eingespielt');
+        for (const k of Object.keys(dirty)) delete dirty[k];
+        savebar.hidden = true;
+        await load();
+        refreshState().catch(() => {});
+      } catch (e) { snackbar(e.message); }
+    });
+    input.click();
   }
 
   async function revokeAll() {
@@ -310,7 +442,7 @@ export function serverView(root) {
   }
 
   load();
-  return () => savebar.remove();
+  return () => { clearTimeout(updatePoll); savebar.remove(); };
 }
 
 function uaShort(ua = '') {

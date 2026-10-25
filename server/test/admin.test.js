@@ -32,7 +32,14 @@ before(async () => {
   fs.writeFileSync(cfgFile, JSON.stringify({ machine: { url: `http://127.0.0.1:${xp}`, pollIdleMs: 300, pollActiveMs: 200, pollBackgroundMs: 300 }, grinder: { url: `https://127.0.0.1:${gp}` }, dataDir: '.' }));
   const cfg = loadConfig(cfgFile);
   prepare(cfg);
-  app = createApp(cfg);
+  app = createApp(cfg, {
+    fetchImpl: async (url, init) => {
+      if (String(url).includes('api.github.com')) {
+        return { ok: true, status: 200, json: async () => ({ tag_name: 'v9.9.9', name: '9.9.9', html_url: 'https://example.test' }) };
+      }
+      return globalThis.fetch(url, init);
+    },
+  });
   server = http.createServer((q, s) => app.handle(q, s));
   base = `http://127.0.0.1:${await listen(server)}`;
 });
@@ -46,16 +53,18 @@ after(() => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-async function call(method, p, body, { headers = {}, who = 'a' } = {}) {
+async function call(method, p, body, { headers = {}, who = 'a', raw = false, binary = false } = {}) {
   const h = { ...headers };
   if (jar[who]) h.Cookie = jar[who];
   if (method !== 'GET') {
-    h['Content-Type'] = 'application/json';
+    h['Content-Type'] = binary ? 'application/zip' : 'application/json';
     h['X-Xenia'] ??= '1';
   }
-  const res = await fetch(base + p, { method, headers: h, body: method === 'GET' ? undefined : JSON.stringify(body ?? {}), redirect: 'manual' });
+  const payload = method === 'GET' ? undefined : binary ? body : JSON.stringify(body ?? {});
+  const res = await fetch(base + p, { method, headers: h, body: payload, redirect: 'manual' });
   const setCookie = res.headers.get('set-cookie');
   if (setCookie) jar[who] = setCookie.split(';')[0];
+  if (raw) return { status: res.status, headers: res.headers, buf: Buffer.from(await res.arrayBuffer()) };
   let json = null;
   try { json = await res.json(); } catch { /* kein JSON */ }
   return { status: res.status, json, headers: res.headers };
@@ -123,6 +132,49 @@ test('Server-Einstellungen: lesen, ändern, sofort wirksam; Prüfungen', async (
   }
   r = await call('PUT', '/api/admin/config', { changes: { 'features.paddle': true } }, { headers: { 'X-Xenia': '0' } });
   assert.equal(r.status, 403, 'CSRF-Schutz gilt auch hier');
+});
+
+test('Aktualisierung: Stand prüfen und anfordern', async () => {
+  let r = await call('GET', '/api/admin/update');
+  assert.equal(r.status, 200);
+  assert.equal(typeof r.json.current, 'string');
+  assert.equal(r.json.latest, '9.9.9');
+  assert.equal(r.json.newer, true);
+  assert.equal(r.json.requested, false);
+  r = await call('POST', '/api/admin/update');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.requested, true);
+  assert.equal(r.json.job.state, 'queued');
+  assert.ok(fs.existsSync(path.join(dir, 'update.request')));
+  const job = JSON.parse(fs.readFileSync(path.join(dir, 'update.json'), 'utf8'));
+  assert.equal(job.state, 'queued');
+});
+
+test('Sicherung: ZIP herunterladen und wieder einspielen', async () => {
+  let r = await call('GET', '/api/admin/backup', undefined, { who: 'none' });
+  assert.equal(r.status, 401);
+  r = await call('GET', '/api/admin/backup', undefined, { raw: true });
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type') || '', /zip/);
+  assert.match(r.headers.get('content-disposition') || '', /xenios-\d{4}-\d{2}-\d{2}\.zip/);
+  const zip = r.buf;
+  assert.ok(zip.length > 100);
+  app.machine.history.data.shots.push({ id: 'backup-shot', at: Date.now() });
+  app.machine.history.flush();
+  r = await call('PUT', '/api/admin/config', { changes: { logLevel: 'debug' } });
+  assert.equal(r.status, 200);
+  assert.equal(app.machine.history.data.shots.some((s) => s.id === 'backup-shot'), true);
+  r = await call('POST', '/api/admin/backup', zip, { binary: true });
+  assert.equal(r.status, 200, r.json?.error);
+  assert.equal(r.json.ok, true);
+  assert.ok(r.json.files.includes('config.json'));
+  assert.equal(app.machine.history.data.shots.some((s) => s.id === 'backup-shot'), false);
+  r = await call('GET', '/api/admin/config');
+  assert.equal(r.json.values.logLevel, 'error');
+  r = await call('POST', '/api/admin/backup', Buffer.from('kein-zip'), { binary: true });
+  assert.equal(r.status, 400);
+  r = await call('POST', '/api/admin/backup', zip, { binary: true, headers: { 'X-Xenia': '0' } });
+  assert.equal(r.status, 403);
 });
 
 test('Per Umgebungsvariable festgelegte Werte sind gesperrt und landen nicht in der Datei', () => {

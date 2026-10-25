@@ -8,8 +8,9 @@ export function showSetup(root, { onDone }) {
   const st = {
     step: 0, dir: 1, code: '', password: '', password2: '',
     machineUrl: 'http://192.168.178.55',
+    machineApi: 'bbs',
     grinder: { enabled: true, url: 'https://192.168.178.54', password: '' },
-    tunnel: { enabled: false, url: '' },
+    tunnel: { enabled: false, url: '', token: '' },
     env: { docker: false, service: 'http://127.0.0.1:8080', httpEnabled: true },
     locked: [],
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
@@ -78,6 +79,7 @@ export function showSetup(root, { onDone }) {
           const r = await api('/auth/setup/check', { method: 'POST', body: { code: st.code } });
           st.locked = r.locked || [];
           st.machineUrl = r.values['machine.url'] || st.machineUrl;
+          st.machineApi = r.values['machine.api'] === 'classic' ? 'classic' : 'bbs';
           st.grinder.enabled = r.values['grinder.enabled'] !== false;
           st.grinder.url = r.values['grinder.url'] || st.grinder.url;
           st.tunnel.url = r.values.publicUrl || '';
@@ -137,6 +139,10 @@ export function showSetup(root, { onDone }) {
     const next = h('button', { class: 'btn filled', type: 'submit' }, 'Weiter', icon('right', 's18'));
     const form = h('form', {},
       h('p', { class: 'muted' }, 'Adresse der Espressomaschine im Heimnetz (steht im Router oder im Display der Xenia).'),
+      apiChoice(st.machineApi, (v) => {
+        st.machineApi = v;
+        if (st.probe.machine) fillProbe(result, st.probe.machine, { selectedApi: v });
+      }),
       h('label', { class: 'field' }, h('span', {}, locked('machine.url') ? 'Adresse (per Umgebungsvariable festgelegt)' : 'Adresse der Xenia'), url),
       h('div', { class: 'row', style: { 'margin-top': '8px' } }, test), result,
       nav(() => go(1), next));
@@ -177,8 +183,30 @@ export function showSetup(root, { onDone }) {
     const result = probeResult('tunnel');
     const test = h('button', { type: 'button', class: 'btn tonal' }, icon('cloud', 's18'), 'Testen');
     test.onclick = () => busy(test, () => runProbe('tunnel', { url: t.url }, result));
+    const tokenInput = h('textarea', { class: 'text', rows: 3, spellcheck: 'false', autocomplete: 'off', placeholder: 'sudo cloudflared service install …', value: t.token });
+    tokenInput.addEventListener('input', () => { t.token = tokenInput.value; });
+    const tokenErr = err();
+    const take = h('button', { type: 'button', class: 'btn tonal' }, 'Token übernehmen');
+    take.onclick = () => busy(take, async () => {
+      tokenErr.textContent = '';
+      try {
+        await api('/auth/setup/tunnel', { method: 'POST', body: { code: st.code, token: t.token } });
+        snackbar('Token übernommen. cloudflared startet in wenigen Sekunden.');
+      } catch (ex) {
+        tokenErr.textContent = ex.message;
+        shake(tokenInput);
+      }
+    });
+    const paste = st.env.docker
+      ? h('div', {},
+        h('label', { class: 'field' }, h('span', {}, 'Befehl aus Cloudflare'), tokenInput),
+        h('div', { class: 'row', style: { 'margin-top': '8px' } }, take),
+        tokenErr,
+        h('p', { class: 'muted small' }, 'Die Zeile einfügen. Xenios führt sie nicht aus, sondern startet cloudflared selbst.'))
+      : null;
     const fields = h('div', { class: 'collapse', hidden: !t.enabled },
       tunnelGuide(st.env),
+      paste,
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', {}, 'Öffentliche Adresse'), url), test),
       result,
       h('p', { class: 'muted small' }, 'Noch nicht fertig? Einfach weiter. Eintragen und testen geht jederzeit unter Einstellungen → Server & Sicherheit.'));
@@ -202,9 +230,10 @@ export function showSetup(root, { onDone }) {
     const form = h('form', {},
       h('dl', { class: 'kv summary' },
         row('App-Passwort', '•'.repeat(Math.min(12, st.password.length))),
-        row('Xenia', st.machineUrl),
+        row('Xenia', `${st.machineApi === 'classic' ? 'Alte Xenia' : 'Neue Xenia'} · ${st.machineUrl}`),
         row('Mühle', st.grinder.enabled ? st.grinder.url : 'nicht eingebunden'),
         row('Unterwegs', st.tunnel.enabled && st.tunnel.url ? st.tunnel.url : 'später einrichten'),
+        st.tunnel.token.trim() ? row('Tunnel-Token', 'wird übernommen') : null,
         row('Zeitzone', st.timezone || 'System')),
       h('p', { class: 'muted small' }, 'Alles lässt sich später unter Einstellungen → Server ändern: Ports, Zertifikat, Funktionen, Zeitzone, Passwort.'),
       e, nav(() => go(4), finish));
@@ -215,8 +244,10 @@ export function showSetup(root, { onDone }) {
           await api('/auth/setup', { method: 'POST', body: {
             code: st.code, password: st.password, timezone: st.timezone,
             machineUrl: locked('machine.url') ? undefined : st.machineUrl,
+            machineApi: st.machineApi,
             grinder: { enabled: st.grinder.enabled, url: locked('grinder.url') ? undefined : st.grinder.url, password: st.grinder.password || undefined },
             publicUrl: st.tunnel.enabled && st.tunnel.url && !locked('publicUrl') ? st.tunnel.url : undefined,
+            tunnelToken: st.tunnel.enabled && st.tunnel.token.trim() ? st.tunnel.token : undefined,
           } });
           card.classList.add('finished');
           setTimeout(onDone, 450);
@@ -231,7 +262,7 @@ export function showSetup(root, { onDone }) {
 
   function probeResult(kind) {
     const box = h('div', { class: 'probe', 'aria-live': 'polite' });
-    if (st.probe[kind]) fillProbe(box, st.probe[kind]);
+    if (st.probe[kind]) fillProbe(box, st.probe[kind], { selectedApi: kind === 'machine' ? st.machineApi : undefined });
     return box;
   }
   async function runProbe(kind, body, box) {
@@ -244,19 +275,38 @@ export function showSetup(root, { onDone }) {
       r = { ok: false, error: ex.message };
     }
     st.probe[kind] = r;
-    fillProbe(box, r);
+    fillProbe(box, r, { selectedApi: kind === 'machine' ? st.machineApi : undefined });
   }
 
   paint();
 }
 
-export function fillProbe(box, r) {
+export function fillProbe(box, r, { selectedApi } = {}) {
   box.className = `probe show ${r.ok ? 'ok' : 'bad'}`;
   if (!r.ok) return box.replaceChildren(icon('warn', 's18'), h('span', {}, r.error));
+  const hint = r.apiHint && selectedApi && r.apiHint !== selectedApi
+    ? h('div', { class: 'small bad-text' }, r.apiHint === 'classic'
+      ? 'Die Maschine antwortet wie die alte API – oben „Alte Xenia“ wählen.'
+      : 'Die Maschine antwortet wie die neue API – oben „Neue Xenia“ wählen.')
+    : r.apiHint ? h('div', { class: 'small muted' }, r.apiHint === 'classic' ? 'Passt zur alten Xenia-API' : 'Passt zur neuen Xenia-API') : null;
   box.replaceChildren(icon('check', 's18'), h('div', {},
     h('div', {}, `${r.name}${r.detail ? ` · ${r.detail}` : ''}`),
+    hint,
     r.login === false ? h('div', { class: 'small bad-text' }, 'Passwort falsch') : r.login ? h('div', { class: 'small' }, 'Anmeldung ok') : null,
     r.fingerprint ? h('div', { class: 'small muted fp' }, `Zertifikat ${r.fingerprint.slice(0, 23)}…`) : null));
+}
+
+export function apiChoice(value, onChange) {
+  const box = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Xenia-Modell' });
+  const paint = (v) => [...box.children].forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.id === v)));
+  for (const [id, title] of [['bbs', 'Neue Xenia'], ['classic', 'Alte Xenia']]) {
+    box.append(h('button', { type: 'button', class: 'chip', dataset: { id }, 'aria-pressed': String(value === id),
+      onclick: () => { onChange(id); paint(id); } }, title));
+  }
+  return h('div', { style: { margin: '4px 0 12px' } },
+    h('div', {}, 'Welche Xenia?'),
+    h('div', { class: 'small muted', style: { margin: '2px 0 8px' } }, 'Neue Xenia: Brew-by-Sync / aktuelle Firmware. Alte Xenia: DBL mit der älteren offiziellen API.'),
+    box);
 }
 
 // Schritt-für-Schritt-Anleitung für den Cloudflare-Tunnel, passend zur Installation (Docker oder direkt).
@@ -267,8 +317,7 @@ export function tunnelGuide(env) {
     h('li', {}, 'Cloudflare-Konto und eine eigene Domain, die bei Cloudflare verwaltet wird.'),
     h('li', {}, 'Auf ', link('https://one.dash.cloudflare.com', 'one.dash.cloudflare.com'), ' unter ', h('b', {}, 'Networks → Tunnels → Create a tunnel → Cloudflared'), ' einen Tunnel „xenios“ anlegen.'),
     env.docker
-      ? h('li', {}, 'Bei „Install and run a connector“ ', h('b', {}, 'Docker'), ' wählen und nur den Token kopieren (den langen Teil nach --token, den Befehl nicht ausführen). Auf dem Server in docker/.env eintragen …',
-        copyBlock('TUNNEL_TOKEN=<token>\nCOMPOSE_PROFILES=tunnel'), '… und im Ordner docker/ neu starten:', copyBlock('docker compose up -d'))
+      ? h('li', {}, 'Bei „Install and run a connector“ die Zeile ', h('b', {}, 'sudo cloudflared service install …'), ' kopieren und unten einfügen. Den Befehl nicht ausführen. Xenios startet cloudflared selbst.')
       : h('li', {}, 'Bei „Install and run a connector“ dein Betriebssystem wählen und den angezeigten Befehl auf diesem Rechner ausführen. Er richtet cloudflared als Dienst ein.'),
     h('li', {}, 'Beim Tunnel einen ', h('b', {}, 'Public Hostname'), ' anlegen: Subdomain und Domain wählen, als ', h('b', {}, 'Service URL'), ' genau das eintragen:', copyBlock(env.service)),
     h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.deine-domain.de) eintragen und testen.'));

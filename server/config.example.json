@@ -4,7 +4,7 @@
   "https": { "enabled": true, "host": "0.0.0.0", "port": 8443, "hosts": [] },
   "trustProxy": "loopback",
   "auth": { "sessionDays": 90 },
-  "machine": { "url": "http://192.168.178.55" },
+  "machine": { "url": "http://192.168.178.55", "api": "bbs" },
   "grinder": { "enabled": true, "url": "https://192.168.178.54", "allowDatabaseDownload": false },
   "features": { "paddle": true, "scriptEditor": true, "settings": true, "clockSync": true },
   "push": { "subject": "mailto:du@example.com" },

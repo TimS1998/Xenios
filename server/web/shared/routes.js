@@ -3,7 +3,7 @@
 import { SCRIPT_OPS, BUILTIN_SCRIPTS, httpError } from './machine-core.js';
 
 // Nur lesende Original-Endpunkte (für Diagnose). Gefährliche GETs sind hier bewusst nicht enthalten.
-export const RAW_READ = ['status', 'overview', 'overview_single', 'diagram/get', 'general', 'machine', 'info', 'switches', 'scriptslist', 'timer2', 'network', 'mako', 'language', 'brewgroup/pid', 'brewboiler/pid', 'pump/pid', 'steamboiler/pid', 'mahlkonig/get', 'upload/status'];
+export const RAW_READ = ['status', 'overview', 'overview_single', 'diagram/get', 'diagram_get', 'general', 'machine', 'info', 'switches', 'scriptslist', 'scripts/list', 'timer2', 'network', 'mako', 'language', 'brewgroup/pid', 'brewboiler/pid', 'pump/pid', 'steamboiler/pid', 'mahlkonig/get', 'upload/status'];
 
 export function intParam(v) {
   const n = Number(v);
@@ -30,7 +30,7 @@ export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('POST', '/api/machine/power', async ({ body }) => machine.power(body.mode, body.steam));
   route('POST', '/api/machine/steam', async ({ body }) => machine.steam(Boolean(body.on)));
   route('POST', '/api/machine/temperature', async ({ body }) => machine.setTemperature(body.group, body.boiler));
-  route('GET', '/api/machine/settings', async () => ({ settings: await machine.client.get('/api/v2/general') }));
+  route('GET', '/api/machine/settings', async () => ({ settings: await machine.readSettings() }));
   route('POST', '/api/machine/settings', async ({ body }) => machine.updateSettings(body.changes || {}));
   route('GET', '/api/machine/scripts', async () => ({ scripts: await machine.scripts(), ops: SCRIPT_OPS, builtin: BUILTIN_SCRIPTS }));
   route('GET', '/api/machine/scripts/:id', async ({ params }) => machine.readScript(intParam(params.id)));
@@ -90,7 +90,7 @@ export function createRouter() {
   const route = (method, pattern, handler, opts = {}) => {
     const keys = [];
     const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '/?$');
-    routes.push({ method, re, keys, handler, auth: opts.auth !== false });
+    routes.push({ method, re, keys, handler, auth: opts.auth !== false, body: opts.body || 'json' });
   };
   const match = (method, path) => {
     const r = routes.find((x) => x.method === method && x.re.test(path));

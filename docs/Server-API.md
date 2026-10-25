@@ -11,7 +11,7 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 - **Heimnetz-HTTP (optional, `lan`):** eigener Port ohne Verschlüsselung für die Android-App zu Hause. Proxy-Header werden dort nie ausgewertet.
 - **Ersteinrichtung:** Solange kein Passwort gesetzt ist, schreibt der Server beim Start einen 8-stelligen **Einrichtungscode** ins Log. Nur damit lässt sich der Server im Browser einrichten (gleiche Sperre gegen Durchprobieren wie beim Login). Danach antworten die Einrichtungs-Endpunkte mit 409.
 - **Server-Einstellungen:** Jeder Wert wird serverseitig geprüft (Adressen nur `http(s)://host[:port]` ohne Pfad, Ports, Zeitzonen, mindestens ein Zugang bleibt offen). Per Umgebungsvariable gesetzte Werte sind gesperrt.
-- **Geheimnisse:** Mühlen-Passwort und privater Push-Schlüssel liegen AES-256-GCM-verschlüsselt in `config.json` (an den Feldnamen gebunden). Schlüssel: `XENIOS_SECRET_KEY` / `XENIOS_SECRET_KEY_FILE` oder `data/secret.key`.
+- **Geheimnisse:** Mühlen-Passwort und privater Push-Schlüssel liegen AES-256-GCM-verschlüsselt in `config.json` (an den Feldnamen gebunden). Schlüssel: `XENIOS_SECRET_KEY` / `XENIOS_SECRET_KEY_FILE` oder `data/secret.key`. Die Sicherung unter `/api/admin/backup` enthält `secret.key` und die verschlüsselte Konfiguration.
 - **Mühle:** Das Zertifikat wird direkt nach dem TLS-Handshake mit dem gemerkten Fingerprint verglichen, bevor Header, Cookie oder Passwort gesendet werden (ohne TLS-Sitzungswiederaufnahme, damit jedes Mal geprüft wird).
 - **App-Shortcuts:** `/?do=on|off|eco|steam` schaltet nur bei Aufrufen ohne fremde Herkunft (`Sec-Fetch-Site` `none`/`same-origin`); ein Link von einer anderen Webseite wird auf `/` umgeleitet.
 - **Push:** Abos nur für die Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft).
@@ -39,6 +39,10 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | POST | `/api/admin/probe` | `{"kind","url","password"?}` | Verbindungstest (bei gleicher Mühlen-Adresse mit gemerktem Zertifikat und gespeichertem Passwort). `kind: "tunnel"`: ruft `<url>/healthz` auf und prüft, dass dieselbe Instanz antwortet |
 | POST | `/api/admin/grinder/unpin` | – | gemerktes Zertifikat der Mühle vergessen |
 | POST | `/api/admin/tls/renew` | – | HTTPS-Zertifikat neu erzeugen (sofort aktiv) |
+| GET | `/api/admin/update` | – | Versionsstand: `{current,latest,newer,helper,job}` (`helper` = Update-Dienst von `install.sh` lebt) |
+| POST | `/api/admin/update` | – | Aktualisierung anfordern; der Host-Dienst holt Image/Git und startet neu |
+| GET | `/api/admin/backup` | – | ZIP mit `config.json`, `secret.key`, Bezügen, Zeitplänen, Sitzungen, Zertifikat (wie ein Passwort aufbewahren) |
+| POST | `/api/admin/backup` | ZIP-Körper (`application/zip`) | dieselbe Datei einspielen; ersetzt die Dateien, diese Sitzung bleibt |
 | GET | `/api/state` | – | `{machine, grinder, server}` (siehe unten) |
 | GET | `/api/stream` | – | **Server-Sent Events**: `snapshot`, `machine`, `grinder`, `event`, `server` (Funktionen geändert); höchstens 50 gleichzeitig |
 | GET | `/api/shots` | – | Bezugs-Protokoll (bis 500 Einträge, Druckkurven für die neuesten 20), `total`, `beans:[{name,roaster}]` |

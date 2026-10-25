@@ -280,6 +280,7 @@ class MainActivity : Activity() {
             if (!prefs.direct) return "{}"
             return JSONObject()
                 .put("machineUrl", "http://" + prefs.machineIp)
+                .put("machineApi", prefs.machineApi)
                 .put("grinderUrl", prefs.grinderIp?.takeIf { it.isNotBlank() }?.let { "https://$it" } ?: JSONObject.NULL)
                 .put("grinderPassword", prefs.grinderPassword ?: "")
                 .put("version", "App " + BuildConfigInfo.VERSION)

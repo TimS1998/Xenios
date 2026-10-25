@@ -2,7 +2,7 @@
 // Kennzahlen, zugeordneter Mahlvorgang der Mühle, Bewertung mit Notizen und der Einstell-Assistent.
 // Dazu die Schnellbewertung direkt nach einem Bezug (Geschmack, Stärke, Mahlgrad → nächster Schritt).
 import { h, icon, fmt, fmtInt, snackbar, fullscreen, sheet, switchEl } from '../ui.js';
-import { api } from '../api.js';
+import { api, hasGrinder } from '../api.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, shotMetrics, STRENGTH } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
@@ -56,9 +56,10 @@ export function beanField(beans, value) {
 }
 
 export function grindField(value, suggest) {
-  const input = h('input', { class: 'text', inputmode: 'numeric', maxlength: 12, value: value || suggest || '', placeholder: suggest || '1761', title: 'Scheibenabstand wie auf der E64 WS' });
+  const mill = hasGrinder();
+  const input = h('input', { class: 'text', inputmode: mill ? 'numeric' : 'text', maxlength: 12, value: value || suggest || '', placeholder: suggest || (mill ? '1761' : 'z. B. 2,5'), title: mill ? 'Scheibenabstand wie auf der E64 WS' : 'Mahlgrad der eigenen Mühle' });
   return {
-    el: h('label', { class: 'field' }, h('span', {}, 'Mahlgrad'), h('div', { class: 'row' }, input, h('span', { class: 'unit-tag' }, 'µm'))),
+    el: h('label', { class: 'field' }, h('span', {}, 'Mahlgrad'), h('div', { class: 'row' }, input, mill ? h('span', { class: 'unit-tag' }, 'µm') : null)),
     get: () => input.value.trim(),
   };
 }
@@ -198,7 +199,7 @@ function paint(root, d, close, onChange) {
     h('div', { class: 'stagger detail' },
       h('section', { class: 'card' }, chartBox, legend),
       kpiBox,
-      h('section', { class: 'card' }, h('h3', { class: 'card-head' }, icon('grinder', 's20'), 'Mühle'), grindBox),
+      hasGrinder() ? h('section', { class: 'card' }, h('h3', { class: 'card-head' }, icon('grinder', 's20'), 'Mühle'), grindBox) : null,
       adviceBox,
       h('section', { class: 'card' },
         h('h3', { class: 'card-head' }, icon('edit', 's20'), 'Bewertung'),

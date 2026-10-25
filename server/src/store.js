@@ -27,4 +27,12 @@ export class JsonStore {
     fs.writeFileSync(tmp, JSON.stringify(this.data, null, 1), { mode: 0o600 });
     fs.renameSync(tmp, this.file);
   }
+
+  reload() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    try {
+      this.data = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+    } catch { /* Datei fehlt oder ist ungültig: bisherigen Stand behalten */ }
+  }
 }

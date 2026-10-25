@@ -119,6 +119,7 @@ export function homeView(root) {
   // Bezug
   const shotCard = h('div', { class: 'card', hidden: true });
   const lastShotCard = h('div', { class: 'card low', hidden: true });
+  const millTitle = h('div', { class: 'section-title', hidden: true }, 'Mühle');
   const grinderCard = h('div', { class: 'list-item clickable', onclick: () => navigate('/muehle'), hidden: true });
 
   root.append(
@@ -133,7 +134,7 @@ export function homeView(root) {
     lastShotCard,
     h('div', { class: 'section-title' }, 'Sensoren'),
     liveCard,
-    h('div', { class: 'section-title' }, 'Mühle'),
+    millTitle,
     grinderCard,
   );
 
@@ -197,9 +198,11 @@ export function homeView(root) {
   function updateGrinder() {
     const g = store.grinder;
     if (!g || !g.enabled) {
+      millTitle.hidden = true;
       grinderCard.hidden = true;
       return;
     }
+    millTitle.hidden = false;
     grinderCard.hidden = false;
     const last = g.stats?.lastGrind;
     const recipe = g.recipes?.find((r) => r.selected);

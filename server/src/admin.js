@@ -4,10 +4,12 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 import { hashPassword, verifyPassword, passwordProblem, sessionCookie } from './auth.js';
 import { updateConfigFile, setPath, getPath, applyTimezone, isTimezone } from './config.js';
-import { XeniaClient, MA_TYPE, httpError } from './machine.js';
+import { XeniaClient, MA_TYPE, machineApiId, httpError } from './machine.js';
 import { GrinderHttp } from './grinder.js';
 import { ensureCert, certInfo } from './tls.js';
 import { setLogLevel, logger } from './log.js';
+import { updateInfo, requestUpdate, helperAlive, readUpdate } from './update.js';
+import { tunnelTokenFromPaste, requestTunnelToken } from './tunnel-token.js';
 
 const log = logger('admin');
 
@@ -64,6 +66,7 @@ export function publicUrl(v) {
 export const FIELDS = {
   publicUrl: (v) => (v === null || v === '' ? null : publicUrl(v)),
   'machine.url': (v) => deviceUrl(v, 'Adresse der Xenia'),
+  'machine.api': oneOf('Xenia-Modell', ['bbs', 'classic']),
   'grinder.enabled': bool('Mühle'),
   'grinder.url': (v) => deviceUrl(v, 'Adresse der Mühle'),
   'grinder.password': (v) => {
@@ -162,9 +165,17 @@ export async function probeDevice({ kind, url, password }, { pinned = null, inst
   if (kind === 'tunnel') return probeTunnel(publicUrl(url), instance);
   if (kind === 'machine') {
     const base = deviceUrl(url, 'Adresse der Xenia');
-    const m = await new XeniaClient({ url: base, timeoutMs: 4000 }).get('/api/v2/machine');
+    const client = new XeniaClient({ url: base, timeoutMs: 4000 });
+    const m = await client.get('/api/v2/machine');
     if (m?.MA_TYPE === undefined) throw httpError(502, 'Unter dieser Adresse antwortet keine Xenia');
-    return { ok: true, name: MA_TYPE[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`, detail: `Firmware ${m.FW_VERSION_MAJOR}.${m.FW_VERSION_MINOR}` };
+    let apiHint = 'classic';
+    try { await client.get('/api/v2/general'); apiHint = 'bbs'; } catch { /* alte API hat /general nicht */ }
+    return {
+      ok: true,
+      name: MA_TYPE[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`,
+      detail: `Firmware ${m.FW_VERSION_MAJOR}.${m.FW_VERSION_MINOR}`,
+      apiHint,
+    };
   }
   if (kind === 'grinder') {
     const base = deviceUrl(url, 'Adresse der Mühle');
@@ -263,7 +274,7 @@ export function authRoutes(route, app) {
       hooks.onTls?.();
     }
     if (keys.some((k) => LISTENER_FIELDS.includes(k))) setTimeout(() => hooks.onListeners?.(), 300).unref?.();
-    if (has(/^(features|grinder)\./)) app.broadcastServer();
+    if (has(/^(features|grinder|machine)\./)) app.broadcastServer();
     log.info(`Einstellungen geändert: ${keys.map((k) => (SECRET_FIELDS.includes(k) ? `${k}=***` : k)).join(', ')}`);
     return keys;
   }
@@ -283,7 +294,18 @@ export function authRoutes(route, app) {
   // Service URL für den Public Hostname in Cloudflare: im Container der Compose-Dienstname, sonst Loopback
   function tunnelEnv() {
     const docker = fs.existsSync('/.dockerenv');
-    return { docker, service: `http://${docker ? 'xenios' : '127.0.0.1'}:${cfg.http.port}`, httpEnabled: cfg.http.enabled };
+    const helper = helperAlive(readUpdate(cfg.dataDir).helper);
+    return { docker, helper, service: `http://${docker ? 'xenios' : '127.0.0.1'}:${cfg.http.port}`, httpEnabled: cfg.http.enabled };
+  }
+
+  // Der Token bleibt im Datenordner, bis install.sh ihn in docker/.env schreibt und cloudflared startet.
+  function storeTunnelToken(pasted, ip) {
+    const token = tunnelTokenFromPaste(pasted);
+    if (token === '') throw bad('Token fehlt');
+    if (!token) throw bad('Das ist kein Cloudflare-Token. Die Zeile „cloudflared service install …“ einfügen. Den Befehl nicht ausführen.');
+    requestTunnelToken(cfg.dataDir, token);
+    log.info(`Tunnel-Token für den Host hinterlegt (von ${ip})`);
+    return { ok: true };
   }
 
   function view(ctx) {
@@ -342,9 +364,13 @@ export function authRoutes(route, app) {
     return {
       ok: true,
       locked: cfg._locked,
-      values: { 'machine.url': cfg.machine.url, 'grinder.enabled': cfg.grinder.enabled, 'grinder.url': cfg.grinder.url, timezone: cfg.timezone, publicUrl: cfg.publicUrl },
+      values: { 'machine.url': cfg.machine.url, 'machine.api': machineApiId(cfg.machine.api), 'grinder.enabled': cfg.grinder.enabled, 'grinder.url': cfg.grinder.url, timezone: cfg.timezone, publicUrl: cfg.publicUrl },
       env: tunnelEnv(),
     };
+  }, { auth: false });
+  route('POST', '/auth/setup/tunnel', async (ctx) => {
+    await checkSetupCode(ctx);
+    return storeTunnelToken(ctx.body.token, ctx.ip);
   }, { auth: false });
   route('POST', '/auth/setup/probe', async (ctx) => {
     await checkSetupCode(ctx);
@@ -352,18 +378,21 @@ export function authRoutes(route, app) {
   }, { auth: false });
   route('POST', '/auth/setup', async (ctx) => {
     await checkSetupCode(ctx);
-    const { password, machineUrl, grinder: g = {}, timezone, publicUrl: pub } = ctx.body;
+    const { password, machineUrl, machineApi, grinder: g = {}, timezone, publicUrl: pub, tunnelToken } = ctx.body;
+    const token = tunnelTokenFromPaste(tunnelToken);
+    if (token === null) throw bad('Das ist kein Cloudflare-Token. Die Zeile „cloudflared service install …“ einfügen. Den Befehl nicht ausführen.');
     const problem = passwordProblem(password);
     if (problem) throw bad(`Passwort: ${problem}`);
-    const wanted = { 'machine.url': machineUrl, 'grinder.enabled': g.enabled, 'grinder.url': g.enabled ? g.url : undefined, 'grinder.password': g.enabled && g.password ? g.password : undefined, timezone: timezone || undefined, publicUrl: pub || undefined };
+    const wanted = { 'machine.url': machineUrl, 'machine.api': machineApi, 'grinder.enabled': g.enabled, 'grinder.url': g.enabled ? g.url : undefined, 'grinder.password': g.enabled && g.password ? g.password : undefined, timezone: timezone || undefined, publicUrl: pub || undefined };
     const changes = Object.fromEntries(Object.entries(wanted).filter(([p, v]) => v !== undefined && !cfg._locked.includes(p)));
     const clean = validate(changes);
     clean['auth.passwordHash'] = hashPassword(password);
     applyChanges(clean);
     app.setup.code = null;
     app.startDevices();
+    if (token) requestTunnelToken(cfg.dataDir, token);
     login(ctx, true);
-    log.info(`Einrichtung abgeschlossen (von ${ctx.ip})`);
+    log.info(`Einrichtung abgeschlossen (von ${ctx.ip})${token ? ', Tunnel-Token hinterlegt' : ''}`);
     return { ok: true };
   }, { auth: false });
 
@@ -416,4 +445,18 @@ export function authRoutes(route, app) {
     log.info(`TLS-Zertifikat neu erzeugt (von ${ctx.ip})`);
     return view(ctx);
   });
+  route('GET', '/api/admin/update', async () => updateInfo({ dataDir: cfg.dataDir, version: app.version, fetchImpl: app.fetchImpl }));
+  route('POST', '/api/admin/tunnel-token', async (ctx) => storeTunnelToken(ctx.body.token, ctx.ip));
+  route('POST', '/api/admin/update', async ({ ip }) => {
+    const info = await updateInfo({ dataDir: cfg.dataDir, version: app.version, fetchImpl: app.fetchImpl });
+    requestUpdate(cfg.dataDir);
+    log.info(`Aktualisierung angefordert (von ${ip})`);
+    return { ...info, requested: true, job: { state: 'queued', at: Date.now(), version: null, error: null } };
+  });
+  route('GET', '/api/admin/backup', async () => app.takeBackup());
+  route('POST', '/api/admin/backup', async ({ body, session, ip }) => {
+    const result = await app.restoreBackup(body, session);
+    log.info(`Sicherung eingespielt (von ${ip}): ${(result.files || []).join(', ')}`);
+    return result;
+  }, { body: 'raw' });
 }

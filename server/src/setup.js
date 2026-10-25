@@ -70,6 +70,8 @@ async function main() {
   }
 
   // 2. Geräte (per Umgebungsvariable festgelegte Werte bleiben unberührt)
+  const which = await ask('Welche Xenia? 1 = neu (Brew-by-Sync), 2 = alt (DBL)', cfg.machine.api === 'classic' ? '2' : '1');
+  changes['machine.api'] = which === '2' || /^alt/i.test(which) ? 'classic' : 'bbs';
   if (!cfg._locked.includes('machine.url')) changes['machine.url'] = await askUrl('Adresse der Xenia', cfg.machine.url);
   const useGrinder = !/^n/i.test(await ask('Mahlkönig-Mühle einbinden? (J/n)', cfg.grinder.enabled ? 'j' : 'n'));
   changes['grinder.enabled'] = useGrinder;

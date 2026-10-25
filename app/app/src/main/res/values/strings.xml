@@ -28,6 +28,8 @@
     <string name="direct_scan">Im WLAN suchen</string>
     <string name="direct_help">IPs finden – Anleitung</string>
     <string name="direct_machine">IP-Adresse der Maschine</string>
+    <string name="direct_api_new">Neue Xenia (Brew-by-Sync)</string>
+    <string name="direct_api_old">Alte Xenia (DBL)</string>
     <string name="direct_grinder">IP-Adresse der Mühle (optional)</string>
     <string name="direct_grinder_pw">Owner-Passwort der Mühle (optional)</string>
     <string name="direct_grinder_hint">Ohne Passwort zeigt die App nur, ob die Mühle erreichbar ist. Mit Passwort auch Rezepte, Mahlvorgänge und Meldungen.</string>

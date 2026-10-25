@@ -1,6 +1,6 @@
 // Steuerung: Tastenbelegung an der Maschine (mit Frontansicht) und Paddle (Pumpe direkt).
 import { h, icon, fmt, snackbar, confirmDialog, switchEl } from '../ui.js';
-import { api, store, subscribe, machineOn } from '../api.js';
+import { api, store, subscribe, machineOn, isClassic } from '../api.js';
 import { setTabs } from '../app.js';
 
 const TABS = [{ id: 'switches', label: 'Schalter' }, { id: 'paddle', label: 'Paddle' }];
@@ -8,16 +8,17 @@ let lastTab = 'switches';
 
 export function controlsView(root) {
   let dispose = null;
+  const tabs = isClassic() ? TABS.filter((t) => t.id !== 'paddle') : TABS;
   const show = (tab) => {
     lastTab = tab;
     dispose?.();
     dispose = null;
     root.replaceChildren();
-    setTabs(TABS, tab, show);
+    setTabs(tabs.length > 1 ? tabs : null, tab, show);
     if (tab === 'switches') dispose = switchesTab(root);
-    if (tab === 'paddle') dispose = paddleTab(root);
+    if (tab === 'paddle' && !isClassic()) dispose = paddleTab(root);
   };
-  show(lastTab);
+  show(tabs.some((t) => t.id === lastTab) ? lastTab : 'switches');
   return () => dispose?.();
 }
 

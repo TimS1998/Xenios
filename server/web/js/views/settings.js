@@ -1,6 +1,6 @@
 // Einstellungen: Maschinenwerte, Benachrichtigungen, Infos, Darstellung, Konto.
 import { h, icon, fmt, fmtInt, snackbar, switchEl, sliderRow, ago } from '../ui.js';
-import { api, store } from '../api.js';
+import { api, store, isClassic } from '../api.js';
 import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate } from '../app.js';
 
 const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item clickable as-button', onclick },
@@ -61,12 +61,13 @@ export function settingsView(root) {
       const flushRow = sliderRow({ label: 'Dauer der Aufheiz-Spülung', min: 1, max: 20, step: 1, value: Math.max(1, s.MA_HEATUP_FLUSH_DURATION || 1), unit: 's', digits: 0, onInput: set('MA_HEATUP_FLUSH_DURATION') });
       flushRow.hidden = Number(s.MA_FAST_HEATUP_TYPE) !== 1;
       const disabled = !features.settings;
+      const classic = isClassic();
       machineBox.replaceChildren(
         h('div', { class: 'card' },
           h('h3', {}, 'Brühgruppe & Brühkessel'),
           sliderRow({ label: 'Brühgruppe', min: 60, max: 96, step: 0.1, value: s.BG_SET_TEMP, unit: '°C', onInput: set('BG_SET_TEMP') }),
           sliderRow({ label: 'Brühkessel', min: 60, max: 96, step: 0.1, value: s.BB_SET_TEMP, unit: '°C', onInput: set('BB_SET_TEMP') }),
-          h('details', { class: 'adv' }, h('summary', {}, 'Eco & Hysterese', icon('more', 's20')),
+          classic ? null : h('details', { class: 'adv' }, h('summary', {}, 'Eco & Hysterese', icon('more', 's20')),
             sliderRow({ label: 'Brühgruppe Eco', min: 40, max: 95, step: 0.1, value: s.BG_SET_ECO_TEMP, unit: '°C', onInput: set('BG_SET_ECO_TEMP') }),
             sliderRow({ label: 'Brühkessel Eco', min: 40, max: 95, step: 0.1, value: s.BB_SET_ECO_TEMP, unit: '°C', onInput: set('BB_SET_ECO_TEMP') }),
             sliderRow({ label: 'Hysterese Brühgruppe', min: 2, max: 5, step: 0.1, value: s.BG_SET_TEMP_HYST, unit: 'K', onInput: set('BG_SET_TEMP_HYST') }),
@@ -74,16 +75,17 @@ export function settingsView(root) {
         h('div', { class: 'card' },
           h('h3', {}, 'Dampfkessel'),
           sliderRow({ label: 'Dampfdruck', min: 0, max: 1.8, step: 0.1, value: s.SB_SET_PRESS, unit: 'bar', onInput: set('SB_SET_PRESS') }),
-          h('details', { class: 'adv' }, h('summary', {}, 'Eco & Hysterese', icon('more', 's20')),
+          classic ? null : h('details', { class: 'adv' }, h('summary', {}, 'Eco & Hysterese', icon('more', 's20')),
             sliderRow({ label: 'Dampfdruck Eco', min: 0, max: 1, step: 0.1, value: s.SB_SET_ECO_PRESS, unit: 'bar', onInput: set('SB_SET_ECO_PRESS') }),
             sliderRow({ label: 'Hysterese', min: 0.1, max: 0.3, step: 0.1, value: s.SB_SET_PRESS_HYST, unit: 'bar', onInput: set('SB_SET_PRESS_HYST') }))),
-        h('div', { class: 'card' },
+        classic ? null : h('div', { class: 'card' },
           h('h3', {}, 'Allgemein'),
           sliderRow({ label: 'Max. Bezugszeit', min: 30, max: 120, step: 1, value: s.PU_SET_MAX_TIMER, unit: 's', digits: 0, onInput: set('PU_SET_MAX_TIMER') }),
           sel('Beim Einschalten', 'MA_BOILER_START_MODE', [[1, 'Brühkessel AN & Dampfkessel AN'], [2, 'Brühkessel AN & Dampfkessel AUS']]),
           sel('Aufheiz-Spülung', 'MA_FAST_HEATUP_TYPE', [[0, 'Keine Spülung'], [1, 'Automatische Spülung']]),
           flushRow,
           sel('Bezugszeit startet bei', 'MA_START_EXTRACTIONCOUNTER_EVENT', [[0, 'Pumpenstart'], [1, '1 bar Druck'], [2, 'Erster Tropfen in der Tasse']])),
+        classic ? h('p', { class: 'muted small' }, 'Auf der alten Xenia lassen sich Temperatur und Dampfdruck über die API setzen. Weitere Werte stehen in der Original-Oberfläche.') : null,
         disabled ? h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.') : save,
       );
       if (disabled) machineBox.querySelectorAll('input,select').forEach((el) => { el.disabled = true; });
@@ -122,7 +124,7 @@ export function settingsView(root) {
         h('dt', {}, 'Eigener Access Point'), h('dd', {}, n.WIFI_SOFT_AP || '–'),
         h('dt', {}, 'Letzter Kontakt'), h('dd', {}, ago(st.lastSeen)),
         h('dt', {}, 'Zeitzone (Index)'), h('dd', {}, String(i.TZ_IND ?? '–'))),
-      serviceDetails());
+      isClassic() ? null : serviceDetails());
     } catch (e) {
       infoBox.replaceChildren(h('div', { class: 'muted' }, e.message));
     }

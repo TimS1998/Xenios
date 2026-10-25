@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, LoginLimiter, parseCookies, sessionCookie } from '../src/auth.js';
@@ -11,7 +12,9 @@ import { parseScript, buildScript, isScriptNameValid, clockToIso, timerToMinutes
 import { openSqlite } from '../src/sqlite-read.js';
 import { createSelfSignedCert } from '../src/tls.js';
 import { unzip } from '../src/grinder.js';
-import { makeZip } from '../mock/mock-devices.js';
+import { makeZip, packBackup, readBackup } from '../src/backup.js';
+import { compareVersions, helperAlive, requestUpdate, readUpdate, resetLatestCache, fetchLatest } from '../src/update.js';
+import { tunnelTokenFromPaste, requestTunnelToken, tunnelTokenFile } from '../src/tunnel-token.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -132,6 +135,47 @@ test('ZIP lesen (wie im Browser: DecompressionStream)', async () => {
   assert.equal(files['b.txt'].length, 5000);
 });
 
+test('Versionsvergleich und Update-Dateien', async () => {
+  assert.equal(compareVersions('2.1.0', '2.2.0'), -1);
+  assert.equal(compareVersions('v2.2.0', '2.2.0'), 0);
+  assert.equal(compareVersions('2.10.0', '2.9.1'), 1);
+  assert.equal(helperAlive({ at: Date.now() - 10e3 }), true);
+  assert.equal(helperAlive({ at: Date.now() - 120e3 }), false);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xenia-upd-'));
+  try {
+    const r = requestUpdate(dir);
+    assert.equal(r.requested, true);
+    assert.equal(r.job.state, 'queued');
+    assert.equal(readUpdate(dir).requested, true);
+    resetLatestCache();
+    const latest = await fetchLatest({
+      version: '2.1.0',
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ tag_name: 'v2.2.0', name: '2.2.0', html_url: 'https://github.com/TimS1998/Xenios/releases/tag/v2.2.0' }) }),
+    });
+    assert.equal(latest.latest.version, '2.2.0');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    resetLatestCache();
+  }
+});
+
+test('Tunnel-Token wird aus dem cloudflared-Befehl gelesen, der Befehl bleibt Text', () => {
+  const token = Buffer.from(JSON.stringify({ a: 'acct', t: '11111111-1111-1111-1111-111111111111', s: 'secret' })).toString('base64');
+  const cmd = `sudo cloudflared service install ${token}`;
+  assert.equal(tunnelTokenFromPaste(cmd), token);
+  assert.equal(tunnelTokenFromPaste(`docker run cloudflare/cloudflared tunnel run --token ${token}`), token);
+  assert.equal(tunnelTokenFromPaste(token), token);
+  assert.equal(tunnelTokenFromPaste(''), '');
+  assert.equal(tunnelTokenFromPaste('sudo cloudflared service install nicht-der-token'), null);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xenios-token-'));
+  try {
+    requestTunnelToken(dir, token);
+    assert.equal(fs.readFileSync(tunnelTokenFile(dir), 'utf8'), `${token}\n`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('Selbstsigniertes Zertifikat ist gültig und enthält IPs', () => {
   const { cert } = createSelfSignedCert({ ips: ['192.168.178.20'], dnsNames: ['xenia.local'] });
   const x = new crypto.X509Certificate(cert);
@@ -139,4 +183,24 @@ test('Selbstsigniertes Zertifikat ist gültig und enthält IPs', () => {
   assert.equal(x.checkIP('192.168.178.20'), '192.168.178.20');
   assert.equal(x.checkHost('xenia.local'), 'xenia.local');
   assert.ok(new Date(x.validTo) > new Date(Date.now() + 365 * 86400e3));
+});
+
+test('Sicherung: ZIP packen und wieder lesen', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xenios-bak-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ logLevel: 'warn', dataDir: '.' }) + '\n');
+    fs.writeFileSync(path.join(dir, 'shots.json'), JSON.stringify({ shots: [{ id: 's1' }] }));
+    fs.writeFileSync(path.join(dir, 'secret.key'), 'test-key\n');
+    const { buffer, filename } = packBackup({ configFile: path.join(dir, 'config.json'), dataDir: dir, version: '2.1.0' });
+    assert.match(filename, /^xenios-\d{4}-\d{2}-\d{2}\.zip$/);
+    const parsed = await readBackup(buffer);
+    assert.equal(parsed.manifest.kind, 'xenios-backup');
+    assert.equal(parsed.manifest.app, '2.1.0');
+    assert.equal(parsed.config.logLevel, 'warn');
+    assert.ok(parsed.files['secret.key']);
+    assert.match(parsed.files['shots.json'].toString('utf8'), /s1/);
+    await assert.rejects(() => readBackup(Buffer.from('kein zip')), /Sicherung|ZIP/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
