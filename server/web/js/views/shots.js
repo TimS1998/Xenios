@@ -1,6 +1,6 @@
 // Bezugs-Protokoll: alle Bezüge dauerhaft (Server-Datei bzw. App-Speicher), Statistik, Filter, Pflege, CSV-Export.
 // Ein Bezug öffnet die Analyse (Kurve mit Vergleich, Kennzahlen, Bewertung).
-import { h, icon, fmt, fmtInt, snackbar } from '../ui.js';
+import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
 import { api, subscribe } from '../api.js';
 import { setTopActions } from '../app.js';
 import { shotMetrics, dialIn } from '../../shared/shot-analysis.js';
@@ -11,16 +11,19 @@ export function shotsView(root) {
   const dial = h('div', {});
   const care = h('div', {});
   const box = h('div', {}, h('div', { class: 'empty' }, 'Lade Bezüge …'));
-  root.append(dial, care, box);
-  setTopActions(h('a', { class: 'icon-btn', href: '/api/shots.csv', download: '', 'aria-label': 'Als CSV exportieren', title: 'Als CSV exportieren' }, icon('download')));
-  let data = { shots: [], total: 0 };
+  const beansBox = h('div', {});
+  root.append(dial, care, beansBox, box);
+  setTopActions(
+    h('button', { class: 'icon-btn', 'aria-label': 'Bohne anlegen', title: 'Bohne anlegen', onclick: () => editBean() }, icon('add')),
+    h('a', { class: 'icon-btn', href: '/api/shots.csv', download: '', 'aria-label': 'Als CSV exportieren', title: 'Als CSV exportieren' }, icon('download')));
+  let data = { shots: [], total: 0, beans: [] };
   let filter = 'all';
   let bean = '';
 
   async function load() {
     try {
       const r = await api('/api/shots');
-      data = { shots: r.shots, total: r.total ?? r.shots.length };
+      data = { shots: r.shots, total: r.total ?? r.shots.length, beans: r.beans || [] };
       paint();
       paintDial();
     } catch (e) {
@@ -72,6 +75,7 @@ export function shotsView(root) {
   function paint() {
     const { shots, total } = data;
     if (!shots.length) {
+      paintBeans(data.beans || []);
       box.replaceChildren(h('div', { class: 'empty' }, 'Noch keine Bezüge protokolliert. Ab jetzt wird jeder Bezug gespeichert – auch über Neustarts von Maschine und Server hinweg.'));
       return;
     }
@@ -88,11 +92,12 @@ export function shotsView(root) {
     const avgTime = avg((s) => s.timeMs);
     const avgRatio = avg((s) => shotMetrics(s).ratio);
 
-    const beans = [...new Set(shots.map((s) => s.notes?.bean).filter(Boolean))];
+    const beans = data.beans?.length ? data.beans : [...new Set(shots.map((s) => s.notes?.bean).filter(Boolean))].map((n) => ({ name: n }));
     const visible = shots.filter((s) => (filter === 'rated' ? s.notes?.rating || s.notes?.taste : filter === 'ref' ? s.notes?.reference : true) && (!bean || s.notes?.bean === bean));
     const chip = (key, label) => h('button', { class: 'chip', 'aria-pressed': String(filter === key), onclick: () => { filter = key; paint(); } }, label);
     const beanSel = beans.length ? h('select', { class: 'text small-select', 'aria-label': 'Bohne' },
-      h('option', { value: '' }, 'Alle Bohnen'), beans.map((b) => h('option', { value: b, selected: b === bean }, b))) : null;
+      h('option', { value: '' }, 'Alle Bohnen'), beans.map((b) => h('option', { value: b.name, selected: b.name === bean }, b.name))) : null;
+    paintBeans(beans);
     beanSel?.addEventListener('change', () => { bean = beanSel.value; paint(); });
 
     const groups = [];
@@ -114,6 +119,63 @@ export function shotsView(root) {
         h('div', { class: 'list' }, g.items.map((s) => shotRow(s))),
       ]),
       total > shots.length ? h('p', { class: 'muted small', style: { 'text-align': 'center' } }, `Angezeigt: die letzten ${shots.length} von ${total}. Alle stehen im CSV-Export.`) : null);
+  }
+
+  function paintBeans(beans) {
+    if (!beans.length) {
+      beansBox.replaceChildren(h('section', { class: 'card' },
+        h('div', { class: 'row' }, icon('coffee', 's20'),
+          h('div', { class: 'grow' }, h('div', {}, 'Bohnen'), h('div', { class: 'small muted' }, 'Anlegen, dann in der Bewertung auswählen.')),
+          h('button', { class: 'btn tonal', onclick: () => editBean() }, icon('add', 's18'), 'Anlegen'))));
+      return;
+    }
+    beansBox.replaceChildren(h('section', { class: 'card' },
+      h('div', { class: 'row' }, icon('coffee', 's20'), h('div', { class: 'grow' }, h('strong', {}, 'Bohnen')),
+        h('button', { class: 'btn text', onclick: () => editBean() }, icon('add', 's18'), 'Neu')),
+      h('div', { class: 'list', style: { 'margin-top': '8px' } }, beans.map((b) => h('div', { class: 'list-item' },
+        h('div', { class: 'grow' }, h('div', { class: 'title' }, b.name), b.roaster ? h('div', { class: 'sub' }, b.roaster) : null),
+        h('button', { class: 'icon-btn', 'aria-label': `${b.name} umbenennen`, title: 'Umbenennen', onclick: () => editBean(b) }, icon('edit', 's20')),
+        h('button', { class: 'icon-btn', 'aria-label': `${b.name} entfernen`, title: 'Aus der Liste nehmen', onclick: () => removeBean(b) }, icon('del', 's20')))))));
+  }
+
+  function editBean(existing = null) {
+    const name = h('input', { class: 'text', maxlength: 60, required: true, value: existing?.name || '', placeholder: 'z. B. Kenia AA' });
+    const roaster = h('input', { class: 'text', maxlength: 60, value: existing?.roaster || '', placeholder: 'optional' });
+    const err = h('p', { class: 'error', role: 'alert' });
+    const ok = h('button', { class: 'btn filled wide', type: 'submit' }, existing ? 'Speichern' : 'Anlegen');
+    const form = h('form', { class: 'stack' },
+      h('label', { class: 'field' }, h('span', {}, 'Name'), name),
+      h('label', { class: 'field' }, h('span', {}, 'Rösterei'), roaster),
+      err, ok);
+    const close = sheet(existing ? 'Bohne ändern' : 'Neue Bohne', form);
+    setTimeout(() => name.focus(), 200);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      ok.disabled = true;
+      try {
+        const body = existing
+          ? { name: name.value.trim(), roaster: roaster.value.trim(), rename: existing.name }
+          : { name: name.value.trim(), roaster: roaster.value.trim() };
+        const r = await api('/api/beans', { method: existing ? 'PUT' : 'POST', body });
+        data.beans = r.beans;
+        close();
+        paint();
+        snackbar(existing ? 'Bohne geändert' : 'Bohne angelegt');
+      } catch (ex) {
+        err.textContent = ex.message;
+        ok.disabled = false;
+      }
+    });
+  }
+
+  async function removeBean(b) {
+    if (!(await confirmDialog('Bohne aus der Liste nehmen?', `„${b.name}“ bleibt an den bewerteten Bezügen stehen, erscheint aber nicht mehr zur Auswahl.`, 'Entfernen', 'danger'))) return;
+    try {
+      const r = await api(`/api/beans/${encodeURIComponent(b.name)}`, { method: 'DELETE' });
+      data.beans = r.beans;
+      if (bean === b.name) bean = '';
+      paint();
+    } catch (e) { snackbar(e.message); }
   }
 
   function shotRow(s) {

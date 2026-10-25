@@ -61,7 +61,7 @@ test('Bewertung speichern, prüfen und Vergleichskurven wählen', () => {
   const d = m.shotDetail('c');
   assert.deepEqual(d.compare.map((s) => s.id), ['b', 'a'], 'erst gleiches Skript, dann die übrigen');
   assert.equal(d.reference.id, 'b', 'Referenz zur selben Bohne');
-  assert.deepEqual(d.beans, ['Kenia']);
+  assert.deepEqual(d.beans, [{ name: 'Kenia', roaster: '' }]);
   assert.match(m.shotsCsv(), /Dosis \(g\);Verhältnis 1:;Rezept Mühle;Skript;Bohne;Mahlgrad;Bewertung;Geschmack;Stärke;Notiz/);
   assert.match(m.shotsCsv(), /"Blooming";"Kenia";;4;ausgewogen;;/);
 });
@@ -72,13 +72,14 @@ test('Mahlvorgang der Mühle wird dem passenden Bezug zugeordnet', () => {
     { id: 'alt', endedAt: iso(120), startedAt: iso(120.5), timeMs: 28000 },
   ]);
   const grinds = [
-    { id: 41, at: iso(3), success: true, weightG: 18.1, targetG: 18, recipe: 2, type: 'DoubleShot', durationMs: 8200, gbs: true },
+    { id: 41, at: iso(3), success: true, weightG: 18.1, targetG: 18, recipe: 2, type: 'DoubleShot', durationMs: 8200, gbs: true, ddd: 1761 },
     { id: 40, at: iso(30), success: true, weightG: 9.1, targetG: 9, recipe: 1 }, // zu früh für „neu“, zu spät für „alt“
     { id: 39, at: iso(121), success: false, weightG: 0.4 }, // abgebrochen
   ];
   assert.equal(m.linkGrinds(grinds), 1);
   const [neu, alt] = m.history.data.shots;
-  assert.deepEqual({ g: neu.dose.g, recipe: neu.dose.recipe, gbs: neu.dose.gbs, grindId: neu.dose.grindId }, { g: 18.1, recipe: 2, gbs: true, grindId: 41 });
+  assert.deepEqual({ g: neu.dose.g, recipe: neu.dose.recipe, gbs: neu.dose.gbs, grindId: neu.dose.grindId, ddd: neu.dose.ddd }, { g: 18.1, recipe: 2, gbs: true, grindId: 41, ddd: 1761 });
+  assert.equal(m.shotDetail('neu').lastGrind, '1761');
   assert.equal(alt.dose, undefined);
   assert.equal(m.linkGrinds(grinds), 0, 'nicht doppelt zuordnen');
   assert.equal(shotMetrics({ ...neu, weight: 36.2 }).ratio, 2);
@@ -159,4 +160,21 @@ test('Bewertung mit Stärke und Mahlgrad liefert die Empfehlung', () => {
   assert.equal(d.advice.dir, 'finer');
   assert.equal(d.lastGrind, '4');
   assert.match(m.shotsCsv(), /"Kenia";"3,8";;sauer;passt;/);
+});
+
+test('Bohnen anlegen, umbenennen, löschen; Bewertung legt an', () => {
+  const m = machine([{ id: 'a', endedAt: iso(1), timeMs: 25000, notes: { bean: 'Alt' } }]);
+  assert.deepEqual(m.listBeans(), [{ name: 'Alt', roaster: '' }]);
+  m.saveBean({ name: 'Kenia AA', roaster: 'Rösterei X' });
+  assert.equal(m.listBeans().length, 2);
+  m.saveBean({ name: 'Kenia', rename: 'Kenia AA', roaster: 'Rösterei X' });
+  assert.deepEqual(m.listBeans().map((b) => b.name), ['Alt', 'Kenia']);
+  m.annotateShot('a', { bean: 'Kenia' });
+  assert.equal(m.history.data.shots[0].notes.bean, 'Kenia');
+  m.saveBean({ name: 'Kenia Nyeri', rename: 'Kenia' });
+  assert.equal(m.history.data.shots[0].notes.bean, 'Kenia Nyeri');
+  m.deleteBean('Alt');
+  assert.deepEqual(m.listBeans().map((b) => b.name), ['Kenia Nyeri']);
+  assert.throws(() => m.saveBean({ name: '' }), /Name fehlt/);
+  assert.throws(() => m.deleteBean('gibt-es-nicht'), /nicht gefunden/);
 });

@@ -80,7 +80,7 @@ export function grinderView(root) {
           h('div', {}, h('strong', {}, `${TYPE_DE[x.type] || 'Rezept ' + x.recipe}`), x.gbs ? h('span', { class: 'badge', style: { 'margin-left': '6px' } }, 'GbS') : null, x.success ? null : h('span', { class: 'badge bad', style: { 'margin-left': '6px' } }, 'abgebrochen')),
           h('div', { class: 'w' }, x.weightG ? `${fmt(x.weightG)} g` : '–', x.targetG ? h('span', { class: 'muted small' }, ` / ${fmt(x.targetG)}`) : null),
           h('div', { class: 'meta' }, `${dateTime(x.at)} · ${fmt(x.durationMs / 1000)} s · ${TRIGGER_DE[x.trigger] || x.trigger}`),
-          h('div', { class: 'meta', style: { 'text-align': 'right' } }, `DDD ${fmtInt(x.ddd)}`),
+          h('div', { class: 'meta', style: { 'text-align': 'right' } }, x.ddd != null ? `${fmtInt(x.ddd)} µm` : ''),
           x.targetG ? h('div', { class: 'bar' }, h('i', { style: { width: `${pct}%` } })) : null);
       })));
     }

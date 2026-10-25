@@ -41,8 +41,9 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | POST | `/api/admin/tls/renew` | – | HTTPS-Zertifikat neu erzeugen (sofort aktiv) |
 | GET | `/api/state` | – | `{machine, grinder, server}` (siehe unten) |
 | GET | `/api/stream` | – | **Server-Sent Events**: `snapshot`, `machine`, `grinder`, `event`, `server` (Funktionen geändert); höchstens 50 gleichzeitig |
-| GET | `/api/shots` | – | Bezugs-Protokoll (bis 500 Einträge, Druckkurven für die neuesten 20), `total` |
-| GET | `/api/shots/:id` | – | ein Bezug mit Kurve, `compare` (bis 5 frühere: gleiches Skript, gleiche Bohne, sonst die letzten), `reference` (Referenz-Bezug), `beans`, `advice` (Einstell-Assistent), `lastGrind` (zuletzt notierter Mahlgrad) |
+| GET | `/api/shots` | – | Bezugs-Protokoll (bis 500 Einträge, Druckkurven für die neuesten 20), `total`, `beans:[{name,roaster}]` |
+| GET | `/api/shots/:id` | – | ein Bezug mit Kurve, `compare` (bis 5 frühere: gleiches Skript, gleiche Bohne, sonst die letzten), `reference` (Referenz-Bezug), `beans:[{name,roaster}]`, `advice` (Einstell-Assistent), `lastGrind` (µm vom Mahlvorgang oder zuletzt notiert) |
+| GET / POST / PUT | `/api/beans` | `{"name","roaster"?,"rename"?}` | Bohnenliste. POST legt an, PUT ändert (`rename` = alter Name, zieht Bewertungen mit). DELETE `/api/beans/:name` nimmt nur aus der Liste, Bezüge behalten den Namen. |
 | PUT | `/api/shots/:id/notes` | `{"rating":1..5,"taste":"sour"|"balanced"|"bitter","strength":"weak"|"ok"|"strong","bean","grind","yieldG","doseG","text","reference":bool}` | Bewertung und Notizen (alle Felder optional, `null` löscht). Antwort `{shot, advice}`: `advice` = `{dir:"finer"|"coarser"|"keep"|"longer"|"shorter"|"puck", size:0..2, title, text, anchor, trail}` aus Geschmack, Stärke, Zeit und den bewerteten Bezügen derselben Bohne (14 Tage) |
 | GET | `/api/community/shots?profile=&roaster=&bean=&min=0..100&page=` | – | Suche in der visualizer.coffee-Community (nur Server): `{items:[{id,title,user,bean,roast,dose,yield,ratio,time,enjoyment}], page, more}` |
 | GET | `/api/community/shots/:id` | – | ein Community-Bezug als Xenia-Skript: `{name, steps, curve, target, info}`; `steps` sind Druckstufen aus dem gemessenen Verlauf, zum Speichern über `POST /api/machine/scripts` |

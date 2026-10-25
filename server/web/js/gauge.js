@@ -73,6 +73,29 @@ export function ring(progress, label) {
 }
 
 // Bezugskurve mit Achsen: Druck (bar, links) und Gewicht (g, rechts) über die Bezugszeit.
+// Serie auf tMax schneiden; letzter Punkt vor dem Rand wird interpoliert, damit Ziel/Vergleich bis zum Bezugsende reichen.
+function clipPts(c, tMax) {
+  if (!c?.length) return [];
+  const out = [];
+  for (let i = 0; i < c.length; i++) {
+    const p = c[i];
+    if (p[0] <= tMax + 1e-9) out.push(p);
+    else {
+      const prev = out[out.length - 1];
+      if (prev && prev[0] < tMax) {
+        const f = (tMax - prev[0]) / (p[0] - prev[0] || 1);
+        out.push(p.map((v, k) => {
+          if (k === 0) return tMax;
+          const a = prev[k], b = v;
+          return Number.isFinite(a) && Number.isFinite(b) ? a + (b - a) * f : b;
+        }));
+      }
+      break;
+    }
+  }
+  return out;
+}
+
 // curve: [[t_s, druck_bar, gewicht_g, ml], …]; live: Endpunkt markieren und Zeitachse mitwachsen lassen.
 // Für die Analyse: compare = frühere Kurven (blass), reference = Referenz-Bezug, target = Soll-Druck [[t, bar] | null, …].
 export function shotChart(curve, { width = 320, height = 150, live = false, minSeconds = 30, compare = [], reference = null, target = null } = {}) {
@@ -82,8 +105,14 @@ export function shotChart(curve, { width = 320, height = 150, live = false, minS
   const pad = { l: 26, r: 30, t: 18, b: 18 };
   const iw = width - pad.l - pad.r;
   const ih = height - pad.t - pad.b;
-  const tEnd = Math.max(pts.length ? pts[pts.length - 1][0] : 0, ...others.map((c) => c[c.length - 1][0]), ...(target || []).filter(Boolean).map((p) => p[0]));
-  const tMax = Math.max(minSeconds, Math.ceil((tEnd + (live ? 3 : 0)) / 5) * 5);
+  // Fertiger Bezug: Achse nur bis zum letzten Messpunkt. Ziel/Vergleich dürfen die Zeit nicht strecken
+  // (langes Skript oder GbS-Halten), sonst bleibt rechts eine leere Fläche. Live und Skript-Vorschau
+  // ohne Kurve wachsen weiter mit.
+  const shotEnd = pts.length ? pts[pts.length - 1][0] : 0;
+  const overlayEnd = Math.max(0, ...others.map((c) => c[c.length - 1][0]), ...(target || []).filter(Boolean).map((p) => p[0]));
+  const tEnd = pts.length && !live ? shotEnd : Math.max(shotEnd, overlayEnd);
+  const tMax = live ? Math.max(minSeconds, Math.ceil((tEnd + 3) / 5) * 5) : Math.max(pts.length ? tEnd : minSeconds, tEnd, 1);
+  const clip = (c) => clipPts(c, tMax);
   const wPeak = Math.max(0, ...pts.map((p) => p[2] || 0), ...others.flat().map((p) => p[2] || 0));
   const wMax = Math.max(40, Math.ceil(wPeak / 10) * 10);
   const x = (t) => pad.l + (t / tMax) * iw;
@@ -107,14 +136,14 @@ export function shotChart(curve, { width = 320, height = 150, live = false, minS
   let seg = [];
   for (const p of target || []) {
     if (p) seg.push(p);
-    else if (seg.length) { targetLines.push(seg); seg = []; }
+    else if (seg.length) { targetLines.push(clip(seg)); seg = []; }
   }
-  if (seg.length) targetLines.push(seg);
+  if (seg.length) targetLines.push(clip(seg));
   return h('svg', { class: 'shot-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Bezugskurve: Druck und Gewicht' },
     h('text', { x: 2, y: 9, class: 'lbl' }, 'bar'), h('text', { x: width - 2, y: 9, class: 'lbl', 'text-anchor': 'end' }, 'g'),
     ...grid,
-    ...compare.map(clean).filter((c) => c.length > 1).map((c) => h('polyline', { class: 'cmp', points: lineOf(c, yP, 1) })),
-    reference && clean(reference).length > 1 ? h('polyline', { class: 'ref', points: lineOf(clean(reference), yP, 1) }) : null,
+    ...compare.map(clean).map(clip).filter((c) => c.length > 1).map((c) => h('polyline', { class: 'cmp', points: lineOf(c, yP, 1) })),
+    reference && clip(clean(reference)).length > 1 ? h('polyline', { class: 'ref', points: lineOf(clip(clean(reference)), yP, 1) }) : null,
     ...targetLines.filter((s) => s.length > 1).map((s) => h('polyline', { class: 'target', points: s.map((p) => `${x(p[0]).toFixed(1)},${yP(p[1]).toFixed(1)}`).join(' ') })),
     pts.length > 1 ? h('polygon', { class: 'area', points: `${x(pts[0][0]).toFixed(1)},${yP(0)} ${line(yP, 1)} ${x(last[0]).toFixed(1)},${yP(0)}` }) : null,
     pts.length > 1 && hasW ? h('polyline', { class: 'w', points: line(yW, 2) }) : null,

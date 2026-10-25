@@ -409,6 +409,15 @@ test('Bezugs-Analyse und Pflege über die API', async () => {
   assert.ok(Array.isArray(r.json.compare));
   r = await call('PUT', `/api/shots/${id}/notes`, { rating: 5, taste: 'balanced', bean: 'Test-Bohne', reference: true });
   assert.equal(r.json.shot.notes.rating, 5);
+  r = await call('GET', '/api/beans');
+  assert.ok(r.json.beans.some((b) => b.name === 'Test-Bohne'));
+  r = await call('POST', '/api/beans', { name: 'Brasil', roaster: 'Rösterei' });
+  assert.ok(r.json.beans.some((b) => b.name === 'Brasil' && b.roaster === 'Rösterei'));
+  r = await call('PUT', '/api/beans', { name: 'Brasil Cerrado', rename: 'Brasil', roaster: 'Rösterei' });
+  assert.ok(r.json.beans.some((b) => b.name === 'Brasil Cerrado'));
+  r = await call('DELETE', `/api/beans/${encodeURIComponent('Brasil Cerrado')}`);
+  assert.ok(!r.json.beans.some((b) => b.name === 'Brasil Cerrado'));
+  assert.ok(r.json.beans.some((b) => b.name === 'Test-Bohne'));
   r = await call('PUT', `/api/shots/${id}/notes`, { rating: 9 });
   assert.equal(r.status, 400);
   r = await call('PUT', `/api/shots/${id}/notes`, { rating: 1 }, { headers: { 'X-Xenia': '0' } });

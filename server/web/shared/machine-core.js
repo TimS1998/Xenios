@@ -611,6 +611,64 @@ export class Machine extends Emitter {
     }
     if (removed || ids) this.history.save();
     if (removed) log.info(`${removed} doppelte Bezüge im Protokoll zusammengeführt`);
+    this._syncBeans();
+  }
+
+  // Bohnen: eigene Liste. Einmalig Namen aus älteren Bewertungen übernehmen; danach nur noch über saveBean.
+  _syncBeans() {
+    const h = this.history.data;
+    if (Array.isArray(h.beans)) return;
+    const have = new Set();
+    h.beans = [];
+    for (const s of h.shots || []) {
+      const n = String(s.notes?.bean || '').trim();
+      if (n && !have.has(n)) {
+        h.beans.push({ name: n, roaster: '' });
+        have.add(n);
+      }
+    }
+    this.history.save();
+  }
+
+  listBeans() {
+    this._syncBeans();
+    return [...this.history.data.beans].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }
+
+  saveBean({ name, roaster, rename }) {
+    const n = cleanBean(name);
+    this._syncBeans();
+    const list = this.history.data.beans;
+    if (rename) {
+      const from = cleanBean(rename);
+      const hit = list.find((b) => b.name === from);
+      if (!hit) throw httpError(404, 'Bohne nicht gefunden');
+      if (n !== from && list.some((b) => b.name === n)) throw httpError(409, `„${n}“ gibt es schon`);
+      hit.name = n;
+      if (roaster !== undefined) hit.roaster = cleanRoaster(roaster);
+      for (const s of this.history.data.shots) {
+        if (s.notes?.bean === from) s.notes.bean = n;
+      }
+    } else {
+      const hit = list.find((b) => b.name === n);
+      if (hit) {
+        if (roaster !== undefined) hit.roaster = cleanRoaster(roaster);
+      } else {
+        list.push({ name: n, roaster: cleanRoaster(roaster) });
+      }
+    }
+    this.history.save();
+    return { beans: this.listBeans() };
+  }
+
+  deleteBean(name) {
+    const n = cleanBean(name);
+    const list = this.history.data.beans || [];
+    const i = list.findIndex((b) => b.name === n);
+    if (i < 0) throw httpError(404, 'Bohne nicht gefunden');
+    list.splice(i, 1);
+    this.history.save();
+    return { beans: this.listBeans() };
   }
 
   // Protokoll-Einträge; Druckkurven nur für die ersten `curves` (Datenmenge)
@@ -655,16 +713,16 @@ export class Machine extends Emitter {
       .slice(0, 5);
     const refs = list.filter((s) => s.notes?.reference && s !== shot && s.curve?.length > 1);
     const reference = (bean && refs.find((s) => s.notes.bean === bean)) || refs[0] || null;
-    const beans = [...new Set(list.map((s) => s.notes?.bean).filter(Boolean))].slice(0, 50);
-    return { shot, compare, reference, beans, advice: dialIn(shot, list.slice(i + 1, i + 60)), lastGrind: this._lastGrind(shot) };
+    return { shot, compare, reference, beans: this.listBeans(), advice: dialIn(shot, list.slice(i + 1, i + 60)), lastGrind: this._lastGrind(shot) };
   }
 
-  // Zuletzt notierter Mahlgrad (zur selben Bohne, falls bekannt) als Vorschlag für die Bewertung
+  // Vorschlag für die Bewertung: Abstand der Mühle (µm) am zugeordneten Mahlvorgang, sonst zuletzt notiert
   _lastGrind(shot) {
+    if (shot.dose?.ddd != null) return String(shot.dose.ddd);
     const list = this.history.data.shots;
     const bean = shot.notes?.bean;
-    const hit = list.find((s) => s !== shot && s.notes?.grind && (!bean || s.notes.bean === bean));
-    return hit?.notes.grind ?? null;
+    const hit = list.find((s) => s !== shot && (!bean || s.notes?.bean === bean) && (s.notes?.grind || s.dose?.ddd != null));
+    return hit?.notes?.grind ?? (hit?.dose?.ddd != null ? String(hit.dose.ddd) : null);
   }
 
   // Bewertung und Notizen zu einem Bezug (alle Felder optional; null löscht)
@@ -685,9 +743,16 @@ export class Machine extends Emitter {
       if (body.strength !== null && !(body.strength in STRENGTH)) throw httpError(400, 'Stärke: weak, ok oder strong');
       set('strength', body.strength);
     }
-    // Mahlgrad so, wie er an der Mühle steht (Skala je nach Mühle, daher Text)
+    // Mahlgrad der E64 WS: Scheibenabstand in µm (DDD), als Text damit ältere Angaben (z. B. 3,5) bleiben
     if ('grind' in body) set('grind', body.grind === null ? null : String(body.grind).trim().replace(/[\u0000-\u001f]/g, '').slice(0, 12));
-    if ('bean' in body) set('bean', body.bean === null ? null : String(body.bean).trim().slice(0, 60));
+    if ('bean' in body) {
+      if (body.bean === null || body.bean === '') set('bean', null);
+      else {
+        const name = cleanBean(body.bean);
+        set('bean', name);
+        this.saveBean({ name });
+      }
+    }
     if ('text' in body) set('text', body.text === null ? null : String(body.text).trim().slice(0, 500));
     if ('yieldG' in body) {
       const y = body.yieldG === null || body.yieldG === '' ? null : Number(body.yieldG);
@@ -727,7 +792,7 @@ export class Machine extends Emitter {
         .filter(({ t }) => Number.isFinite(t) && t <= start + 60e3 && t >= start - 20 * 60e3)
         .sort((a, b) => b.t - a.t)[0]?.x;
       if (!g) continue;
-      s.dose = { g: g.weightG, targetG: g.targetG ?? null, recipe: g.recipe ?? null, type: g.type ?? null, grindId: g.id, at: g.at, durationMs: g.durationMs ?? null, gbs: Boolean(g.gbs) };
+      s.dose = { g: g.weightG, targetG: g.targetG ?? null, recipe: g.recipe ?? null, type: g.type ?? null, grindId: g.id, at: g.at, durationMs: g.durationMs ?? null, gbs: Boolean(g.gbs), ddd: g.ddd ?? null };
       used.add(g.id);
       linked++;
     }
@@ -1048,6 +1113,15 @@ export class Machine extends Emitter {
     for (const k of ['WIFI_SOFT_AP_MAC', 'WIFI_AP_MAC']) if (out.network?.[k]) out.network[k] = '…' + String(out.network[k]).slice(-5);
     return out;
   }
+}
+
+function cleanBean(v) {
+  const s = String(v ?? '').trim().replace(/[\u0000-\u001f]/g, '').slice(0, 60);
+  if (!s) throw httpError(400, 'Bohne: Name fehlt');
+  return s;
+}
+function cleanRoaster(v) {
+  return String(v ?? '').trim().replace(/[\u0000-\u001f]/g, '').slice(0, 60);
 }
 
 export function httpError(status, message) {

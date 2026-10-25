@@ -714,6 +714,8 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 .note.advice.keep { background: rgba(46,157,79,.14); color: var(--success); }
 textarea.text { width: 100%; min-height: 72px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--outline); background: transparent; resize: vertical; font: inherit; }
 textarea.text:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+.bean-new { margin-top: 6px; }
+.unit-tag { color: var(--on-surface-variant); font-variant-numeric: tabular-nums; min-width: 1.6em; }
 .detail-nums { grid-template-columns: 1fr 1fr; margin-top: 8px; }
 .detail-nums .row { gap: 6px; }
 .detail-nums .small-btn { height: 48px; padding: 0 12px; }

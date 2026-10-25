@@ -14,9 +14,13 @@ export function intParam(v) {
 const enc = (s) => new TextEncoder().encode(s);
 
 export function deviceRoutes(route, { machine, grinder, cfg }) {
-  route('GET', '/api/shots', async () => ({ shots: machine.shots(500, { curves: 20 }), total: machine.history.data.shots.length }));
+  route('GET', '/api/shots', async () => ({ shots: machine.shots(500, { curves: 20 }), total: machine.history.data.shots.length, beans: machine.listBeans() }));
   route('GET', '/api/shots/:id', async ({ params }) => machine.shotDetail(params.id));
   route('PUT', '/api/shots/:id/notes', async ({ params, body }) => machine.annotateShot(params.id, body));
+  route('GET', '/api/beans', async () => ({ beans: machine.listBeans() }));
+  route('POST', '/api/beans', async ({ body }) => machine.saveBean({ name: body.name, roaster: body.roaster }));
+  route('PUT', '/api/beans', async ({ body }) => machine.saveBean({ name: body.name, roaster: body.roaster, rename: body.rename }));
+  route('DELETE', '/api/beans/:name', async ({ params }) => machine.deleteBean(params.name));
   route('GET', '/api/maintenance', async () => machine.maintenance());
   route('PUT', '/api/maintenance', async ({ body }) => machine.setMaintenance(body));
   route('POST', '/api/maintenance/backflush', async () => machine.markBackflush());

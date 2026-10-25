@@ -316,6 +316,7 @@ function lastGrindTile() {
           h('span', { class: 'badge' }, `${fmt(last.durationMs / 1000)} s`),
           last.recipe ? h('span', { class: 'badge' }, `Rezept ${last.recipe}${recipe?.type ? ` · ${TYPE_DE[recipe.type] || recipe.type}` : ''}`) : null,
           TRIGGER_DE[last.trigger] ? h('span', { class: 'badge' }, TRIGGER_DE[last.trigger]) : null,
+          last.ddd != null ? h('span', { class: 'badge' }, `${fmtInt(last.ddd)} µm`) : null,
           last.gbs ? h('span', { class: 'badge ok' }, 'Grind-by-Sync') : null,
           !g.online ? h('span', { class: 'badge bad' }, 'offline') : null));
       return { extra: ago(last.at) };

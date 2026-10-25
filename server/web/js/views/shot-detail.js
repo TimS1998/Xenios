@@ -17,15 +17,50 @@ export function adviceNote(a, recipe = null) {
   const grindDir = a.dir === 'finer' || a.dir === 'coarser';
   const trail = a.trail?.length > 1 ? h('div', { class: 'dial-trail', 'aria-label': 'Verlauf' }, a.trail.map((t, i) => [
     i ? h('span', { class: 'arrow', 'aria-hidden': 'true' }, '→') : null,
-    h('span', { class: `trail-step ${t.taste || ''}` }, [t.grind, TASTE_SHORT[t.taste], t.timeS ? `${fmt(t.timeS, 0)} s` : null].filter(Boolean).join(' · ') || '–'),
+    h('span', { class: `trail-step ${t.taste || ''}` }, [grindLabel(t.grind), TASTE_SHORT[t.taste], t.timeS ? `${fmt(t.timeS, 0)} s` : null].filter(Boolean).join(' · ') || '–'),
   ])) : null;
   return h('div', { class: `note advice dial ${a.dir}` },
     icon(ADVICE_ICON[a.dir] || 'tune', 's20'),
     h('div', { class: 'grow' },
       h('div', { class: 'dial-title' }, a.title),
       h('div', { class: 'small' }, a.text, grindDir && recipe ? ` (Rezept ${recipe} an der Mühle)` : ''),
-      a.anchor && grindDir ? h('div', { class: 'small' }, `Zuletzt getroffen bei Mahlgrad ${a.anchor.grind}${a.anchor.timeS ? ` in ${fmt(a.anchor.timeS)} s` : ''}.`) : null,
+      a.anchor && grindDir ? h('div', { class: 'small' }, `Zuletzt getroffen bei ${grindLabel(a.anchor.grind)}${a.anchor.timeS ? ` in ${fmt(a.anchor.timeS)} s` : ''}.`) : null,
       trail));
+}
+
+const NEW_BEAN = '__new__';
+
+export function grindLabel(g) {
+  if (g === null || g === undefined || g === '') return '';
+  const s = String(g).trim();
+  return /^\d{2,5}$/.test(s) ? `${s} µm` : s;
+}
+
+export function beanField(beans, value) {
+  const list = (beans || []).map((b) => (typeof b === 'string' ? { name: b, roaster: '' } : b)).filter((b) => b.name);
+  if (value && !list.some((b) => b.name === value)) list.unshift({ name: value, roaster: '' });
+  const nameIn = h('input', { class: 'text', maxlength: 60, placeholder: 'Name der Bohne', 'aria-label': 'Neue Bohne' });
+  const extra = h('div', { class: 'bean-new', hidden: true }, nameIn);
+  const sel = h('select', { class: 'text', 'aria-label': 'Bohne' },
+    h('option', { value: '', selected: !value }, 'Keine'),
+    list.map((b) => h('option', { value: b.name, selected: b.name === value }, b.roaster ? `${b.name} · ${b.roaster}` : b.name)),
+    h('option', { value: NEW_BEAN }, 'Neue Bohne …'));
+  sel.addEventListener('change', () => {
+    extra.hidden = sel.value !== NEW_BEAN;
+    if (sel.value === NEW_BEAN) setTimeout(() => nameIn.focus(), 40);
+  });
+  return {
+    el: h('label', { class: 'field' }, h('span', {}, 'Bohne'), sel, extra),
+    get: () => (sel.value === NEW_BEAN ? nameIn.value.trim() : sel.value.trim()),
+  };
+}
+
+export function grindField(value, suggest) {
+  const input = h('input', { class: 'text', inputmode: 'numeric', maxlength: 12, value: value || suggest || '', placeholder: suggest || '1761', title: 'Scheibenabstand wie auf der E64 WS' });
+  return {
+    el: h('label', { class: 'field' }, h('span', {}, 'Mahlgrad'), h('div', { class: 'row' }, input, h('span', { class: 'unit-tag' }, 'µm'))),
+    get: () => input.value.trim(),
+  };
 }
 
 // Auswahl als Chips (eine Option oder keine)
@@ -114,7 +149,7 @@ function paint(root, d, close, onChange) {
       ? h('div', { class: 'row' }, icon('grinder', 's20'),
         h('div', { class: 'grow' },
           h('div', {}, `${fmt(g.g)} g gemahlen${g.targetG ? ` (Ziel ${fmt(g.targetG)} g)` : ''}${g.durationMs ? ` in ${fmt(g.durationMs / 1000)} s` : ''}`),
-          h('div', { class: 'small muted' }, [g.recipe ? `Rezept ${g.recipe}` : null, TYPE_DE[g.type] || g.type, g.at ? new Date(g.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null].filter(Boolean).join(' · '))),
+          h('div', { class: 'small muted' }, [g.recipe ? `Rezept ${g.recipe}` : null, TYPE_DE[g.type] || g.type, g.ddd != null ? `${fmtInt(g.ddd)} µm` : null, g.at ? new Date(g.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null].filter(Boolean).join(' · '))),
         g.gbs ? h('span', { class: 'badge ok' }, 'Grind-by-Sync') : null)
       : h('p', { class: 'muted small' }, 'Kein Mahlvorgang der Mühle zugeordnet (bis 20 min vor dem Bezug). Die Dosis lässt sich unten eintragen.'));
     adviceBox.replaceChildren(adviceNote(advice, g?.recipe));
@@ -131,9 +166,8 @@ function paint(root, d, close, onChange) {
   paintStars();
   const taste = choice(TASTE, n.taste, (v) => { n.taste = v; });
   const strength = choice(STRENGTH, n.strength, (v) => { n.strength = v; });
-  const beanList = h('datalist', { id: 'beans-list' }, d.beans.map((b) => h('option', { value: b })));
-  const bean = h('input', { class: 'text', value: n.bean || '', list: 'beans-list', maxlength: 60, placeholder: 'z. B. Röstereiname Bohne' });
-  const grind = h('input', { class: 'text', value: n.grind || '', maxlength: 12, placeholder: d.lastGrind ? `zuletzt ${d.lastGrind}` : 'z. B. 3,5' });
+  const bean = beanField(d.beans, n.bean || '');
+  const grind = grindField(n.grind || '', d.lastGrind);
   const yieldIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 399, value: n.yieldG ?? '', placeholder: shot.weight ? `gemessen ${fmt(shot.weight)}` : 'Gramm' });
   const twoCups = shot.weight ? h('button', { type: 'button', class: 'btn tonal small-btn', title: 'Zwei Tassen, nur eine stand auf der Waage', onclick: () => { yieldIn.value = String(Math.round(shot.weight * 20) / 10); } }, '×2') : null;
   const doseIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 39, value: n.doseG ?? '', placeholder: shot.dose?.g ? `Mühle ${fmt(shot.dose.g)}` : 'Gramm' });
@@ -143,7 +177,7 @@ function paint(root, d, close, onChange) {
     save.disabled = true;
     try {
       const r = await api(`/api/shots/${encodeURIComponent(shot.id)}/notes`, { method: 'PUT', body: {
-        rating: n.rating ?? null, taste: n.taste ?? null, strength: n.strength ?? null, bean: bean.value.trim() || null, grind: grind.value.trim() || null,
+        rating: n.rating ?? null, taste: n.taste ?? null, strength: n.strength ?? null, bean: bean.get() || null, grind: grind.get() || null,
         text: text.value.trim() || null, yieldG: yieldIn.value === '' ? null : Number(yieldIn.value), doseG: doseIn.value === '' ? null : Number(doseIn.value),
         reference: Boolean(n.reference),
       } });
@@ -176,8 +210,8 @@ function paint(root, d, close, onChange) {
         strength,
         h('div', { class: 'gap' }),
         h('div', { class: 'grid2 detail-nums' },
-          h('label', { class: 'field' }, h('span', {}, 'Bohne'), bean, beanList),
-          h('label', { class: 'field' }, h('span', {}, 'Mahlgrad'), grind)),
+          bean.el,
+          grind.el),
         h('div', { class: 'grid2 detail-nums' },
           h('label', { class: 'field' }, h('span', {}, 'Ausbeute korrigieren (g)'), h('div', { class: 'row' }, yieldIn, twoCups)),
           h('label', { class: 'field' }, h('span', {}, 'Dosis (g)'), doseIn)),
@@ -201,9 +235,8 @@ export async function quickRate(id, { taste = null, onChange } = {}) {
   if (taste) n.taste = taste;
   const m = shotMetrics(shot);
   const facts = [m.timeS !== null ? `${fmt(m.timeS)} s` : null, m.yieldG !== null ? `${fmt(m.yieldG)} g` : null, m.ratio !== null ? `1:${fmt(m.ratio)}` : null, shot.script?.title || null].filter(Boolean).join(' · ');
-  const beanList = h('datalist', { id: 'quick-beans' }, d.beans.map((b) => h('option', { value: b })));
-  const bean = h('input', { class: 'text', value: n.bean || d.beans[0] || '', list: 'quick-beans', maxlength: 60, placeholder: 'Bohne' });
-  const grind = h('input', { class: 'text', value: n.grind || d.lastGrind || '', maxlength: 12, placeholder: 'z. B. 3,5' });
+  const bean = beanField(d.beans, n.bean || d.beans[0]?.name || '');
+  const grind = grindField(n.grind || '', d.lastGrind);
   const body = h('div', { class: 'quick-rate' });
   const save = h('button', { class: 'btn filled wide', onclick: submit }, icon('check', 's18'), 'Empfehlung holen');
   body.append(
@@ -213,8 +246,8 @@ export async function quickRate(id, { taste = null, onChange } = {}) {
     h('div', { class: 'field-label small muted' }, 'Stärke'),
     choice(STRENGTH, n.strength, (v) => { n.strength = v; }, 'big-chips'),
     h('div', { class: 'grid2 detail-nums' },
-      h('label', { class: 'field' }, h('span', {}, 'Bohne'), bean, beanList),
-      h('label', { class: 'field' }, h('span', {}, 'Mahlgrad'), grind)),
+      bean.el,
+      grind.el),
     h('div', { class: 'gap' }),
     save);
   const close = sheet('Wie war der Bezug?', body);
@@ -224,7 +257,7 @@ export async function quickRate(id, { taste = null, onChange } = {}) {
     save.disabled = true;
     try {
       const r = await api(`/api/shots/${encodeURIComponent(shot.id)}/notes`, { method: 'PUT', body: {
-        taste: n.taste ?? null, strength: n.strength ?? null, bean: bean.value.trim() || null, grind: grind.value.trim() || null,
+        taste: n.taste ?? null, strength: n.strength ?? null, bean: bean.get() || null, grind: grind.get() || null,
       } });
       onChange?.();
       body.replaceChildren(
