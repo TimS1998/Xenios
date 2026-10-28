@@ -364,6 +364,14 @@ test('Wecker: Handys melden, frühester Wecker zählt, Einschalten mit Vorlauf',
   await app.wake.tick(at(6, 10));
   await app.wake.tick(at(6, 11));
   assert.equal(xenia.state.log.slice(before).filter((l) => l.includes('machine/control')).length, 1);
+  // Ausgeschaltet und geschlummert (Android meldet 06:39): nicht erneut einschalten
+  await call('POST', '/api/machine/power', { mode: 'off' });
+  await until(() => app.machine.snapshot().statusKey === 'off');
+  const snoozed = xenia.state.log.length;
+  await call('POST', '/api/wake/alarm', { next: at(6, 39) }, { auth: false, headers: a });
+  await app.wake.tick(at(6, 31));
+  assert.equal(xenia.state.log.slice(snoozed).filter((l) => l.includes('machine/control')).length, 0);
+  await call('POST', '/api/wake/alarm', { next: at(6, 30) }, { auth: false, headers: a });
   // Widget zeigt das nächste geplante Einschalten
   await call('PUT', '/api/wake', { config: { enabled: true } });
   const w = await call('GET', '/api/widget', undefined, { auth: false, headers: a });

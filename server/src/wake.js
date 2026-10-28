@@ -9,6 +9,8 @@ const log = logger('wecker');
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 const p2 = (n) => String(n).padStart(2, '0');
+// Schlummern meldet Android als neuen Wecker kurz nach dem alten: so lange gilt er als derselbe Wecker.
+const SNOOZE_MS = 2 * 3600e3;
 
 export const WAKE_DEFAULTS = {
   enabled: false,
@@ -123,8 +125,9 @@ export class Wake {
     if (!this.store.data.config.enabled) return;
     const p = this.plan(now);
     if (!p || now < p.at) return;
-    const key = `${p.id}:${p.alarm}`;
-    if (this.store.data.fired === key) return;
+    // Schon für diesen Wecker eingeschaltet (auch geschlummert)? Dann nicht erneut, auch wenn inzwischen jemand ausgeschaltet hat.
+    const f = this.store.data.fired;
+    if (f && f.id === p.id && p.alarm >= f.alarm && p.alarm - f.alarm < SNOOZE_MS) return;
     const m = this.machine.snapshot();
     if (!m.online) return; // nächster Versuch in 15 s
     const alarm = new Date(p.alarm);
@@ -135,7 +138,7 @@ export class Wake {
         log.info(`Eingeschaltet für Wecker ${when} (${p.device})`);
         this.onEvent({ topic: 'power', title: 'Wecker', body: `Xenia eingeschaltet – Wecker um ${when} (${p.device})`, tag: 'wake', at: new Date(now).toISOString() });
       }
-      this.store.data.fired = key;
+      this.store.data.fired = { id: p.id, alarm: p.alarm };
       this.store.save(0);
     } catch (e) {
       log.warn(`Einschalten für Wecker ${when} fehlgeschlagen: ${e.message}`);

@@ -179,11 +179,12 @@ object Widgets {
                 eco = s.isEco
                 off = s.isOff
                 rv.setInt(R.id.root, "setBackgroundResource", bgFor(s))
-                rv.setTextViewText(R.id.status, "Kaffeemaschine · ${title(s)}")
+                // Im 4×1 bleibt neben den Knöpfen kaum Platz: nur der Zustand
+                rv.setTextViewText(R.id.status, if (layout == R.layout.widget_wide) title(s) else "Kaffeemaschine · ${title(s)}")
                 if (large) {
                     val live = s.online && !s.isOff
                     rv.setTextViewText(R.id.v_group, if (live) "${fmt(s.group)} °C" else "–")
-                    rv.setTextViewText(R.id.k_group, if (live && s.groupSet != null) "Brühgruppe (Ziel ${fmt(s.groupSet)})" else "Brühgruppe")
+                    rv.setTextViewText(R.id.k_group, if (live && s.groupSet != null) "Gruppe · Ziel ${fmt(s.groupSet)}" else "Brühgruppe")
                     rv.setTextViewText(R.id.v_boiler, if (live) "${fmt(s.boiler)} °C" else "–")
                     rv.setTextViewText(R.id.v_steam, if (live && s.steamOn) "${fmt(s.steam)} bar" else "aus")
                     val next = s.nextAt?.let { "Nächstes Einschalten: ${dateTime(it)}${s.nextReason?.let { r -> " · $r" } ?: ""}" } ?: "Kein Einschalten geplant"
