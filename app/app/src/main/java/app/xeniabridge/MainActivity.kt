@@ -340,6 +340,10 @@ class MainActivity : Activity() {
             return AlarmReport.nextAlarm(app) ?: 0L
         }
 
+        /** App, die den nächsten Wecker gestellt hat; "" = unbekannt. Hilft, wenn der gemeldete Wecker nicht zur Uhr-App passt. */
+        @JavascriptInterface
+        fun alarmSource(): String = AlarmReport.nextAlarmSource(applicationContext) ?: ""
+
         /** Wecker-Liste der Uhr-App öffnen (Android gibt anderen Apps nur den nächsten Wecker heraus). */
         @JavascriptInterface
         fun showAlarms() {

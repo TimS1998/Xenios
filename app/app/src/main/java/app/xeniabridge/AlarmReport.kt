@@ -15,6 +15,17 @@ object AlarmReport {
     fun nextAlarm(context: Context): Long? =
         context.getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime
 
+    /** App, die den nächsten Wecker gestellt hat (Name, sonst Paketname); null, wenn Android es nicht verrät. */
+    fun nextAlarmSource(context: Context): String? {
+        val pkg = context.getSystemService(AlarmManager::class.java)?.nextAlarmClock?.showIntent?.creatorPackage ?: return null
+        return try {
+            val pm = context.packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: Exception) {
+            pkg
+        }
+    }
+
     /** Blockierend; nur senden, wenn sich der Wecker geändert hat oder die letzte Meldung älter als 6 h ist. */
     fun sendIfChanged(context: Context, force: Boolean = false) {
         val prefs = Prefs(context)

@@ -230,7 +230,9 @@ export function timerView(root) {
     try {
       if (inApp) {
         const next = Number(window.XeniaApp.checkAlarm());
-        snackbar(next > 0 ? `Nächster Wecker auf diesem Handy: ${when(next)}` : 'Auf diesem Handy ist kein Wecker gestellt');
+        // Android meldet den frühesten Wecker aller Apps; die Quelle zeigt, falls er nicht zur Uhr-App passt
+        const source = next > 0 ? String(window.XeniaApp.alarmSource?.() || '') : '';
+        snackbar(next > 0 ? `Nächster Wecker auf diesem Handy: ${when(next)}${source ? ` (gestellt von ${source})` : ''}` : 'Auf diesem Handy ist kein Wecker gestellt');
         await new Promise((r) => setTimeout(r, 1500));
       }
       if (wakeDirty) snackbar('Ungespeicherte Änderungen bleiben erhalten');
