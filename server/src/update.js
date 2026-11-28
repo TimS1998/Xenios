@@ -1,4 +1,5 @@
-// Versionsvergleich und der Austausch mit dem Host-Update-Dienst (install.sh --apply-requested).
+// Versionsvergleich und der Austausch mit dem Host-Update-Dienst: install.sh --apply-requested (Docker) bzw.
+// native-update.sh --apply-requested (ohne Docker, Programm als systemd-Dienst).
 // Die App schreibt nur Dateien unter dataDir; das Skript auf dem Rechner holt Image/Git und startet neu.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,7 +58,7 @@ export function readUpdate(dataDir) {
   const job = readJson(p.status);
   const requested = fs.existsSync(p.request);
   return {
-    helper: helper && { at: helper.at, host: helper.host || null },
+    helper: helper && { at: helper.at, host: helper.host || null, mode: helper.mode === 'native' ? 'native' : 'docker' },
     job: job && { state: job.state || null, at: job.at || null, version: job.version || null, error: job.error || null },
     requested,
     helperAlive: helperAlive(helper),
@@ -133,6 +134,9 @@ export async function updateInfo({ dataDir, version, fetchImpl }) {
     newer,
     helper: local.helperAlive,
     helperAt: local.helper?.at || null,
+    helperMode: local.helper?.mode || null,
+    // läuft der Server in einem Container? (für den Hinweis, welcher Update-Dienst passt)
+    docker: fs.existsSync('/.dockerenv'),
     requested: local.requested,
     job: local.job,
   };

@@ -3,7 +3,7 @@
 import { h, icon, snackbar, switchEl, sheet, confirmDialog, ago } from '../ui.js';
 import { api, refreshState } from '../api.js';
 import { logout } from '../app.js';
-import { paintPush } from './settings.js';
+import { paintPush, deviceFolds } from './settings.js';
 import { fillProbe, revealToggle, shake, tunnelGuide, apiChoice } from '../setup.js';
 
 const LOCK_HINT = 'per Umgebungsvariable festgelegt';
@@ -51,8 +51,17 @@ export const serverPage = (part) => (root) => {
       : job.state === 'ok' && job.version ? h('p', { class: 'small' }, `Zuletzt aktualisiert auf ${job.version}.`) : null;
     const btn = h('button', { type: 'button', class: 'btn tonal', disabled: pending || stuck || !u.helper, onclick: requestUpdate },
       icon('refresh', 's18'), u.newer && u.latest ? `Auf ${u.latest} aktualisieren` : 'Aktualisieren');
+    // Update-Dienst: Docker (install.sh) oder ohne Docker als systemd-Dienst (native-update.sh)
+    const native = u.helperMode === 'native' || (!u.helper && u.docker === false);
     const hint = u.helper
-      ? h('p', { class: 'small muted' }, 'Holt das neueste Image und startet Xenios neu. Konfiguration, Sitzungen und Bezüge bleiben.')
+      ? h('p', { class: 'small muted' }, native
+        ? 'Holt das neueste Release, tauscht den Programmordner (der alte bleibt als Sicherung) und startet den Dienst neu. Startet der neue Stand nicht, läuft der alte weiter. Konfiguration, Sitzungen und Bezüge bleiben.'
+        : 'Holt das neueste Image und startet Xenios neu. Konfiguration, Sitzungen und Bezüge bleiben.')
+      : native
+      ? h('div', { class: 'small muted' },
+        h('p', {}, 'Auf diesem Server läuft kein Update-Dienst, deshalb ist der Knopf aus. Xenios läuft hier ohne Docker; einmal auf dem Server ausführen – richtet den Update-Dienst für den systemd-Dienst „xenios“ ein, danach geht der Knopf:'),
+        h('pre', { class: 'hint-code' }, 'curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/native-update.sh | sudo sh -s -- --setup'),
+        h('p', {}, 'Heißt der Dienst anders: ', h('code', {}, '… --setup --service <name>'), '. Von Hand aktualisieren danach mit ', h('code', {}, 'sudo xenios-update'), '.'))
       : h('div', { class: 'small muted' },
         h('p', {}, 'Auf diesem Server läuft kein Update-Dienst, deshalb ist der Knopf aus. Einmal auf dem Linux-Server ausführen – aktualisiert und richtet den Dienst ein, danach geht der Knopf:'),
         h('pre', { class: 'hint-code' }, 'sh ~/xenios/install.sh --update'),
@@ -113,6 +122,7 @@ export const serverPage = (part) => (root) => {
     const el = body.querySelector(`[data-anchor="${anchor}"]`);
     anchor = '';
     history.replaceState(history.state, '', location.pathname);
+    if (el?.tagName === 'DETAILS') { el.open = true; foldOpen.set('look', true); }
     if (el) setTimeout(() => { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); el.classList.add('flash'); }, 350);
   }
 
@@ -177,6 +187,17 @@ export const serverPage = (part) => (root) => {
       h('div', { class: 'card-head' }, icon(ic, 's20'), h('h3', { class: 'grow' }, title), badge || null),
       ...kids.filter(Boolean));
   };
+  // Einklappbarer Bereich, der sein Auf/Zu beim Neuzeichnen (nach jeder Änderung) behält
+  const foldOpen = new Map();
+  const sfold = ({ id, title, anchor, open = false }, ic, ...kids) => {
+    const el = h('details', { class: 'card fold', 'data-anchor': anchor, open: foldOpen.get(id) ?? open },
+      h('summary', {}, icon(ic, 's20'), h('span', { class: 'grow' }, title), icon('more', 's20 chev')),
+      h('div', { class: 'fold-body' }, ...kids.filter(Boolean)));
+    el.addEventListener('toggle', () => foldOpen.set(id, el.open));
+    return el;
+  };
+  // Wi-Fi und Firmware unter „Modell, Aussehen & Firmware“: einmal laden, beim Neuzeichnen dieselben Elemente
+  let devFolds = null;
   const gap = () => h('div', { class: 'gap' });
   const warn = (txt) => h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, txt));
 
@@ -229,7 +250,7 @@ export const serverPage = (part) => (root) => {
   // Modell, Adresse und Aussehen der Xenia
   function modelCards() {
     const [mTest, mBox] = probeButton('machine', () => ({ url: value('machine.url') }));
-    const connection = card('Verbindung', 'coffeeLine',
+    const connection = sfold({ id: 'model', title: 'Modell & Adresse', open: true }, 'coffeeLine',
       apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
       h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
       mBox);
@@ -250,25 +271,36 @@ export const serverPage = (part) => (root) => {
           h('span', { class: 'swatch', style: { background: swatch || c } }), text)),
         h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, input, 'Eigene')));
     };
-    const BODY = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
+    // Auswahl je nach gesteuerter Maschine, nur was es zu kaufen gibt bzw. gab. Alte Xenia (DBL, Xenia Espresso):
+    // Gehäuse Schwarz, Anthrazit, Weiß (eloxal mit Glimmereffekt), Edelstahl satiniert/spiegelnd, Rot (eloxal), Rost; ein
+    // Gitter über die ganze Abtropfschale (Edelstahl, Schwarz, Weiß); Griffe Kunststoff schwarz (Standard) oder Holz
+    // (Olive, Eiche, Nuss, Kirsche, Grenadill, schwarze Esche); Manometer schwarz oder weiß. Neue Xenia (Mahlkönig,
+    // Brew-by-Sync): Gehäuse Mattschwarz, sonst RAL über „Eigene“; Griffe Original ohne Holz,
+    // Eiche, Nuss, Olive, Eiche schwarz gebeizt; Abtropfschale und Manometer (schwarz) ohne Auswahl.
+    const dbl = value('machine.api') === 'classic';
+    const BODY = dbl
+      ? [['#26272b', 'Schwarz'], ['#3a3d42', 'Anthrazit'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl satiniert'], ['#e3e6e9', 'Edelstahl spiegelnd'],
+        ['#9e1f24', 'Rot'], ['#8a4a2b', 'Rost']]
+      : [['#26272b', 'Mattschwarz']];
     const TRAY = [['#c4c7cb', 'Edelstahl'], ['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß']];
-    const GRIP = [['chrome', 'Chrom', 'linear-gradient(90deg, #7d8186, #f4f6f8, #8a8e93)'], ['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
+    const GRIP = dbl
+      ? [['#1d1e21', 'Kunststoff schwarz'], ['#e0aa6a', 'Olive'], ['#c49a6c', 'Eiche'], ['#6e4127', 'Nuss'], ['#9b4e2f', 'Kirsche'], ['#4a3128', 'Grenadill'], ['#2b2624', 'Schwarze Esche']]
+      : [['chrome', 'Original (ohne Holz)', 'linear-gradient(90deg, #7d8186, #f4f6f8, #8a8e93)'], ['#c49a6c', 'Eiche'], ['#6e4127', 'Nuss'], ['#e0aa6a', 'Olive'], ['#2e2a27', 'Eiche schwarz gebeizt']];
     const GAUGE = [['#141518', 'Schwarz'], ['#f4f4f1', 'Weiß']];
     const simple = value('machine.look.style') === 'simple';
-    // Ventile (Hebel/Drehknopf) nur bei der DBL; Griffe bei beiden, ohne eigene Wahl DBL Holz, neue Xenia Chrom
-    const dbl = value('machine.api') === 'classic';
-    const look = card({ title: 'Aussehen', anchor: 'aussehen' }, 'palette',
+    const look = sfold({ id: 'look', title: 'Aussehen', anchor: 'aussehen' }, 'palette',
       h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine mit eigenen Farben und Ausstattung oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
       pick('Ansicht', 'machine.look.style', [['render', 'Render'], ['simple', 'Vereinfacht']], simple ? 'simple' : 'render'),
       simple ? null : h('div', { class: 'look-pick' },
         colorRow('Gehäuse', 'machine.look.color', BODY, { fallback: BODY[0][0] }),
-        colorRow('Abtropfgitter', 'machine.look.tray', TRAY, { fallback: value('machine.look.color') || BODY[0][0], same: 'Wie Gehäuse' }),
-        colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: dbl ? '#c98a4f' : 'chrome' }),
-        colorRow('Manometer', 'machine.look.gauge', GAUGE, { fallback: GAUGE[0][0] }),
+        dbl ? colorRow('Abtropfgitter (ganze Schale)', 'machine.look.tray', TRAY, { fallback: TRAY[0][0] }) : null,
+        colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: dbl ? GRIP[0][0] : 'chrome' }),
+        dbl ? colorRow('Manometer', 'machine.look.gauge', GAUGE, { fallback: GAUGE[0][0] }) : null,
         row('Dampflanze', pick('Dampflanze', 'machine.look.steamSide', [['left', 'Links'], ['right', 'Rechts']], value('machine.look.steamSide') === 'right' ? 'right' : 'left')),
         dbl ? row('Ventile', pick('Ventile', 'machine.look.valves', [['lever', 'Hebel'], ['rotary', 'Drehknopf']], value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever')) : null),
       toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Ansicht ändern“', 'machine.look.editButton'));
-    return [connection, look];
+    devFolds ||= deviceFolds();
+    return [connection, look, ...devFolds];
   }
 
   // Mühle und Grind-by-Sync-Vermittler

@@ -173,7 +173,7 @@ object Widgets {
     /** Läuft gerade eine Aktualisierung? Dann keine zweite parallel (die laufende plant die nächste). */
     private val updating = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    /** Gerade per Widget geänderte Sollwerte: bis der Server sie meldet (höchstens 8 s) gilt der neue Wert */
+    /** Gerade per Widget geänderte Sollwerte: bis der Server sie meldet (höchstens 20 s) gilt der neue Wert */
     private val targetHold = java.util.concurrent.ConcurrentHashMap<String, Pair<Double, Long>>()
     private fun withHolds(s: Api.State): Api.State {
         var r = s
@@ -189,7 +189,7 @@ object Widgets {
     /** Letzter bekannter Zustand (für die sofortige Anzeige nach einem Tipp) */
     @Volatile private var lastState: Api.State? = null
 
-    /** Laufender Schaltbefehl: weitere Tipps auf Schalter werden bis zur Bestätigung (höchstens 10 s) ignoriert */
+    /** Laufender Schaltbefehl: weitere Tipps auf Schalter werden bis zur Bestätigung (höchstens 25 s) ignoriert */
     private class Switching(val until: Long)
     @Volatile private var switching: Switching? = null
 
@@ -211,9 +211,12 @@ object Widgets {
         }
     }
 
-    /** Bestätigt die Maschine den erwarteten Zustand? */
-    private fun reached(exp: Api.State, now: Api.State) = now.online && now.status == exp.status && now.steamOn == exp.steamOn ||
-        exp.status == "on" && now.isOn && now.steamOn == exp.steamOn
+    /** Bestätigt die Maschine den erwarteten Zustand? Beim Ein-/Ausschalten zählt der Zustand der Maschine, der Dampfkessel
+     *  nur beim Schalten des Dampfkessels (die alte Xenia meldet ihn beim Einschalten teils erst später oder anders). */
+    private fun reached(action: String?, exp: Api.State, now: Api.State) = now.online && when (action) {
+        ACTION_STEAM -> now.isOn && now.steamOn == exp.steamOn
+        else -> if (exp.status == "on") now.isOn else now.status == exp.status
+    }
 
     /** Aktion aus einem Widget: sofort anzeigen, ausführen, bis zur Bestätigung nachsehen, neu zeichnen. Läuft im goAsync-Kontext. */
     fun handleAction(receiver: AppWidgetProvider, context: Context, intent: Intent) {
@@ -243,7 +246,7 @@ object Widgets {
                             // Doppelte Tipps abfangen: solange ein Schaltbefehl läuft, nichts weiter auslösen
                             val busy = switching
                             if (busy != null && System.currentTimeMillis() < busy.until) return@thread
-                            switching = Switching(System.currentTimeMillis() + 10_000)
+                            switching = Switching(System.currentTimeMillis() + 25_000) // länger als das Warten auf die Bestätigung (20 s)
                         }
                         // Sofort zeigen, was der Tipp bewirkt (erwarteter Zustand und „Schaltet ein …“)
                         val exp = lastState?.let { expect(intent.action, intent.getStringExtra(EXTRA_MODE), it, prefs.noSteamOn) }
@@ -270,7 +273,7 @@ object Widgets {
                                             }
                                             if (cur != null) {
                                                 val v = ((cur + delta).coerceIn(lo, hi) * 10).roundToInt() / 10.0
-                                                targetHold[key] = v to System.currentTimeMillis() + 8000
+                                                targetHold[key] = v to System.currentTimeMillis() + 20_000
                                                 val shown = withHolds(s)
                                                 lastState = shown
                                                 render(app, Data(shown, null, false, prefs.noSteamOn, prefs.direct)) // sofort sichtbar
@@ -281,8 +284,9 @@ object Widgets {
                                 }
                             }
                             if (isSwitch && exp != null) {
-                                // bis zu 8 s jede Sekunde nachsehen, bis die Maschine den neuen Zustand meldet
-                                for (i in 0 until 8) {
+                                // bis zu 20 s jede Sekunde nachsehen, bis die Maschine den neuen Zustand meldet (der Server
+                                // fragt nach einer Aktion so lange schnell nach)
+                                for (i in 0 until 20) {
                                     // Pulsieren wie der Knopf in der App: zweimal pro Sekunde gedämpft / voll
                                     render(app, Data(exp.first, null, false, prefs.noSteamOn, prefs.direct, exp.second, dim = true))
                                     Thread.sleep(500)
@@ -290,7 +294,7 @@ object Widgets {
                                     Thread.sleep(500)
                                     val now = runCatching { Api.state(app) }.getOrNull() ?: continue
                                     lastState = now
-                                    if (reached(exp.first, now)) break
+                                    if (reached(intent.action, exp.first, now)) break
                                 }
                             } else Thread.sleep(1200)
                         } catch (e: Exception) {
@@ -411,7 +415,7 @@ object Widgets {
                     rv.setOnClickPendingIntent(plus, broadcast(context, ACTION_TARGET, key = key, delta = step))
                 }
             }
-            CareWidget::class.java -> { drawCare(p, d); rv.setOnClickPendingIntent(R.id.root, openIntent(context, "/bezuege")) }
+            CareWidget::class.java -> { drawCare(p, p.layout("care"), d); rv.setOnClickPendingIntent(R.id.root, openIntent(context, "/bezuege")) }
             HistoryWidget::class.java -> { drawHistory(p, p.layout("history"), d); rv.setOnClickPendingIntent(R.id.root, openIntent(context, "/")) }
             LastShotWidget::class.java -> { drawLastShot(p, p.layout("lastshot"), d); rv.setOnClickPendingIntent(R.id.root, openIntent(context, "/bezuege")) }
             ShotsWidget::class.java -> { drawShots(p, p.layout("shots"), d, false); rv.setOnClickPendingIntent(R.id.root, openIntent(context, "/bezuege")) }
@@ -502,23 +506,11 @@ object Widgets {
 
     /** 4×1 wie das frühere Widget: Status und Brühgruppe links, Ein/Eco/Aus rechts */
     private fun drawMode(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
-        r["head"]?.let { h ->
-            val dot = 8f
-            p.roundRect(RectF(h.left, h.centerY() - dot / 2, h.left + dot, h.centerY() + dot / 2), dot / 2, stateDot(p, s))
-            val tx = RectF(h.left + dot + 8, h.top, h.right - 4, h.bottom)
-            val label = d.note ?: stateLabel(s)
-            val sub = if (s.online && !s.isOff && s.group != null) "${fmt(s.group)} °C" else null
-            if (sub == null || d.note != null || tx.height() < 30) p.textMid(label, tx, 14f, p.t.onSurface, 1)
-            else {
-                p.textMid(label, RectF(tx.left, tx.top, tx.right, tx.centerY() + 1), 14f, p.t.onSurface, 1)
-                p.textMid(sub, RectF(tx.left, tx.centerY() + 1, tx.right, tx.bottom), 11.5f, p.t.muted)
-            }
-        }
-        // Knöpfe höchstens 40 dp hoch (bei größerem Widget mittig), die Klickflächen bleiben so groß wie die Zeile
-        val seg = r.mapValues { (k, v) ->
-            if (k.startsWith("btn_") && v.height() > 40f) RectF(v.left, v.centerY() - 20f, v.right, v.centerY() + 20f) else v
-        }
-        drawSeg(p, seg, s, d.dim)
+        // Kopfzeile mit Symbol und Titel, Zustand rechts (wie „Schalter“), darunter Ein/Eco/Aus über die ganze Breite
+        val label = d.note ?: stateLabel(s)
+        val right = if (d.note == null && s.online && !s.isOff && s.group != null) "$label · ${fmt(s.group)} °C" else label
+        r["head"]?.let { p.head(it, R.drawable.wi_power, "Ein/Eco/Aus", right, dot = stateDot(p, s)) }
+        drawSeg(p, r, s, d.dim)
     }
 
     private fun drawSwitch(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
@@ -529,7 +521,8 @@ object Widgets {
 
     private fun drawLarge(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
         val label = d.note ?: stateLabel(s)
-        r["head"]?.let { p.head(it, R.drawable.wi_power, "Kaffeemaschine", label, rightBadge = badgeColors(p, s)) }
+        // ohne Zustand rechts oben: den zeigt groß die Zeile darunter
+        r["head"]?.let { p.head(it, R.drawable.wi_power, "Espressomaschine") }
         r["status"]?.let { st ->
             val dia = min(46f, st.height())
             val on = s.isOn || s.isEco
@@ -557,12 +550,6 @@ object Widgets {
         }
         drawSeg(p, r, s, d.dim)
         drawToggles(p, r, s, d)
-    }
-
-    private fun badgeColors(p: WidgetPainter, s: Api.State): Pair<Int, Int> = when {
-        !s.online || s.status == "fault" -> Pair(p.t.danger, p.t.onDanger)
-        s.heated && s.isOn -> Pair(p.withAlpha(p.t.success, 0.22f), p.t.success)
-        else -> Pair(p.t.primaryContainer, p.t.onPrimaryContainer)
     }
 
     private fun curveOf(a: JSONArray?): List<DoubleArray> {
@@ -621,9 +608,10 @@ object Widgets {
         }
     }
 
-    private fun drawCare(p: WidgetPainter, d: Data) {
-        val pad = WidgetSpecs.PAD
-        val r = RectF(pad, pad, p.wDp - pad, p.hDp - pad)
+    private fun drawCare(p: WidgetPainter, rows: Map<String, RectF>, d: Data) {
+        // Kopfzeile wie bei den anderen Widgets: Symbol der Home-Kachel „Pflege“ und Titel
+        rows["head"]?.let { p.head(it, R.drawable.wi_check, "Pflege") }
+        val r = rows["body"] ?: return
         val care = d.raw?.optJSONObject("care")
         if (care == null) { p.textMid(missing(d, "Pflege"), r, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         val interval = max(1, care.optInt("intervalDays", 7))

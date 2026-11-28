@@ -42,6 +42,7 @@ class SetupActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup)
         val root = findViewById<ScrollView>(R.id.scroll)
+        SetupStyle.apply(this, root) // im Design der App (Material oder Xenia, hell/dunkel)
         root.setOnApplyWindowInsetsListener { v, insets ->
             val b = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
             v.setPadding(b.left, b.top, b.right, b.bottom)

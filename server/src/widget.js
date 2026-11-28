@@ -42,7 +42,7 @@ export function widgetExtras({ m, shots = [], maintenance = null, history = null
     pump: r1(m?.pressure?.pump), pumpSet: r1(m?.pressure?.pumpSet),
     gaugeStyle: null,
   };
-  // laufender Bezug (für „Kaffeemaschine groß“ während eines Bezugs)
+  // laufender Bezug (für „Espressomaschine groß“ während eines Bezugs)
   if (m?.shot?.running) {
     out.live = {
       timeS: r1((m.shot.timeMs || 0) / 1000), pressure: r1(m.pressure?.pump), weight: r1(m.scale?.weight), rate: r1(m.scale?.rate || m.flow?.rate),

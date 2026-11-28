@@ -1,4 +1,4 @@
-// Einstellungen: die Hauptseite ist nur eine Übersicht in drei Gruppen (App, Kaffeemaschine, Server); jeder Eintrag
+// Einstellungen: die Hauptseite ist nur eine Übersicht in drei Gruppen (App, Espressomaschine, Server); jeder Eintrag
 // öffnet eine eigene Seite. Seiten mit Werten des Servers stehen in views/server.js.
 import { h, icon, fmt, fmtInt, snackbar, switchEl, sliderRow, ago } from '../ui.js';
 import { api, store, isClassic, classicPages } from '../api.js';
@@ -17,6 +17,8 @@ export function fold(title, ic, ...nodes) {
     h('summary', {}, icon(ic, 's20'), h('span', { class: 'grow' }, title), icon('more', 's20 chev')),
     h('div', { class: 'fold-body' }, ...nodes.filter(Boolean)));
 }
+// Bereich, der beim Öffnen der Seite schon aufgeklappt ist (der meistgenutzte)
+const openFold = (f) => { f.open = true; return f; };
 
 // --- Hauptseite: Übersicht ---------------------------------------------------------------------------------
 export function settingsView(root) {
@@ -31,11 +33,14 @@ export function settingsView(root) {
       widgetAlarmButton(unsubs),
       appUpdateItem(unsubs),
       direct && android ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
-    ...group('Kaffeemaschine',
-      listButton('settings', 'Maschine', 'Temperaturen, Dampf, Pumpe, Waage, Wi-Fi, Firmware', go('/einstellungen/maschine')),
-      direct ? null : listButton('coffeeLine', 'Modell & Aussehen', 'Neue oder alte Xenia, Adresse, Ansicht unter „Schalter“', go('/einstellungen/modell')),
-      listButton('shotlog', 'Bezüge', 'Kurze Bezüge aussortieren, Standard-Dosis', go('/einstellungen/bezuege')),
-      direct ? null : listButton('grinder', 'Mühle & Grind-by-Sync', store.server?.grinder?.enabled ? 'Mahlkönig E64 WS, Drehknopf startet Profile' : 'Mahlkönig E64 WS einbinden', go('/einstellungen/muehle'))),
+    // Nach Aufgaben, häufig Genutztes oben; jede Seite mit einklappbaren Bereichen, der meistgenutzte aufgeklappt
+    ...group('Espressomaschine',
+      listButton('thermo', 'Temperaturen & Druck', 'Brühgruppe, Brühkessel, Dampfkessel, Pumpe & Bezugszeit', go('/einstellungen/temperaturen')),
+      listButton('shotlog', 'Bezüge & Waage', isHidden('scale') ? 'Kurze Bezüge aussortieren, Standard-Dosis' : 'Kurze Bezüge aussortieren, Standard-Dosis, Waage', go('/einstellungen/bezuege')),
+      listButton('power', 'Einschalten & Energiesparen', 'Mit/ohne Dampf, Aufheiz-Spülung, Eco und Ausschalten nach', go('/einstellungen/einschalten')),
+      direct ? null : listButton('grinder', 'Mühle & Grind-by-Sync', store.server?.grinder?.enabled ? 'Mahlkönig E64 WS, Drehknopf startet Profile' : 'Mahlkönig E64 WS einbinden', go('/einstellungen/muehle')),
+      direct ? listButton('info', 'Wi-Fi & Firmware', 'WLAN der Maschine, Firmware, Zähler', go('/einstellungen/firmware'))
+        : listButton('coffeeLine', 'Modell, Aussehen & Firmware', 'Neue oder alte Xenia, Adresse, Ansicht unter „Schalter“, Wi-Fi, Firmware', go('/einstellungen/modell'))),
     ...(direct ? [] : group('Server',
       listButton('cloud', 'Von unterwegs', 'Zugriff über den Cloudflare-Tunnel', go('/einstellungen/unterwegs')),
       listButton('bell', 'Benachrichtigungen', 'Push-Meldungen auf diesem Gerät', go('/einstellungen/benachrichtigungen')),
@@ -62,9 +67,17 @@ export function viewPrefsView(root) {
   return () => unsubs.forEach((u) => u());
 }
 
-// Bezüge: gilt auf dem Server bzw. im Direkt-Modus in der App
+// Bezüge & Waage: Aufzeichnung (gilt auf dem Server bzw. im Direkt-Modus in der App) und Zielgewicht der Waage
 export function shotPrefsView(root) {
-  root.append(shotFilterCard());
+  const features = store.server?.features || {};
+  root.append(h('div', { class: 'folds' },
+    openFold(fold('Bezüge', 'shotlog', shotFilterCard())),
+    isHidden('scale') ? null : fold('Waage', 'scale', scaleCard(features))));
+}
+
+// Wi-Fi & Firmware ohne Server (Direkt-Modus); mit Server unter „Modell, Aussehen & Firmware“
+export function firmwareView(root) {
+  root.append(h('div', { class: 'folds' }, ...deviceFolds()));
 }
 
 // Android-App: Erlaubnis „Wecker und Erinnerungen“, damit sich die Widgets alle 5 s aktualisieren
@@ -123,8 +136,10 @@ function appUpdateItem(unsubs) {
   return item;
 }
 
-// --- Maschinen-Einstellungen: Kategorien wie die Seite der Maschine, eingeklappt ------------------------------
-export function machineSettingsView(root) {
+// --- Werte der Maschine: zwei Seiten mit einklappbaren Bereichen ---------------------------------------------
+// part 'temp': Temperaturen & Druck (Brühgruppe aufgeklappt, Brühkessel, Dampfkessel, Pumpe & Bezugszeit)
+// part 'power': Einschalten & Energiesparen (Beim Einschalten aufgeklappt, Energiesparen, Wasser & Stabilität)
+export const machineSettingsView = (part) => (root) => {
   const features = store.server?.features || {};
 
   // Speichern-Leiste für Maschinenwerte aus allen Kategorien
@@ -149,23 +164,18 @@ export function machineSettingsView(root) {
     }
   }
 
-  const slots = { maschine: h('div'), bruehgruppe: h('div'), bruehkessel: h('div'), dampfkessel: h('div'), pumpe: h('div') };
-  slots.maschine.append(h('div', { class: 'muted small' }, 'Lade Einstellungen …'));
-  const wifiBox = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
-  // Wi-Fi nur, wenn die Maschine ihre WLAN-Verbindung über die API meldet (die DBL tut es nicht)
-  const wifiFold = fold('Wi-Fi', 'wifi', wifiBox);
-  wifiFold.hidden = true;
-  const fwBox = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
-
-  root.append(h('div', { class: 'folds' },
-    isHidden('scale') ? null : fold('Waage', 'scale', scaleCard(features)),
-    fold('Maschine', 'settings', slots.maschine, powerPrefCard()),
-    fold('Brühgruppe', 'group', slots.bruehgruppe),
-    fold('Brühkessel', 'boiler', slots.bruehkessel),
-    fold('Dampfkessel', 'cloud', slots.dampfkessel),
-    fold('Pumpe', 'drop', slots.pumpe),
-    wifiFold,
-    fold('Firmware', 'info', fwBox)), savebar);
+  const slots = { start: h('div'), energy: h('div'), water: h('div'), bruehgruppe: h('div'), bruehkessel: h('div'), dampfkessel: h('div'), pumpe: h('div') };
+  const first = part === 'power' ? slots.start : slots.bruehgruppe;
+  first.append(h('div', { class: 'muted small' }, 'Lade Einstellungen …'));
+  // Energiesparen und Wasser & Stabilität nur, wenn die Maschine diese Werte über die API anbietet
+  const energyFold = fold('Energiesparen', 'eco', slots.energy);
+  const waterFold = fold('Wasser & Stabilität', 'drop', slots.water);
+  energyFold.hidden = true;
+  waterFold.hidden = true;
+  root.append(h('div', { class: 'folds' }, ...(part === 'power'
+    ? [openFold(fold('Beim Einschalten', 'power', slots.start, powerPrefCard())), energyFold, waterFold]
+    : [openFold(fold('Brühgruppe', 'group', slots.bruehgruppe)), fold('Brühkessel', 'boiler', slots.bruehkessel),
+      fold('Dampfkessel', 'cloud', slots.dampfkessel), fold('Pumpe & Bezugszeit', 'drop', slots.pumpe)])), savebar);
 
   async function loadMachine() {
     try {
@@ -189,16 +199,20 @@ export function machineSettingsView(root) {
         flushRow = sliderRow({ label: 'Dauer der Aufheiz-Spülung', min: 1, max: 20, step: 1, value: Math.max(1, s.MA_HEATUP_FLUSH_DURATION || 1), unit: 's', digits: 0, onInput: set('MA_HEATUP_FLUSH_DURATION') });
         flushRow.hidden = Number(s.MA_FAST_HEATUP_TYPE) !== 1;
       }
-      slots.maschine.replaceChildren(...group(
+      slots.start.replaceChildren(...group(
         sel('Beim Einschalten', 'MA_BOILER_START_MODE', [[1, 'Brühkessel AN & Dampfkessel AN'], [2, 'Brühkessel AN & Dampfkessel AUS']]),
         classic ? null : sel('Aufheiz-Spülung', 'MA_FAST_HEATUP_TYPE', [[0, 'Keine Spülung'], [1, 'Automatische Spülung']], (v) => { flushRow.hidden = v !== 1; }),
         flushRow,
         pages ? slider('Aufheizphase: automatischer Leerbezug', 'MA_HEATUP_FLUSH_DURATION', 0, 20, 1, 's', 0) : null,
-        pages ? sel('Wasserversorgung', 'MA_FIX_WATER_SUPPLY', [[0, 'Tank'], [1, 'Festwasseranschluss']]) : null,
-        pages ? sel('Thermische Stabilität', 'MA_EXTENDED_THERMAL_STABILITY', [[0, 'normal'], [1, 'optimiert']]) : null,
-        pages ? slider('Eco-Modus nach', 'MA_SET_TIMER_ECO_MA', 1, 240, 1, 'min', 0) : null,
-        pages ? slider('Ausschalten nach', 'MA_SET_TIMER_POWERDOWN', 1, 240, 1, 'min', 0) : null,
         classic && !pages ? h('p', { class: 'muted small' }, 'Diese Firmware erlaubt über die API nur Temperatur und Dampfdruck. Weitere Werte stehen in der Original-Oberfläche.') : null));
+      slots.energy.replaceChildren(...group(
+        pages ? slider('Eco-Modus nach', 'MA_SET_TIMER_ECO_MA', 1, 240, 1, 'min', 0) : null,
+        pages ? slider('Ausschalten nach', 'MA_SET_TIMER_POWERDOWN', 1, 240, 1, 'min', 0) : null));
+      slots.water.replaceChildren(...group(
+        pages ? sel('Wasserversorgung', 'MA_FIX_WATER_SUPPLY', [[0, 'Tank'], [1, 'Festwasseranschluss']]) : null,
+        pages ? sel('Thermische Stabilität', 'MA_EXTENDED_THERMAL_STABILITY', [[0, 'normal'], [1, 'optimiert']]) : null));
+      energyFold.hidden = !slots.energy.children.length;
+      waterFold.hidden = !slots.water.children.length;
       slots.bruehgruppe.replaceChildren(...group(
         slider('Temperatur', 'BG_SET_TEMP', 60, 96, 0.1, '°C'),
         full ? slider('Eco-Temperatur', 'BG_SET_ECO_TEMP', 40, 95, 0.1, '°C') : null,
@@ -219,14 +233,24 @@ export function machineSettingsView(root) {
         !full ? h('p', { class: 'muted small' }, 'Pumpenwerte sind bei dieser Firmware nur in der Original-Oberfläche einstellbar.') : null));
       if (!features.settings) {
         for (const el of Object.values(slots)) el.querySelectorAll('input,select').forEach((x) => { x.disabled = true; });
-        slots.maschine.append(h('p', { class: 'muted small' }, 'Ändern ist unter Einstellungen → Sicherheit → Funktionen ausgeschaltet.'));
+        first.append(h('p', { class: 'muted small' }, 'Ändern ist unter Einstellungen → Sicherheit → Funktionen ausgeschaltet.'));
       }
     } catch (e) {
-      slots.maschine.replaceChildren(h('div', { class: 'muted small' }, e.message));
+      first.replaceChildren(h('div', { class: 'muted small' }, e.message));
     }
   }
   loadMachine();
 
+  return () => savebar.remove();
+};
+
+// Wi-Fi (nur, wenn die Maschine ihre WLAN-Verbindung über die API meldet; die DBL tut es nicht) und Firmware mit
+// Zählern, als einklappbare Bereiche. Inhalt wird einmal geladen.
+export function deviceFolds() {
+  const wifiBox = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
+  const wifiFold = fold('Wi-Fi', 'wifi', wifiBox);
+  wifiFold.hidden = true;
+  const fwBox = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
   (async () => {
     try {
       const d = await api('/api/machine/details');
@@ -259,8 +283,7 @@ export function machineSettingsView(root) {
       fwBox.replaceChildren(h('div', { class: 'muted small' }, e.message));
     }
   })();
-
-  return () => savebar.remove();
+  return [wifiFold, fold('Firmware', 'info', fwBox)];
 }
 
 // Waage: Zielgewicht der Standardbezüge (Skripte 7/8). Die DBL-Oberfläche kennt sie nur als feste Werte.
@@ -333,7 +356,7 @@ function componentsCard() {
 
 // Bezüge unter einer Mindestdauer aussortieren (Backflush, Spülen, Fehlbezüge); gilt auf dem Server bzw. in der App
 function shotFilterCard() {
-  const box = h('div', { class: 'card' }, h('div', { class: 'muted small' }, 'Lade …'));
+  const box = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
   (async () => {
     try {
       const st = await api('/api/shots/settings');

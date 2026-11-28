@@ -9,7 +9,7 @@
     <string name="widget_mode_desc">Status und Ein, Eco, Aus in einer Zeile</string>
     <string name="widget_switch">Xenios – Schalter</string>
     <string name="widget_switch_desc">Ein, Eco, Aus, Dampfkessel und Ohne Dampf einschalten</string>
-    <string name="widget_large">Xenios – Kaffeemaschine groß</string>
+    <string name="widget_large">Xenios – Espressomaschine groß</string>
     <string name="widget_large_desc">Status und Schalter</string>
     <string name="widget_gauges">Xenios – Instrumente</string>
     <string name="widget_gauges_desc">Druck, Brühgruppe, Brühkessel und Dampfkessel mit Zielen</string>
@@ -25,7 +25,7 @@
     <string name="widget_shots_desc">Letzter Bezug und Bezüge pro Tag</string>
     <string name="widget_shotslarge">Xenios – Bezüge groß</string>
     <string name="widget_shotslarge_desc">Letzter Bezug, Bezüge pro Tag und Bezugszeiten</string>
-    <string name="tile_label">Kaffeemaschine</string>
+    <string name="tile_label">Espressomaschine</string>
     <string name="sc_on_short">Einschalten</string>
     <string name="sc_on_long">Maschine einschalten</string>
     <string name="sc_off_short">Ausschalten</string>

@@ -318,6 +318,7 @@ export class Machine extends Emitter {
     this._failSince = null;
     this._offlineNotified = false;
     this._lastAppAction = 0;
+    this._burstUntil = 0; // bis dahin nach einer Aktion schnell abfragen
     this._paddleUntil = 0;
     this._liveStarts = [];    // Startzeiten live erkannter Bezüge, die der Bezugszähler noch nicht mitgezählt hat
     this._lastDiag = null;
@@ -361,6 +362,9 @@ export class Machine extends Emitter {
   _interval() {
     const s = this.state;
     if (s.shot.running || s.status === 4) return this.cfg.pollActiveMs;
+    // nach einer Aktion (App, Widget, Wecker) eine Weile schnell nachsehen, auch ohne offene App: die Maschine meldet
+    // z. B. das Einschalten erst nach einigen Sekunden, sonst bliebe der alte Zustand bis zur nächsten Abfrage (10 s)
+    if (Date.now() < this._burstUntil) return this.cfg.pollActiveMs;
     if (this.viewers > 0) return s.status && s.status !== 0 ? this.cfg.pollActiveMs : this.cfg.pollIdleMs;
     return s.status && s.status !== 0 ? Math.min(this.cfg.pollBackgroundMs, 5000) : this.cfg.pollBackgroundMs;
   }
@@ -1096,6 +1100,7 @@ export class Machine extends Emitter {
 
   _acted() {
     this._lastAppAction = Date.now();
+    this._burstUntil = Date.now() + (this.cfg.actionBurstMs ?? 20000);
     setTimeout(() => this.kick(), 300);
   }
 

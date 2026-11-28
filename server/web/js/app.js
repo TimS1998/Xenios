@@ -1,6 +1,6 @@
 import { pageEnter } from './motion.js'; // zuerst: animiertes Ein- und Ausblenden für die ganze App
 // App-Start: Login, Navigation, Live-Verbindung, Service Worker, Shortcuts.
-import { h, icon, snackbar, closeTopOverlay, dialog } from './ui.js';
+import { h, icon, snackbar, closeTopOverlay } from './ui.js';
 import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder, hasPaddle } from './api.js';
 import { dashboardView } from './views/dashboard.js';
 import { scriptsView, scriptNewView, scriptEditView, profileBuilderView, discoverView } from './views/scripts.js';
@@ -8,7 +8,7 @@ import { controlsView, paddleView } from './views/controls.js';
 import { shotsView } from './views/shots.js';
 import { timerView } from './views/timer.js';
 import { grinderView } from './views/grinder.js';
-import { settingsView, machineSettingsView, appearanceView, viewPrefsView, shotPrefsView } from './views/settings.js';
+import { settingsView, machineSettingsView, appearanceView, viewPrefsView, shotPrefsView, firmwareView } from './views/settings.js';
 import { serverPage } from './views/server.js';
 import { showSetup } from './setup.js';
 import { quickRate, shotPageView } from './views/shot-detail.js';
@@ -34,9 +34,11 @@ const ROUTES = [
   ...[
     ['darstellung', 'Darstellung', appearanceView],
     ['ansicht', 'Leiste & Ansicht', viewPrefsView],
-    ['maschine', 'Maschine', machineSettingsView],
-    ['modell', 'Modell & Aussehen', serverPage('modell'), true],
-    ['bezuege', 'Bezüge', shotPrefsView],
+    ['temperaturen', 'Temperaturen & Druck', machineSettingsView('temp')],
+    ['bezuege', 'Bezüge & Waage', shotPrefsView],
+    ['einschalten', 'Einschalten & Energiesparen', machineSettingsView('power')],
+    ['modell', 'Modell, Aussehen & Firmware', serverPage('modell'), true],
+    ['firmware', 'Wi-Fi & Firmware', firmwareView],
     ['muehle', 'Mühle & Grind-by-Sync', serverPage('muehle'), true],
     ['unterwegs', 'Von unterwegs', serverPage('unterwegs'), true],
     ['benachrichtigungen', 'Benachrichtigungen', serverPage('benachrichtigungen'), true],
@@ -45,7 +47,7 @@ const ROUTES = [
   ].map(([id, title, view, server]) => ({ path: `/einstellungen/${id}`, label: title, icon: 'settings', view, title, nav: false, back: '/einstellungen', server })),
 ];
 // Frühere Adressen der Einstellungen (Lesezeichen, alte Links)
-const MOVED = { '/server': '/einstellungen', '/server#aufzeichnung': '/einstellungen/bezuege', '/einstellungen#aufzeichnung': '/einstellungen/bezuege' };
+const MOVED = { '/einstellungen/maschine': '/einstellungen/temperaturen', '/server': '/einstellungen', '/server#aufzeichnung': '/einstellungen/bezuege', '/einstellungen#aufzeichnung': '/einstellungen/bezuege' };
 
 const $ = (id) => document.getElementById(id);
 
@@ -106,7 +108,7 @@ if (/XeniaApp\//.test(navigator.userAgent)) {
 // Android-Widgets: Farben und Manometer-Design der App für hell und dunkel melden (aufgelöste Farben, #rrggbb).
 // Die Widgets zeichnen sich damit wie die Kacheln; bei „System“ wechseln sie mit der Helligkeit des Handys.
 const WIDGET_COLORS = {
-  bg: '--surface-container-high', onSurface: '--on-surface', muted: '--on-surface-variant', primary: '--primary', onPrimary: '--on-primary',
+  bg: '--surface-container-high', surface: '--surface', onSurface: '--on-surface', muted: '--on-surface-variant', primary: '--primary', onPrimary: '--on-primary',
   primaryContainer: '--primary-container', onPrimaryContainer: '--on-primary-container', secondaryContainer: '--secondary-container',
   onSecondaryContainer: '--on-secondary-container', outline: '--outline', outlineVariant: '--outline-variant', highest: '--surface-container-highest',
   danger: '--danger', onDanger: '--on-danger', dangerContainer: '--danger-container', success: '--success', warning: '--warning',
@@ -527,6 +529,9 @@ function showSetupScreen() {
 async function showApp() {
   window.__authed = true;
   $('login').hidden = true;
+  // Erster Start: erst das Design wählen (Vollbild wie Anmeldung und Einrichtung), dann die App gleich im richtigen
+  // Design aufbauen – Manometer bzw. flache Anzeigen legt eine Seite beim Aufbau fest
+  await chooseDesignOnce();
   $('app').hidden = false;
   buildNav();
   // Erst den Zustand (u. a. Server-Features) holen, sonst fehlen beim direkten Aufruf einer Seite Bedienelemente
@@ -535,12 +540,11 @@ async function showApp() {
   connect();
   $('splash').classList.add('hide');
   handleShortcut();
-  askDesignOnce();
 }
 
 // --- Erster Start: Design wählen ----------------------------------------------------
-// Einmal je Gerät (localStorage „designChosen“). Die Wahl gilt sofort, die App dahinter zeigt sie gleich.
-// Wer schon ein Design gewählt hat, wird nicht gefragt.
+// Einmal je Gerät (localStorage „designChosen“), als eigener Bildschirm nach der Anmeldung bzw. Verbindung und vor
+// der Startseite. Die Wahl gilt sofort für diesen Bildschirm. Wer schon ein Design gewählt hat, wird nicht gefragt.
 const DESIGN_PREVIEW = {
   material: '<svg viewBox="0 0 120 80" aria-hidden="true"><rect width="120" height="80" fill="#f4f3fa"/><rect width="120" height="13" fill="#2f3e74"/>'
     + '<rect x="7" y="18" width="50" height="30" rx="8" fill="#e3e2ec"/><rect x="63" y="18" width="50" height="30" rx="8" fill="#e3e2ec"/>'
@@ -556,30 +560,47 @@ const DESIGN_PREVIEW = {
     + '<rect x="8" y="52" width="50" height="9" rx="2" fill="#f5862f"/><rect x="62" y="52" width="50" height="9" rx="2" fill="#4a4e57"/><rect y="65" width="120" height="15" fill="#383c44"/>'
     + '<circle cx="15" cy="72.5" r="2.4" fill="#f5862f"/><circle cx="37" cy="72.5" r="2.4" fill="#c9ccd3"/><circle cx="60" cy="72.5" r="2.4" fill="#c9ccd3"/><circle cx="83" cy="72.5" r="2.4" fill="#c9ccd3"/><circle cx="105" cy="72.5" r="2.4" fill="#c9ccd3"/></svg>',
 };
-function askDesignOnce() {
-  if (localStorageGet('designChosen')) return;
-  if (localStorageGet('uiStyle')) return localStorageSet('designChosen', '1');
+function chooseDesignOnce() {
+  if (localStorageGet('designChosen')) return Promise.resolve();
+  if (localStorageGet('uiStyle')) {
+    localStorageSet('designChosen', '1');
+    return Promise.resolve();
+  }
   const opts = [
     ['material', 'Material', 'Leiste unten mit Beschriftung, runde Formen, flache Anzeigen'],
     ['xenia', 'Xenia', 'Wie die Oberfläche der Maschine: Manometer, Navigation mit Symbolen'],
   ];
-  const cards = opts.map(([id, title, sub]) => {
-    const pv = h('span', { class: 'pv' });
-    pv.innerHTML = DESIGN_PREVIEW[id]; // feste Grafik aus diesem Modul
-    return h('button', { type: 'button', class: 'design-opt', role: 'radio', dataset: { id }, onclick: () => pick(id) },
-      pv, h('span', { class: 't' }, title), h('span', { class: 's' }, sub));
-  });
-  const paint = () => cards.forEach((c) => c.setAttribute('aria-checked', String(c.dataset.id === uiPalette())));
-  function pick(id) {
-    localStorageSet('uiStyle', id);
-    applyTheme();
+  return new Promise((resolve) => {
+    const cards = opts.map(([id, title, sub]) => {
+      const pv = h('span', { class: 'pv' });
+      pv.innerHTML = DESIGN_PREVIEW[id]; // feste Grafik aus diesem Modul
+      return h('button', { type: 'button', class: 'design-opt', role: 'radio', dataset: { id }, onclick: () => pick(id) },
+        pv, h('span', { class: 't' }, title), h('span', { class: 's' }, sub));
+    });
+    const paint = () => cards.forEach((c) => c.setAttribute('aria-checked', String(c.dataset.id === uiPalette())));
+    function pick(id) {
+      localStorageSet('uiStyle', id);
+      applyTheme();
+      paint();
+    }
+    const screen = $('setup');
+    const done = () => {
+      localStorageSet('designChosen', '1');
+      screen.hidden = true;
+      screen.replaceChildren();
+      resolve();
+    };
+    screen.replaceChildren(h('div', { class: 'setup-card design-card' },
+      h('img', { src: '/icons/icon.svg', alt: '', class: 'login-icon', width: 56, height: 56 }),
+      h('h1', {}, 'Design wählen'),
+      h('p', { class: 'muted' }, 'So sieht Xenios auf diesem Gerät aus. Später änderbar unter Einstellungen → Darstellung.'),
+      h('div', { class: 'design-pick', role: 'radiogroup', 'aria-label': 'Design' }, cards),
+      h('div', { class: 'setup-nav' }, h('span'), h('button', { type: 'button', class: 'btn filled', onclick: done }, 'Weiter'))));
     paint();
-  }
-  paint();
-  dialog('Design wählen', h('div', {},
-    h('p', { class: 'muted' }, 'So sieht Xenios auf diesem Gerät aus. Später änderbar unter Einstellungen → Darstellung.'),
-    h('div', { class: 'design-pick', role: 'radiogroup', 'aria-label': 'Design' }, cards)),
-  [{ label: 'Weiter', value: true, kind: 'filled' }]).then(() => localStorageSet('designChosen', '1'));
+    $('app').hidden = true;
+    screen.hidden = false;
+    $('splash').classList.add('hide');
+  });
 }
 
 setUnauthorizedHandler(() => showLogin());

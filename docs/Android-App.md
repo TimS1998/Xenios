@@ -18,7 +18,7 @@ Native App (Kotlin, ohne Fremd-Bibliotheken, ab Android 11) im Ordner [`app/`](.
 | **Ein/Aus** | 2×1 | Ein Tipp schaltet ein (aus Aus oder Eco) bzw. aus; „Ohne Dampf einschalten“ der App gilt. |
 | **Ein ohne Dampf/Aus** | 2×1 | Ein Tipp schaltet ohne Dampfkessel ein bzw. aus, unabhängig von der Einstellung. |
 | **Ein/Eco/Aus** | 4×1 | Wie das frühere schmale Widget: Zustand und Brühgruppe links, Ein, Eco und Aus rechts in einer Zeile. |
-| **Kaffeemaschine groß** | 4×3 | Status (Brühgruppe, Dampf, nächstes geplantes Einschalten), Plaketten Tank, Dampf, Waage verbunden (alte Xenia), Bezüge heute; Ein/Eco/Aus, Dampfkessel, „Ohne Dampf einschalten“. |
+| **Espressomaschine groß** | 4×3 | Status (Brühgruppe, Dampf, nächstes geplantes Einschalten), Plaketten Tank, Dampf, Waage verbunden (alte Xenia), Bezüge heute; Ein/Eco/Aus, Dampfkessel, „Ohne Dampf einschalten“. |
 | **Schalter** | 4×2 | Wie die Kachel „Schalter“: Ein/Eco/Aus, Dampfkessel, „Ohne Dampf einschalten“, Zustand oben rechts. |
 | **Instrumente** | 4×2 (2×2 bei schmalem Widget) | Druck, Brühgruppe, Brühkessel, Dampfkessel mit Zielen – Manometer (Xenia) oder flache Anzeigen (Material). |
 | **Verlauf (10 min)** | 4×2 | Temperaturen und Drücke der letzten 10 Minuten. |

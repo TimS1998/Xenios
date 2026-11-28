@@ -40,6 +40,8 @@ class WidgetTheme(
     val badgeR get() = if (xenia) 2f else 9f
     private fun col(k: String, light: Int, darkC: Int) = c[k] ?: if (dark) darkC else light
     val bg get() = col("bg", 0xFFFFFFFF.toInt(), 0xFF1F1F25.toInt())
+    /** Seitenhintergrund (--surface), z. B. für den Einrichtungs-Bildschirm */
+    val surface get() = col("surface", 0xFFFBF8FF.toInt(), 0xFF121318.toInt())
     val onSurface get() = col("onSurface", 0xFF1B1B21.toInt(), 0xFFE4E1E9.toInt())
     val muted get() = col("muted", 0xFF46464F.toInt(), 0xFFC6C5D0.toInt())
     val primary get() = col("primary", 0xFF4A5891.toInt(), 0xFFB8C4FF.toInt())
@@ -107,11 +109,13 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
         val rows = WidgetSpecs.ROWS[spec] ?: return emptyMap()
         val pad = WidgetSpecs.PAD
         val out = mutableMapOf<String, RectF>()
-        val total = rows.sumOf { it.weight.toDouble() }.toFloat()
+        // Kopfzeile und Abstand darunter mit fester Höhe (der Titel bleibt oben), der Rest nach Gewicht – wie im Layout
+        val total = rows.filter { !it.fixed }.sumOf { it.weight.toDouble() }.toFloat()
         val inner = hDp - 2 * pad
+        val flex = (inner - rows.filter { it.fixed }.sumOf { it.weight.toDouble() }.toFloat()).coerceAtLeast(0f)
         var y = pad
         for (r in rows) {
-            val h = inner * r.weight / total
+            val h = if (r.fixed) r.weight else if (total > 0f) flex * r.weight / total else 0f
             val rect = RectF(pad, y, wDp - pad, y + h)
             r.name?.let { out[it] = rect }
             r.cols?.let { cols ->

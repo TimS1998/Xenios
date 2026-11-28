@@ -235,7 +235,7 @@ export function showSetup(root, { onDone }) {
         row('Unterwegs', st.tunnel.enabled && st.tunnel.url ? st.tunnel.url : 'später einrichten'),
         st.tunnel.token.trim() ? row('Tunnel-Token', 'wird übernommen') : null,
         row('Zeitzone', st.timezone || 'System')),
-      h('p', { class: 'muted small' }, 'Alles lässt sich später unter Einstellungen ändern: Modell und Mühle unter Kaffeemaschine, Zugänge, Passwort, Funktionen und Zeitzone unter Server.'),
+      h('p', { class: 'muted small' }, 'Alles lässt sich später unter Einstellungen ändern: Modell und Mühle unter Espressomaschine, Zugänge, Passwort, Funktionen und Zeitzone unter Server.'),
       e, nav(() => go(4), finish));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();

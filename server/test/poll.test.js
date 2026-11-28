@@ -26,3 +26,17 @@ test('Erst der zweite Fehlschlag in Folge meldet die Maschine offline', async ()
   assert.equal(await poll(false), true);
   assert.equal(await poll(true), true);
 });
+
+test('Nach dem Einschalten ohne offene App eine Weile schnell abfragen (Widget sieht die Bestätigung)', async () => {
+  const m = new Machine({ machine: { ...DEFAULTS.machine, url: 'http://127.0.0.1:9', api: 'classic' }, features: DEFAULTS.features }, { history: new MemoryStore({ shots: [] }) });
+  m._stopped = true;
+  m.state.status = 0;
+  const posts = [];
+  m.client = { post: async (p, b) => { posts.push(b.action); return {}; } };
+  assert.equal(m._interval(), DEFAULTS.machine.pollBackgroundMs, 'aus, keine App: selten');
+  await m.power('on');
+  assert.deepEqual(posts, ['1']);
+  assert.equal(m._interval(), DEFAULTS.machine.pollActiveMs, 'nach der Aktion schnell, obwohl noch „aus“ gemeldet');
+  m._burstUntil = Date.now() - 1;
+  assert.equal(m._interval(), DEFAULTS.machine.pollBackgroundMs, 'danach wieder selten');
+});

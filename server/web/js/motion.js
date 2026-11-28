@@ -230,6 +230,13 @@ const observer = typeof MutationObserver === 'function' ? new MutationObserver((
   let n = 0;
   for (const r of records) {
     for (const node of r.addedNodes) {
+      // In einen aufgeklappten Bereich nachgeladene Zeilen (statt „Lade …“): Fläche wächst, Inhalt blendet ein –
+      // wie nach der Ladephase, sonst springen sie ohne Übergang herein
+      if (node instanceof HTMLElement && node.parentElement?.closest('details[open] > .fold-body') && !node.__ghost
+        && typeof node.animate === 'function' && !node.closest('[data-noanim]') && node.getClientRects().length && !node.getAnimations?.().length) {
+        grow(node);
+        continue;
+      }
       if (!(node instanceof HTMLElement) || node.parentElement === enterView || !node.matches(ENTER)) continue;
       if (node.parentElement?.classList.contains('stagger')) continue; // blendet schon per CSS gestaffelt ein
       if (node.closest('[data-noanim]') || typeof node.animate !== 'function') continue;

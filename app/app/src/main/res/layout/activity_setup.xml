@@ -21,6 +21,7 @@
             android:src="@mipmap/ic_launcher" />
 
         <TextView
+            android:id="@+id/setup_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -72,6 +73,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:baselineAligned="false"
                 android:orientation="horizontal">
 
                 <Button
@@ -117,6 +119,7 @@
             </LinearLayout>
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -134,6 +137,7 @@
                 android:textColor="@color/on_surface" />
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -151,8 +155,10 @@
                 android:textColor="@color/on_surface" />
 
             <TextView
+                android:tag="hint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:alpha="0.7"
                 android:text="@string/setup_local_hint"
                 android:textColor="@color/on_surface"
@@ -160,6 +166,7 @@
 
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -176,6 +183,7 @@
                 android:textColor="@color/on_surface" />
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -213,6 +221,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:baselineAligned="false"
                 android:orientation="horizontal">
 
                 <Button
@@ -280,6 +289,7 @@
             </RadioGroup>
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -296,6 +306,7 @@
                 android:textColor="@color/on_surface" />
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -312,6 +323,7 @@
                 android:textColor="@color/on_surface" />
 
             <TextView
+                android:tag="label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -327,8 +339,10 @@
                 android:textColor="@color/on_surface" />
 
             <TextView
+                android:tag="hint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:alpha="0.7"
                 android:text="@string/direct_grinder_hint"
                 android:textColor="@color/on_surface"

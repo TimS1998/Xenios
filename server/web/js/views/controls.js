@@ -53,7 +53,8 @@ function s(tag, attrs = {}, ...children) {
 // vier Taster und Display; alte Xenia (DBL, nach Foto): zwei Kippschalter oben, vier Leuchten rechts der Brühgruppe.
 // Nur die Taster bzw. die Schalterseiten sind antippbar. Ansicht, Farbe, Dampflanze und Ventile: Einstellungen →
 // Modell & Aussehen.
-export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left', grip: '#c98a4f', gauge: '#141518' };
+// Griffe der DBL ohne eigene Wahl: Kunststoff schwarz (Standard bei Xenia); Abtropfgitter der DBL ohne eigene Wahl: Edelstahl
+export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left', grip: '#1d1e21', gauge: '#141518', dblTray: '#c4c7cb' };
 const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : null);
 export function machineLook() {
   const l = store.server?.machine?.look || {};
@@ -63,7 +64,8 @@ export function machineLook() {
     steamSide: l.steamSide === 'right' ? 'right' : 'left',
     valves: l.valves === 'rotary' ? 'rotary' : 'lever',
     grip: l.grip === 'chrome' ? 'chrome' : hex(l.grip), // null: Standard des Modells (DBL Holz, neue Xenia Chrom)
-    tray: hex(l.tray) || hex(l.color) || LOOK_DEFAULTS.color, // ohne eigene Farbe wie das Gehäuse
+    tray: hex(l.tray) || hex(l.color) || LOOK_DEFAULTS.color, // ohne eigene Farbe wie das Gehäuse (neue Xenia)
+    trayOwn: hex(l.tray), // eigene Wahl; ohne sie ist das Gitter der DBL aus Edelstahl
     gauge: hex(l.gauge) || LOOK_DEFAULTS.gauge,
     editButton: l.editButton !== false,
   };
@@ -97,9 +99,14 @@ function pickable(g, key, onPick) {
   return g;
 }
 
-function xeniaSvg({ classic, look, onPick }) {
+function xeniaSvg({ classic, look: look0, onPick }) {
+  // DBL: ein Gitter über die ganze Schale, ohne eigene Wahl Edelstahl (nicht die Gehäusefarbe).
+  // Neue Xenia (Mahlkönig): Abtropfschale wie das Gehäuse, Manometer immer schwarz (keine Auswahl)
+  const look = classic
+    ? (look0.trayOwn ? look0 : { ...look0, tray: LOOK_DEFAULTS.dblTray })
+    : { ...look0, tray: look0.color, gauge: LOOK_DEFAULTS.gauge };
   const body = look.color;
-  // Griffe: Farbe (Holzarten, Schwarz, Weiß, eigene) oder Chrom; ohne eigene Wahl DBL Holz, neue Xenia Chrom
+  // Griffe: Farbe (Holzarten, Schwarz, Weiß, eigene) oder Chrom; ohne eigene Wahl DBL Kunststoff schwarz, neue Xenia Chrom
   const grip = look.grip || (classic ? LOOK_DEFAULTS.grip : 'chrome');
   const chromeGrip = grip === 'chrome';
   const tone = chromeGrip ? '#b9bdc2' : grip;
@@ -138,12 +145,16 @@ function xeniaSvg({ classic, look, onPick }) {
     ]),
   ];
 
-  // Abtropfschale mit versetzten Schlitzen
+  // Abtropfschale mit versetzten Schlitzen. Alte Xenia (DBL): ein Gitter über die ganze Schale, in einer Farbe
   const slots = [];
-  for (let r = 0; r < 3; r++) {
-    for (let x = 48 + (r % 2) * 9; x + 13 <= 274; x += 18) slots.push(s('rect', { x, y: 271 + r * 10, width: 13, height: 6, rx: 3, fill: '#0c0d0f' }));
+  const [rows, sx0, sx1, sy0] = classic ? [5, 38, 282, 268] : [3, 48, 274, 271];
+  for (let r = 0; r < rows; r++) {
+    for (let x = sx0 + (r % 2) * 9; x + 13 <= sx1; x += 18) slots.push(s('rect', { x, y: sy0 + r * 10, width: 13, height: 6, rx: 3, fill: '#0c0d0f' }));
   }
-  const tray = [
+  const tray = classic ? [
+    s('rect', { x: 28, y: 262, width: 264, height: 74, rx: 6, fill: 'url(#mTray)', stroke: 'rgba(0,0,0,.45)', 'stroke-width': 0.8 }),
+    ...slots,
+  ] : [
     s('rect', { x: 28, y: 262, width: 264, height: 74, rx: 6, fill: 'url(#mTray)', stroke: 'rgba(0,0,0,.45)', 'stroke-width': 0.8 }),
     s('rect', { x: 40, y: 267, width: 240, height: 33, rx: 4, fill: shade(look.tray, -0.45) }),
     ...slots,
