@@ -32,7 +32,7 @@ class PowerTileService : TileService() {
         if (busy) return
         busy = true
         val wasOn = last?.isOn == true
-        paint(null, busy = true, note = if (wasOn) "Schaltet aus …" else "Schaltet ein …")
+        paint(null, busy = true, note = getString(if (wasOn) R.string.switch_note_off else R.string.switch_note_on))
         thread(name = "xenia-tile") {
             try {
                 Api.toggle(this)
@@ -43,7 +43,7 @@ class PowerTileService : TileService() {
                     if (now.online && now.isOn != wasOn) break
                 }
             } catch (e: Exception) {
-                main.post { Toast.makeText(this, Api.message(e), Toast.LENGTH_SHORT).show() }
+                main.post { Toast.makeText(this, Api.message(this, e), Toast.LENGTH_SHORT).show() }
             } finally {
                 busy = false
             }
@@ -71,7 +71,7 @@ class PowerTileService : TileService() {
         when {
             busy -> {
                 // sofort den Zielzustand zeigen
-                tile.state = if (note == "Schaltet ein …") Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+                tile.state = if (note == getString(R.string.switch_note_on)) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
                 tile.subtitle = note ?: "…"
             }
             s == null || !s.online -> {
@@ -81,11 +81,11 @@ class PowerTileService : TileService() {
             else -> {
                 tile.state = if (s.isOn) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
                 tile.subtitle = when {
-                    s.shot -> "Bezug läuft"
-                    s.isEco -> "Eco"
-                    s.isOff -> "Aus"
-                    s.heated -> "Bereit"
-                    else -> "Heizt auf"
+                    s.shot -> getString(R.string.state_shot)
+                    s.isEco -> getString(R.string.state_eco)
+                    s.isOff -> getString(R.string.state_off)
+                    s.heated -> getString(R.string.state_ready)
+                    else -> getString(R.string.state_heating)
                 }
             }
         }

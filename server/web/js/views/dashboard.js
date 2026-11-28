@@ -10,25 +10,26 @@ import { liveHistory, SERIES } from '../live.js';
 import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
 import { shotMetrics, scriptDuration, brewSeconds, liveTimes } from '../../shared/shot-analysis.js';
+import { t, locale } from '../../shared/i18n.js';
 
 // w: Spalten (0 = ganze Breite), h: Höhe in Zellen. Reihenfolge = Standardanordnung (schmal und breit gleich):
 // Live-Bezug (immer oben), Schalter, Status, Instrumente, Verlauf, Letzter Bezug, Bezüge pro Tag, Bezugszeiten,
 // Sollwerte, Pflege. Breite Ansicht (4 Spalten): Schalter | Status nebeneinander, Instrumente und Verlauf über die
 // ganze Breite, dann Letzter Bezug (2 × 2) mit Bezüge pro Tag / Bezugszeiten und Sollwerte / Pflege rechts daneben.
 const TILES = {
-  shot: { title: 'Live-Bezug', icon: 'coffeeDrip', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
-  control: { title: 'Schalter', icon: 'toggleTile', w: 2, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
-  status: { title: 'Status', icon: 'power', w: 2, h: 1, build: statusTile },
-  gauges: { title: 'Instrumente', icon: 'thermo', w: 0, h: 2, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
-  live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 2, build: liveTile },
-  lastShot: { title: 'Letzter Bezug', icon: 'coffeeLine', w: 2, h: 2, build: lastShotTile, link: '/bezuege' },
-  week: { title: 'Bezüge pro Tag', icon: 'calendarBars', w: 1, h: 1, build: weekTile, link: '/bezuege' },
-  shotTimes: { title: 'Bezugszeiten', icon: 'timer', w: 1, h: 1, build: shotTimesTile, link: '/bezuege' },
-  targets: { title: 'Sollwerte', icon: 'thermo', w: 1, h: 1, note: 'Brühgruppe, Brühkessel und Dampfdruck einstellen', build: targetsTile },
-  care: { title: 'Pflege', icon: 'check', w: 1, h: 1, build: careTile, link: '/bezuege' },
-  lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
-  grinds: { title: 'Mahlgewichte', icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
-  grinder: { title: 'Mühle heute', icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
+  shot: { get title() { return t('home.tiles.shot.title'); }, icon: 'coffeeDrip', w: 0, h: 2, get note() { return t('home.tiles.shot.note'); }, build: shotTile },
+  control: { get title() { return t('home.tiles.control.title'); }, icon: 'toggleTile', w: 2, h: 1, get note() { return t('home.tiles.control.note'); }, build: controlTile },
+  status: { get title() { return t('home.tiles.status.title'); }, icon: 'power', w: 2, h: 1, build: statusTile },
+  gauges: { get title() { return t('home.tiles.gauges.title'); }, icon: 'thermo', w: 0, h: 2, get note() { return t('home.tiles.gauges.note'); }, build: gaugesTile },
+  live: { get title() { return t('home.tiles.live.title'); }, icon: 'history', w: 0, h: 2, build: liveTile },
+  lastShot: { get title() { return t('home.tiles.lastShot.title'); }, icon: 'coffeeLine', w: 2, h: 2, build: lastShotTile, link: '/bezuege' },
+  week: { get title() { return t('home.tiles.week.title'); }, icon: 'calendarBars', w: 1, h: 1, build: weekTile, link: '/bezuege' },
+  shotTimes: { get title() { return t('home.tiles.shotTimes.title'); }, icon: 'timer', w: 1, h: 1, build: shotTimesTile, link: '/bezuege' },
+  targets: { get title() { return t('home.tiles.targets.title'); }, icon: 'thermo', w: 1, h: 1, get note() { return t('home.tiles.targets.note'); }, build: targetsTile },
+  care: { get title() { return t('home.tiles.care.title'); }, icon: 'check', w: 1, h: 1, build: careTile, link: '/bezuege' },
+  lastGrind: { get title() { return t('home.tiles.lastGrind.title'); }, icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
+  grinds: { get title() { return t('home.tiles.grinds.title'); }, icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
+  grinder: { get title() { return t('home.tiles.grinder.title'); }, icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
 };
 const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
@@ -37,8 +38,8 @@ const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende steh
 const MIN_COL = 250;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl (1, 2 oder 4)
 const MAX_COL = 340;        // Höchstbreite einer Spalte: darüber bleibt das Raster schmaler und steht zentriert
 const GAP = 12;
-const WIDTHS = [[1, '1 Spalte'], [2, '2 Spalten'], [3, '3 Spalten'], [0, 'Ganze Breite']];
-const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']];
+const WIDTHS = () => [[1, t('home.customize.columns', { n: 1 })], [2, t('home.customize.columns', { n: 2 })], [3, t('home.customize.columns', { n: 3 })], [0, t('home.customize.fullWidth')]];
+const HEIGHTS = () => [1, 2, 3, 4].map((n) => [n, t('home.customize.height', { n })]);
 const CELL = 180;           // Höhe einer Zelle (px), wie --cell in app.css
 // Mindesthöhe je Kachel in Zellen: wird bei jeder Anordnung für die aktuelle Breite gemessen (Inhalt bei 1 Zelle).
 // Bis dahin (oder für gerade ausgeblendete Kacheln wie den Live-Bezug) gelten diese Werte.
@@ -218,7 +219,7 @@ export function dashboardView(root) {
     if (built.length && lastRects.size) relayout(null, lastRects); else { place(); snap(); }
   });
   root.append(grid);
-  setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Home anpassen', title: 'Home anpassen', onclick: customize }, icon('tune')));
+  setTopActions(h('button', { class: 'icon-btn', 'aria-label': t('home.customize.title'), title: t('home.customize.title'), onclick: customize }, icon('tune')));
 
   let firstBuild = true;
   function build() {
@@ -246,7 +247,7 @@ export function dashboardView(root) {
     }
     if (firstBuild) firstBuild = false;
     else grid.classList.remove('stagger'); // gestaffelter Einflug nur beim Öffnen der Seite
-    grid.replaceChildren(built.length ? built.map((b) => b.el) : h('div', { class: 'empty' }, 'Keine Kachel ausgewählt. Oben rechts lässt sich das Dashboard anpassen.'));
+    grid.replaceChildren(built.length ? built.map((b) => b.el) : h('div', { class: 'empty' }, t('home.customize.empty')));
     measureCols(); // gleich in der richtigen Spaltenzahl aufbauen, nicht erst einspaltig
     place();
     update();
@@ -302,29 +303,29 @@ export function dashboardView(root) {
   function customize() {
     const list = h('div', { class: 'list dash-cfg' });
     const visible = () => layout.tiles.filter((t) => tileVisible(t.id));
-    const paint = () => list.replaceChildren(visible().map((t, i, vis) => {
-      const def = TILES[t.id];
+    const paint = () => list.replaceChildren(visible().map((tile, i, vis) => {
+      const def = TILES[tile.id];
       const move = (d) => {
         const next = vis[i + d];
         if (!next) return;
-        const a = layout.tiles.indexOf(t);
+        const a = layout.tiles.indexOf(tile);
         const b = layout.tiles.indexOf(next);
         [layout.tiles[a], layout.tiles[b]] = [layout.tiles[b], layout.tiles[a]];
         changed('move');
       };
       const pinned = false;
       return h('div', { class: 'list-item dash-cfg-row' },
-        switchEl({ checked: t.on, label: def.title, onChange: (on) => { t.on = on; changed(); } }),
-        h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, 'Immer unter „Status“, gleiche Breite') : def.note ? h('div', { class: 'sub' }, def.note) : null),
+        switchEl({ checked: tile.on, label: def.title, onChange: (on) => { tile.on = on; changed(); } }),
+        h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, t('home.customize.pinnedNote')) : def.note ? h('div', { class: 'sub' }, def.note) : null),
         h('div', { class: 'dash-cfg-ctl' },
-          pinned || cols === 1 ? null : sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
+          pinned || cols === 1 ? null : sizeSelect(WIDTHS(), tile.w, t('home.customize.widthOf', { title: def.title }), (v) => { tile.w = v; changed(); }),
           // Nur Höhen anbieten, in die der Inhalt bei der aktuellen Breite passt
-          cols === 1 ? null : sizeSelect(HEIGHTS.filter(([v]) => v >= minH(t.id)), Math.max(t.h, minH(t.id)), `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
+          cols === 1 ? null : sizeSelect(HEIGHTS().filter(([v]) => v >= minH(tile.id)), Math.max(tile.h, minH(tile.id)), t('home.customize.heightOf', { title: def.title }), (v) => { tile.h = v; changed(); }),
           // Handy: Instrumente 1 × 4 (Standard) oder 2 × 2 (größer)
-          cols === 1 && t.id === 'gauges' ? sizeSelect([[4, '1 × 4'], [2, '2 × 2']], t.arr === 2 ? 2 : 4, `${def.title}: Anordnung`, (v) => { t.arr = v; changed(); }) : null,
-          t.id === 'shot' || pinned ? null : [
-            h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
-            h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
+          cols === 1 && tile.id === 'gauges' ? sizeSelect([[4, '1 × 4'], [2, '2 × 2']], tile.arr === 2 ? 2 : 4, t('home.customize.arrangementOf', { title: def.title }), (v) => { tile.arr = v; changed(); }) : null,
+          tile.id === 'shot' || pinned ? null : [
+            h('button', { class: 'icon-btn', 'aria-label': t('home.customize.moveUp', { title: def.title }), disabled: i === 0, onclick: () => move(-1) }, icon('less')),
+            h('button', { class: 'icon-btn', 'aria-label': t('home.customize.moveDown', { title: def.title }), disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
     }));
     const changed = (kind) => {
       shotFirst(layout.tiles);
@@ -349,16 +350,16 @@ export function dashboardView(root) {
     paint();
     // Wake Lock gibt es im Browser nur über HTTPS (bzw. localhost); in der Android-App immer
     const canWake = typeof window.XeniaApp?.keepScreenOn === 'function' || ('wakeLock' in navigator && window.isSecureContext);
-    sheet('Home anpassen', h('div', {},
+    sheet(t('home.customize.title'), h('div', {},
       h('p', { class: 'muted small' }, cols === 1
-        ? 'Kacheln ein- und ausblenden und ihre Reihenfolge ändern. Auf diesem schmalen Bildschirm stehen alle Kacheln untereinander, jede so hoch wie ihr Inhalt; Breite und Höhe lassen sich ab Tablet-Breite einstellen. Die Auswahl gilt für dieses Gerät.'
-        : 'Breite in Spalten, Höhe in Zellen (wie Android-Widgets). Die Reihenfolge läuft von links nach rechts; schmalere Kacheln füllen ihren Abschnitt spaltenweise von oben nach unten – so bleibt sie auch auf schmaleren Bildschirmen stimmig. Die Auswahl gilt für dieses Gerät.'),
+        ? t('home.customize.introSingle')
+        : t('home.customize.introGrid')),
       list,
-      h('div', { class: 'section-title' }, 'Dieses Gerät'),
+      h('div', { class: 'section-title' }, t('home.customize.thisDevice')),
       h('div', { class: 'list' },
-        canWake ? h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon('screen')), h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Bildschirm anlassen'), h('div', { class: 'sub' }, 'Solange Home offen ist')),
-          switchEl({ checked: layout.keepAwake, label: 'Bildschirm anlassen', onChange: (on) => { layout.keepAwake = on; saveLayout(layout); setAwake(on); } })) : null),
-      h('button', { class: 'btn text wide', onclick: () => { const keep = layout.keepAwake; layout = loadLayoutDefaults(keep); changed(); } }, icon('refresh', 's18'), 'Standard wiederherstellen')));
+        canWake ? h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon('screen')), h('div', { class: 'grow' }, h('div', { class: 'title' }, t('home.customize.keepAwake')), h('div', { class: 'sub' }, t('home.customize.keepAwakeSub'))),
+          switchEl({ checked: layout.keepAwake, label: t('home.customize.keepAwake'), onChange: (on) => { layout.keepAwake = on; saveLayout(layout); setAwake(on); } })) : null),
+      h('button', { class: 'btn text wide', onclick: () => { const keep = layout.keepAwake; layout = loadLayoutDefaults(keep); changed(); } }, icon('refresh', 's18'), t('home.customize.reset'))));
   }
 
   let lastEnded = store.machine?.lastShot?.endedAt;
@@ -447,15 +448,15 @@ function shotTile({ wide, h: rows }) {
       const w = running ? m.scale.weight : ls.weight;
       const flow = running ? (m.scale.rate || m.flow.rate) : null;
       side.replaceChildren(
-        ring(lt?.pre ? 0 : secs / 30, `${fmt(secs, 0)} s`, lt?.pre ? 'Vorbrühen' : null),
+        ring(lt?.pre ? 0 : secs / 30, `${fmt(secs, 0)} s`, lt?.pre ? t('home.shot.preinfusion') : null),
         h('div', { class: 'dash-kpis' },
-          kpi(running ? 'Druck' : 'Max. Druck', fmt(p), 'bar', 'pu'),
-          kpi('Gewicht', w ? fmt(w) : running ? fmt(0) : '–', 'g', 'w'),
-          running ? kpi('Fluss', fmt(flow), 'g/s')
+          kpi(running ? t('home.kpi.pressure') : t('home.kpi.maxPressure'), fmt(p), 'bar', 'pu'),
+          kpi(t('home.kpi.weight'), w ? fmt(w) : running ? fmt(0) : '–', 'g', 'w'),
+          running ? kpi(t('home.kpi.flow'), fmt(flow), 'g/s')
             // Ohne Durchflussmesser (alte Xenia) statt der Wassermenge das Verhältnis
-            : isClassic() ? kpi('Verhältnis', shotMetrics(ls).ratio ? `1:${fmt(shotMetrics(ls).ratio)}` : '–', '')
-            : kpi('Menge', ls.volumeMl ? fmt(ls.volumeMl, 0) : '–', 'ml')));
-      return { extra: running ? h('span', { class: 'badge ok pulse' }, 'Bezug läuft') : h('span', { class: 'badge' }, 'Fertig') };
+            : isClassic() ? kpi(t('home.kpi.ratio'), shotMetrics(ls).ratio ? `1:${fmt(shotMetrics(ls).ratio)}` : '–', '')
+            : kpi(t('home.kpi.amount'), ls.volumeMl ? fmt(ls.volumeMl, 0) : '–', 'ml')));
+      return { extra: running ? h('span', { class: 'badge ok pulse' }, t('home.shot.running')) : h('span', { class: 'badge' }, t('home.shot.done')) };
     },
   };
 }
@@ -469,22 +470,22 @@ function controlTile() {
   let lastM = null;
   let paintNow = () => {};
   const seg = (mode, label, ic) => h('button', { class: 'seg-btn', type: 'button', dataset: { mode }, onclick: (e) => { e.stopPropagation(); setMode(mode); } }, icon(ic, 's18'), label);
-  const btnOn = seg('on', 'Ein', 'power');
-  const btnEco = seg('eco', 'Eco', 'eco');
-  const btnOff = seg('off', 'Aus', 'close');
-  const steamSw = switchEl({ label: 'Dampfkessel', onChange: (on, input) => setSteam(on, input) });
+  const btnOn = seg('on', t('home.control.on'), 'power');
+  const btnEco = seg('eco', t('home.control.eco'), 'eco');
+  const btnOff = seg('off', t('home.control.off'), 'close');
+  const steamSw = switchEl({ label: t('home.control.steamBoiler'), onChange: (on, input) => setSteam(on, input) });
   const steamState = h('span', { class: 'muted small' });
-  const noSteamSw = switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) });
+  const noSteamSw = switchEl({ checked: noSteamOn(), label: t('home.control.noSteam'), onChange: (on) => setNoSteamOn(on) });
   // „Skript stoppen“: erscheint nur, solange ein Skript, Bezug oder Backflush läuft
   const stopBtn = h('button', { class: 'btn danger wide', type: 'button', hidden: true, onclick: () => run(async () => {
     const r = await api('/api/machine/scripts/stop', { method: 'POST' });
-    if (!r.stopped && !r.backflush) throw new Error('Kein Skript aktiv – nichts gestoppt');
-  }, 'Wird gestoppt') }, icon('stop', 's18'), 'Skript stoppen');
+    if (!r.stopped && !r.backflush) throw new Error(t('home.control.noScript'));
+  }, t('home.control.stopping')) }, icon('stop', 's18'), t('home.control.stopScript'));
   const body = h('div', { class: 'dash-control' },
     stopBtn,
     h('div', { class: 'seg' }, btnOn, btnEco, btnOff),
-    h('div', { class: 'ctl-row' }, icon('cloud', 's20'), h('span', { class: 'grow' }, 'Dampfkessel ', steamState), steamSw),
-    h('div', { class: 'ctl-row' }, icon('power', 's20'), h('span', { class: 'grow' }, 'Ohne Dampf einschalten'), noSteamSw));
+    h('div', { class: 'ctl-row' }, icon('cloud', 's20'), h('span', { class: 'grow' }, `${t('home.control.steamBoiler')} `, steamState), steamSw),
+    h('div', { class: 'ctl-row' }, icon('power', 's20'), h('span', { class: 'grow' }, t('home.control.noSteam')), noSteamSw));
 
   async function run(fn, msg) {
     if (busy) return;
@@ -510,17 +511,17 @@ function controlTile() {
   }
   function setMode(mode) {
     const m = store.machine;
-    if (!m?.online) return snackbar('Maschine nicht erreichbar');
+    if (!m?.online) return snackbar(t('home.control.unreachable'));
     if (mode === 'on') {
       const b = powerOnBody();
-      return begin({ mode, steam: b.steam !== false }, () => api('/api/machine/power', { method: 'POST', body: b }), b.steam === false ? 'Xenia wird ohne Dampf eingeschaltet …' : 'Xenia wird eingeschaltet …');
+      return begin({ mode, steam: b.steam !== false }, () => api('/api/machine/power', { method: 'POST', body: b }), b.steam === false ? t('home.control.poweringOnNoSteam') : t('home.control.poweringOn'));
     }
-    if (mode === 'eco') return begin({ mode }, () => api('/api/machine/power', { method: 'POST', body: { mode: 'eco' } }), 'Schaltet auf Eco …');
-    return begin({ mode }, () => api('/api/machine/power', { method: 'POST', body: { mode: 'off' } }), 'Xenia wird ausgeschaltet …');
+    if (mode === 'eco') return begin({ mode }, () => api('/api/machine/power', { method: 'POST', body: { mode: 'eco' } }), t('home.control.toEco'));
+    return begin({ mode }, () => api('/api/machine/power', { method: 'POST', body: { mode: 'off' } }), t('home.control.poweringOff'));
   }
   function setSteam(on, input) {
     if (pending || busy) { input.checked = !on; return; }
-    begin({ steamOnly: on }, () => api('/api/machine/steam', { method: 'POST', body: { on } }), on ? 'Dampfkessel wird eingeschaltet …' : 'Dampfkessel wird ausgeschaltet …');
+    begin({ steamOnly: on }, () => api('/api/machine/steam', { method: 'POST', body: { on } }), on ? t('home.control.steamTurningOn') : t('home.control.steamTurningOff'));
   }
   // Meldet die Maschine den erwarteten Zustand?
   function confirmed(m) {
@@ -541,8 +542,8 @@ function controlTile() {
       paintNow = () => paint(lastM);
       paint(m);
       stopBtn.hidden = !scriptActive(m);
-      stopBtn.lastChild.textContent = m?.backflush ? 'Backflush stoppen' : m?.shot?.script?.title ? `„${m.shot.script.title}“ stoppen` : 'Bezug stoppen';
-      return { extra: !m?.online ? h('span', { class: 'badge bad' }, 'Offline') : null };
+      stopBtn.lastChild.textContent = m?.backflush ? t('home.control.stopBackflush') : m?.shot?.script?.title ? t('home.control.stopNamed', { title: m.shot.script.title }) : t('home.control.stopShot');
+      return { extra: !m?.online ? h('span', { class: 'badge bad' }, t('home.control.offline')) : null };
     },
   };
   function paint(m) {
@@ -565,8 +566,8 @@ function controlTile() {
       const steamPending = pending && 'steamOnly' in pending;
       sIn.checked = steamPending ? pending.steamOnly : Boolean(m?.steamOn);
       sIn.disabled = Boolean(pending) || !online || !(on || eco) || !machineOn(m);
-      steamState.textContent = !online ? '' : steamPending ? (pending.steamOnly ? 'schaltet ein …' : 'schaltet aus …')
-        : m.steamOn ? (m.steamReady ? `bereit · ${fmt(m.pressure.steam, 1)} bar` : `heizt · ${fmt(m.pressure.steam, 1)} bar`) : 'aus';
+      steamState.textContent = !online ? '' : steamPending ? (pending.steamOnly ? t('home.control.steamSwitchingOn') : t('home.control.steamSwitchingOff'))
+        : m.steamOn ? (m.steamReady ? t('home.control.steamReady', { p: fmt(m.pressure.steam, 1) }) : t('home.control.steamHeating', { p: fmt(m.pressure.steam, 1) })) : t('home.control.steamOff');
       noSteamSw.querySelector('input').checked = noSteamOn();
   }
 }
@@ -580,25 +581,25 @@ function statusTile() {
     body: [head, running, meters, chips],
     update({ m, shots }) {
       if (!m) {
-        head.replaceChildren(orb('info', ''), h('div', {}, h('div', { class: 'label' }, 'Keine Daten')));
+        head.replaceChildren(orb('info', ''), h('div', {}, h('div', { class: 'label' }, t('home.status.noData'))));
         return {};
       }
-      const [text, cls, ic] = !m.online ? ['Offline', 'bad', 'warn']
-        : m.statusKey === 'off' ? ['Aus', 'off', 'power']
-        : m.statusKey === 'eco' ? ['Eco', 'off', 'eco']
-        : m.statusKey === 'brewing' ? ['Bezug läuft', 'ok', 'coffeeDrip']
-        : m.statusKey === 'fault' ? ['Störung', 'bad', 'warn']
-        : m.heated ? ['Bereit', 'ok', 'check'] : ['Heizt auf', 'warn', 'thermo'];
+      const [text, cls, ic] = !m.online ? [t('home.status.offline'), 'bad', 'warn']
+        : m.statusKey === 'off' ? [t('home.status.off'), 'off', 'power']
+        : m.statusKey === 'eco' ? [t('home.status.eco'), 'off', 'eco']
+        : m.statusKey === 'brewing' ? [t('home.status.brewing'), 'ok', 'coffeeDrip']
+        : m.statusKey === 'fault' ? [t('home.status.fault'), 'bad', 'warn']
+        : m.heated ? [t('home.status.ready'), 'ok', 'check'] : [t('home.status.heating'), 'warn', 'thermo'];
       head.className = `dash-status ${cls}`;
       head.replaceChildren(orb(ic), h('div', {}, h('div', { class: 'label' }, text),
-        h('div', { class: 'muted small' }, m.online ? `Brühgruppe ${fmt(m.temp.group)} °C` : `Letzter Kontakt ${ago(m.lastSeen)}`)));
+        h('div', { class: 'muted small' }, m.online ? t('home.status.groupTemp', { t: fmt(m.temp.group) }) : t('home.status.lastContact', { ago: ago(m.lastSeen) }))));
       // Laufendes Skript (Name, Zeit, Restzeit soweit bekannt), Backflush-Runde oder die letzte Störung
       const sh = m.shot || {};
       if (m.online && m.backflush) {
         running.hidden = false;
         running.className = 'dash-running';
-        running.replaceChildren(h('div', { class: 'run-title' }, icon('play', 's18'), 'Backflush'),
-          h('div', { class: 'muted small' }, `Runde ${fmtInt(m.backflush.cycle)} von ${fmtInt(m.backflush.cycles)}`),
+        running.replaceChildren(h('div', { class: 'run-title' }, icon('play', 's18'), t('home.status.backflush')),
+          h('div', { class: 'muted small' }, t('home.status.backflushRound', { cycle: fmtInt(m.backflush.cycle), cycles: fmtInt(m.backflush.cycles) })),
           targetBar(m.backflush.cycle, m.backflush.cycles, { max: m.backflush.cycles }));
       } else if (m.online && sh.running) {
         const secs = (sh.timeMs || 0) / 1000;
@@ -606,8 +607,8 @@ function statusTile() {
         const left = total ? Math.max(0, total - secs) : null;
         running.hidden = false;
         running.className = 'dash-running';
-        running.replaceChildren(h('div', { class: 'run-title' }, icon('play', 's18'), sh.script?.title || 'Bezug (an der Maschine gestartet)'),
-          h('div', { class: 'muted small' }, left !== null ? `${fmt(secs, 0)} s · noch etwa ${fmt(left, 0)} s` : `${fmt(secs, 0)} s`),
+        running.replaceChildren(h('div', { class: 'run-title' }, icon('play', 's18'), sh.script?.title || t('home.status.manualShot')),
+          h('div', { class: 'muted small' }, left !== null ? t('home.status.elapsedLeft', { secs: fmt(secs, 0), left: fmt(left, 0) }) : `${fmt(secs, 0)} s`),
           total ? targetBar(Math.min(secs, total), total, { max: total }) : null);
       } else if (m.lastFault) {
         running.hidden = false;
@@ -618,27 +619,27 @@ function statusTile() {
       }
       const on = m.online && m.statusKey !== 'off';
       meters.replaceChildren(
-        on && m.temp.groupSet ? meter('Brühgruppe', `${fmt(m.temp.group)} / ${fmt(m.temp.groupSet)} °C`, targetBar(m.temp.group, m.temp.groupSet, { max: m.temp.groupSet + 5, heating: true })) : null,
-        on && m.temp.boilerSet ? meter('Brühkessel', `${fmt(m.temp.boiler)} / ${fmt(m.temp.boilerSet)} °C`, targetBar(m.temp.boiler, m.temp.boilerSet, { max: m.temp.boilerSet + 5, heating: true })) : null,
-        on && m.steamOn ? meter('Dampfkessel', `${fmt(m.pressure.steam, 2)} / ${fmt(m.pressure.steamSet, 1)} bar`, targetBar(m.pressure.steam, m.pressure.steamSet, { max: (m.pressure.steamSet || 1.5) * 1.3, heating: true })) : null);
+        on && m.temp.groupSet ? meter(t('home.status.group'), `${fmt(m.temp.group)} / ${fmt(m.temp.groupSet)} °C`, targetBar(m.temp.group, m.temp.groupSet, { max: m.temp.groupSet + 5, heating: true })) : null,
+        on && m.temp.boilerSet ? meter(t('home.status.boiler'), `${fmt(m.temp.boiler)} / ${fmt(m.temp.boilerSet)} °C`, targetBar(m.temp.boiler, m.temp.boilerSet, { max: m.temp.boilerSet + 5, heating: true })) : null,
+        on && m.steamOn ? meter(t('home.status.steamBoiler'), `${fmt(m.pressure.steam, 2)} / ${fmt(m.pressure.steamSet, 1)} bar`, targetBar(m.pressure.steam, m.pressure.steamSet, { max: (m.pressure.steamSet || 1.5) * 1.3, heating: true })) : null);
       const today = new Date().toDateString();
       const n = shots.filter((s) => new Date(s.endedAt).toDateString() === today).length;
       chips.replaceChildren(
-        m.tankOk === false ? h('span', { class: 'badge bad' }, 'Tank leer') : m.tankOk ? h('span', { class: 'badge ok' }, 'Tank ok') : null,
-        h('span', { class: 'badge' }, m.steamOn ? (m.steamReady ? 'Dampf bereit' : 'Dampf heizt') : 'Dampf aus'),
+        m.tankOk === false ? h('span', { class: 'badge bad' }, t('home.status.tankEmpty')) : m.tankOk ? h('span', { class: 'badge ok' }, t('home.status.tankOk')) : null,
+        h('span', { class: 'badge' }, m.steamOn ? (m.steamReady ? t('home.status.steamReady') : t('home.status.steamHeating')) : t('home.status.steamOff')),
         // Alte Xenia (DBL): verbundene Bluetooth-Waage
-        m.online && m.scaleLink?.connected && !isHidden('scale') ? h('span', { class: 'badge ok' }, 'Waage verbunden') : null,
-        h('span', { class: 'badge' }, `${fmtInt(n)} ${n === 1 ? 'Bezug' : 'Bezüge'} heute`));
+        m.online && m.scaleLink?.connected && !isHidden('scale') ? h('span', { class: 'badge ok' }, t('home.status.scaleConnected')) : null,
+        h('span', { class: 'badge' }, t('home.status.shotsToday', { n, count: fmtInt(n) })));
       return {};
     },
   };
 }
 
 function gaugesTile({ arr } = {}) {
-  const pressure = createGauge({ title: 'Druck', min: 0, max: 12, majorStep: 2, minorStep: 0.5, redFrom: 11, digits: 1, unit: 'bar', mano: { max: 16, majorStep: 2, minorStep: 1, labelEvery: 2, label: 'POMPA' } });
-  const temp = createGauge({ title: 'Brühgruppe', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20, unit: '°C', mano: { min: 0, max: 120, majorStep: 20, minorStep: 5, labelEvery: 20, label: 'GRUPPO' } });
-  const boiler = createGauge({ title: 'Brühkessel', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20, unit: '°C', mano: { min: 0, max: 120, majorStep: 20, minorStep: 5, labelEvery: 20, label: 'CAFFÈ' } });
-  const steam = createGauge({ title: 'Dampfkessel', min: 0, max: 2.5, majorStep: 0.5, minorStep: 0.1, redFrom: 2, digits: 2, labelEvery: 1, unit: 'bar', mano: { max: 3, majorStep: 0.5, minorStep: 0.1, labelEvery: 0.5, label: 'CALDAIA' } });
+  const pressure = createGauge({ title: t('home.gauges.pressure'), min: 0, max: 12, majorStep: 2, minorStep: 0.5, redFrom: 11, digits: 1, unit: 'bar', mano: { max: 16, majorStep: 2, minorStep: 1, labelEvery: 2, label: 'POMPA' } });
+  const temp = createGauge({ title: t('home.gauges.group'), min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20, unit: '°C', mano: { min: 0, max: 120, majorStep: 20, minorStep: 5, labelEvery: 20, label: 'GRUPPO' } });
+  const boiler = createGauge({ title: t('home.gauges.boiler'), min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20, unit: '°C', mano: { min: 0, max: 120, majorStep: 20, minorStep: 5, labelEvery: 20, label: 'CAFFÈ' } });
+  const steam = createGauge({ title: t('home.gauges.steamBoiler'), min: 0, max: 2.5, majorStep: 0.5, minorStep: 0.1, redFrom: 2, digits: 2, labelEvery: 1, unit: 'bar', mano: { max: 3, majorStep: 0.5, minorStep: 0.1, labelEvery: 0.5, label: 'CALDAIA' } });
   // Die Manometer füllen die Fläche der Kachel: je nach Breite und Höhe in einer Reihe (4 × 1) oder als 2 × 2,
   // je nachdem, was größere Instrumente ergibt. So geht die Kachel bis auf Höhe 1 (flachste Version: kleine Reihe).
   const grid = h('div', { class: 'gauges dash-gauges' }, pressure, temp, boiler, steam);
@@ -676,10 +677,10 @@ function gaugesTile({ arr } = {}) {
     update({ m }) {
       if (!m) return {};
       // Ziele immer zeigen (Druck: eingestellter Pumpendruck; Dampf auch bei ausgeschaltetem Kessel)
-      pressure.update(m.pressure.pump, m.pressure.pumpSet ? `Ziel ${fmt(m.pressure.pumpSet)} bar` : 'bar');
-      temp.update(m.temp.group, m.temp.groupSet ? `Ziel ${fmt(m.temp.groupSet)} °C` : '°C');
-      boiler.update(m.temp.boiler, m.temp.boilerSet ? `Ziel ${fmt(m.temp.boilerSet)} °C` : '°C');
-      steam.update(m.pressure.steam, m.pressure.steamSet ? `${m.steamOn ? '' : 'aus · '}Ziel ${fmt(m.pressure.steamSet, 1)} bar` : (m.steamOn ? 'bar' : 'aus'));
+      pressure.update(m.pressure.pump, m.pressure.pumpSet ? t('home.gauges.targetBar', { v: fmt(m.pressure.pumpSet) }) : 'bar');
+      temp.update(m.temp.group, m.temp.groupSet ? t('home.gauges.targetTemp', { v: fmt(m.temp.groupSet) }) : '°C');
+      boiler.update(m.temp.boiler, m.temp.boilerSet ? t('home.gauges.targetTemp', { v: fmt(m.temp.boilerSet) }) : '°C');
+      steam.update(m.pressure.steam, m.pressure.steamSet ? (m.steamOn ? t('home.gauges.targetBar', { v: fmt(m.pressure.steamSet, 1) }) : t('home.gauges.steamOffTarget', { v: fmt(m.pressure.steamSet, 1) })) : (m.steamOn ? 'bar' : t('home.gauges.off')));
       return {};
     },
   };
@@ -704,7 +705,7 @@ function lastShotTile({ wide }) {
       const ls = m?.lastShot;
       if (!ls) {
         curve = null;
-        head.replaceChildren(h('div', { class: 'empty' }, 'Noch kein Bezug'));
+        head.replaceChildren(h('div', { class: 'empty' }, t('home.lastShot.none')));
         draw();
         return {};
       }
@@ -712,13 +713,13 @@ function lastShotTile({ wide }) {
       const ratio = met.ratio;
       const amount = met.yieldG ? [fmt(met.yieldG), 'g'] : ls.volumeMl ? [fmt(ls.volumeMl, 0), 'ml'] : ['–', ''];
       head.replaceChildren(
-        h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(met.timeS), 's'), kpi('Menge', amount[0], amount[1], 'w'),
-          ratio ? kpi('Verhältnis', `1:${fmt(ratio)}`, '') : kpi('Max. Druck', fmt(ls.maxPressure), 'bar', 'pu')),
-        ls.curve?.length > 1 ? null : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
+        h('div', { class: 'dash-kpis' }, kpi(t('home.kpi.time'), fmt(met.timeS), 's'), kpi(t('home.kpi.amount'), amount[0], amount[1], 'w'),
+          ratio ? kpi(t('home.kpi.ratio'), `1:${fmt(ratio)}`, '') : kpi(t('home.kpi.maxPressure'), fmt(ls.maxPressure), 'bar', 'pu')),
+        ls.curve?.length > 1 ? null : h('p', { class: 'muted small' }, t('home.lastShot.noCurve')));
       curve = ls.curve?.length > 1 ? ls.curve : null;
       draw();
       if (curve && !fit.clientHeight) requestAnimationFrame(draw); // erst nach dem Einfügen messbar
-      return { extra: `${ls.notes?.rating ? `${'★'.repeat(ls.notes.rating)} · ` : ''}${ago(ls.endedAt)}${ls.estimated ? ' · nachträglich' : ''}` };
+      return { extra: `${ls.notes?.rating ? `${'★'.repeat(ls.notes.rating)} · ` : ''}${ls.estimated ? t('home.lastShot.agoEstimated', { ago: ago(ls.endedAt) }) : ago(ls.endedAt)}` };
     },
   };
 }
@@ -729,27 +730,27 @@ function lastGrindTile() {
     body: box,
     update({ g }) {
       if (!g) {
-        box.replaceChildren(h('div', { class: 'empty' }, 'Mühle nicht eingerichtet'));
+        box.replaceChildren(h('div', { class: 'empty' }, t('home.grind.notSetUp')));
         return {};
       }
       const last = g.grinds?.[0] || g.stats?.lastGrind;
       if (!last) {
-        box.replaceChildren(h('div', { class: 'empty' }, g.online ? 'Noch keine Mahlvorgänge' : 'Mühle offline'));
+        box.replaceChildren(h('div', { class: 'empty' }, g.online ? t('home.grind.none') : t('home.grind.offline')));
         return {};
       }
       const recipe = g.recipes?.find((r) => r.index === last.recipe);
       box.replaceChildren(
         h('div', { class: 'big-row' },
           h('div', { class: 'big' }, last.success && last.weightG ? fmt(last.weightG) : '–', h('span', { class: 'unit' }, ' g')),
-          h('div', { class: 'muted' }, last.targetG ? `Ziel ${fmt(last.targetG)} g` : last.mode === 'ByTime' ? 'nach Zeit' : '')),
-        last.success && last.weightG ? targetBar(last.weightG, last.targetG) : h('span', { class: 'badge bad' }, 'Abgebrochen'),
+          h('div', { class: 'muted' }, last.targetG ? t('home.grind.target', { v: fmt(last.targetG) }) : last.mode === 'ByTime' ? t('home.grind.byTime') : '')),
+        last.success && last.weightG ? targetBar(last.weightG, last.targetG) : h('span', { class: 'badge bad' }, t('home.grind.aborted')),
         h('div', { class: 'chips' },
           h('span', { class: 'badge' }, `${fmt(last.durationMs / 1000)} s`),
-          last.recipe ? h('span', { class: 'badge' }, `Rezept ${last.recipe}${recipe?.type ? ` · ${TYPE_DE[recipe.type] || recipe.type}` : ''}`) : null,
+          last.recipe ? h('span', { class: 'badge' }, recipe?.type ? t('home.grind.recipeType', { n: last.recipe, type: TYPE_DE[recipe.type] || recipe.type }) : t('home.grind.recipe', { n: last.recipe })) : null,
           TRIGGER_DE[last.trigger] ? h('span', { class: 'badge' }, TRIGGER_DE[last.trigger]) : null,
           last.ddd != null ? h('span', { class: 'badge' }, `${fmtInt(last.ddd)} µm`) : null,
-          last.gbs ? h('span', { class: 'badge ok' }, 'Grind-by-Sync') : null,
-          !g.online ? h('span', { class: 'badge bad' }, 'offline') : null));
+          last.gbs ? h('span', { class: 'badge ok' }, t('home.grind.gbs')) : null,
+          !g.online ? h('span', { class: 'badge bad' }, t('home.grind.offlineBadge')) : null));
       return { extra: ago(last.at) };
     },
   };
@@ -765,15 +766,15 @@ function weekTile() {
         const d = new Date();
         d.setHours(0, 0, 0, 0);
         d.setDate(d.getDate() - i);
-        days.push({ key: d.toDateString(), label: i === 0 ? 'heute' : d.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', ''), value: 0, cls: i === 0 ? 'now' : '' });
+        days.push({ key: d.toDateString(), label: i === 0 ? t('home.week.today') : d.toLocaleDateString(locale(), { weekday: 'short' }).replace('.', ''), value: 0, cls: i === 0 ? 'now' : '' });
       }
       for (const s of shots) {
         const day = days.find((d) => d.key === new Date(s.endedAt).toDateString());
         if (day) day.value++;
       }
       const sum = days.reduce((a, d) => a + d.value, 0);
-      box.replaceChildren(sum ? barChart(days) : h('div', { class: 'empty' }, 'Keine Bezüge in den letzten 7 Tagen'));
-      return { extra: `${fmtInt(sum)} in 7 Tagen` };
+      box.replaceChildren(sum ? barChart(days) : h('div', { class: 'empty' }, t('home.week.none')));
+      return { extra: t('home.week.sum', { n: fmtInt(sum) }) };
     },
   };
 }
@@ -785,16 +786,16 @@ function shotTimesTile() {
     update({ shots }) {
       const list = shots.filter((s) => !s.estimated && brewSeconds(s) > 0).slice(0, 12).reverse();
       if (!list.length) {
-        box.replaceChildren(h('div', { class: 'empty' }, 'Noch keine Bezüge mit Zeit'));
+        box.replaceChildren(h('div', { class: 'empty' }, t('home.shotTimes.none')));
         return {};
       }
       const avg = list.reduce((a, s) => a + brewSeconds(s), 0) / list.length;
       box.replaceChildren(barChart(list.map((s, i) => ({
         value: brewSeconds(s),
-        label: new Date(s.endedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        label: new Date(s.endedAt).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }),
         cls: i === list.length - 1 ? 'now' : '',
       })), { unit: 's' }));
-      return { extra: `Ø ${fmt(avg, 0)} s` };
+      return { extra: t('home.shotTimes.avg', { v: fmt(avg, 0) }) };
     },
   };
 }
@@ -805,21 +806,21 @@ function grindsTile() {
     body: box,
     update({ g }) {
       if (!g) {
-        box.replaceChildren(h('div', { class: 'empty' }, 'Mühle nicht eingerichtet'));
+        box.replaceChildren(h('div', { class: 'empty' }, t('home.grind.notSetUp')));
         return {};
       }
       // Spülen/abgebrochene Mahlvorgänge (unter halbem Ziel) verzerren die Skala und sagen über die Genauigkeit nichts
       const list = (g.grinds || []).filter((x) => x.success && x.weightG >= 1 && (!x.targetG || x.weightG >= x.targetG / 2)).slice(0, 12).reverse();
       if (!list.length) {
-        box.replaceChildren(h('div', { class: 'empty' }, 'Noch keine Mahlvorgänge'));
+        box.replaceChildren(h('div', { class: 'empty' }, t('home.grind.none')));
         return {};
       }
       box.replaceChildren(barChart(list.map((x) => {
         const off = x.targetG ? Math.abs(x.weightG - x.targetG) / x.targetG : null;
-        return { value: x.weightG, mark: x.targetG, label: x.recipe ? `R${x.recipe}` : '', cls: off === null ? '' : off <= 0.03 ? 'ok' : off <= 0.08 ? 'warn' : 'bad' };
-      }), { unit: 'g', digits: 1 }), h('div', { class: 'legend muted small' }, h('span', { class: 'mark-key' }), 'Ziel', h('span', { class: 'sw ok' }), '±3 %', h('span', { class: 'sw warn' }), '±8 %'));
+        return { value: x.weightG, mark: x.targetG, label: x.recipe ? t('home.grind.recipeShort', { n: x.recipe }) : '', cls: off === null ? '' : off <= 0.03 ? 'ok' : off <= 0.08 ? 'warn' : 'bad' };
+      }), { unit: 'g', digits: 1 }), h('div', { class: 'legend muted small' }, h('span', { class: 'mark-key' }), t('home.grind.legendTarget'), h('span', { class: 'sw ok' }), '±3 %', h('span', { class: 'sw warn' }), '±8 %'));
       const dev = g.stats?.avgDeviationG;
-      return { extra: dev !== null && dev !== undefined ? `Ø Abw. ${fmt(dev, 2)} g` : '' };
+      return { extra: dev !== null && dev !== undefined ? t('home.grind.avgDeviation', { v: fmt(dev, 2) }) : '' };
     },
   };
 }
@@ -830,7 +831,7 @@ function grinderTile() {
     body: box,
     update({ g }) {
       if (!g) {
-        box.replaceChildren(h('div', { class: 'empty' }, 'Mühle nicht eingerichtet'));
+        box.replaceChildren(h('div', { class: 'empty' }, t('home.grind.notSetUp')));
         return {};
       }
       const st = g.stats || {};
@@ -838,14 +839,14 @@ function grinderTile() {
       const recipe = g.recipes?.find((r) => r.selected);
       box.replaceChildren(
         h('div', { class: 'dash-kpis' },
-          kpi('Mahlvorgänge', fmtInt(st.today ?? 0), ''),
-          kpi('Kaffee', fmt(st.todayCoffeeG ?? 0), 'g'),
-          kpi('Gesamt', fmtInt(st.totalGrinds ?? 0), '')),
+          kpi(t('home.kpi.grinds'), fmtInt(st.today ?? 0), ''),
+          kpi(t('home.kpi.coffee'), fmt(st.todayCoffeeG ?? 0), 'g'),
+          kpi(t('home.kpi.total'), fmtInt(st.totalGrinds ?? 0), '')),
         h('div', { class: 'chips' },
-          h('span', { class: `badge ${g.online ? 'ok' : 'bad'}` }, g.online ? 'online' : 'offline'),
-          recipe ? h('span', { class: 'badge' }, `Rezept ${recipe.index} gewählt`) : null,
+          h('span', { class: `badge ${g.online ? 'ok' : 'bad'}` }, g.online ? t('home.grind.online') : t('home.grind.offlineBadge')),
+          recipe ? h('span', { class: 'badge' }, t('home.grind.recipeSelected', { n: recipe.index })) : null,
           ...alerts.slice(0, 3).map((a) => h('span', { class: 'badge warn' }, ALERT_TEXT[a.type] || a.type))));
-      return { extra: g.lastSync ? `Stand ${ago(g.lastSync)}` : '' };
+      return { extra: g.lastSync ? t('home.grind.syncedAgo', { ago: ago(g.lastSync) }) : '' };
     },
   };
 }
@@ -860,7 +861,7 @@ function liveTile({ wide, h: rows, relayout }) {
     const tile = toggle.closest('.tile');
     const opening = values.hidden;
     toggle.setAttribute('aria-expanded', String(opening));
-    toggle.lastChild.textContent = opening ? 'Werte ausblenden' : 'Alle Werte';
+    toggle.lastChild.textContent = opening ? t('home.live.hideAll') : t('home.live.showAll');
     const ease = { duration: 180, easing: 'cubic-bezier(.2, 0, 0, 1)' };
     if (opening) {
       // Diagramm behält seine Höhe; die Kachel wächst animiert, dann blenden die Werte ein
@@ -879,7 +880,7 @@ function liveTile({ wide, h: rows, relayout }) {
       };
       if (out) out.onfinish = done; else done();
     }
-  } }, icon('more', 's18'), h('span', {}, 'Alle Werte'));
+  } }, icon('more', 's18'), h('span', {}, t('home.live.showAll')));
   const row = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
   return {
     body: [box, h('div', { class: 'live-foot' }, legend, toggle), values],
@@ -896,16 +897,16 @@ function liveTile({ wide, h: rows, relayout }) {
   function fill(m) {
       if (m) {
         values.replaceChildren(
-          ...row('Brühgruppe', `${fmt(m.temp.group)} °C (Ziel ${fmt(m.temp.groupSet)})`),
-          ...row('Brühkessel', `${fmt(m.temp.boiler)} °C (Ziel ${fmt(m.temp.boilerSet)})`),
-          ...row('Pumpendruck', `${fmt(m.pressure.pump)} bar`),
-          ...row('Dampfkessel', m.steamOn ? `${fmt(m.pressure.steam, 2)} bar (Ziel ${fmt(m.pressure.steamSet)})` : `aus (Ziel ${fmt(m.pressure.steamSet)} bar)`),
-          ...row('Heizleistung Gruppe / Kessel', `${fmt(m.power?.group, 0)} % / ${fmt(m.power?.boiler, 0)} %`),
-          ...row('Pumpenleistung', `${fmt(m.power?.pump, 0)} %`),
-          ...(isHidden('scale') ? [] : row('Waage', `${fmt(m.scale?.weight)} g · ${fmt(m.scale?.rate)} g/s`)),
+          ...row(t('home.live.group'), t('home.live.tempValue', { v: fmt(m.temp.group), set: fmt(m.temp.groupSet) })),
+          ...row(t('home.live.boiler'), t('home.live.tempValue', { v: fmt(m.temp.boiler), set: fmt(m.temp.boilerSet) })),
+          ...row(t('home.live.pump'), `${fmt(m.pressure.pump)} bar`),
+          ...row(t('home.live.steamBoiler'), m.steamOn ? t('home.live.steamOnValue', { v: fmt(m.pressure.steam, 2), set: fmt(m.pressure.steamSet) }) : t('home.live.steamOffValue', { set: fmt(m.pressure.steamSet) })),
+          ...row(t('home.live.heating'), `${fmt(m.power?.group, 0)} % / ${fmt(m.power?.boiler, 0)} %`),
+          ...row(t('home.live.pumpPower'), `${fmt(m.power?.pump, 0)} %`),
+          ...(isHidden('scale') ? [] : row(t('home.live.scale'), `${fmt(m.scale?.weight)} g · ${fmt(m.scale?.rate)} g/s`)),
           // Die alte Xenia (DBL) hat keinen Durchflussmesser (Felder stehen immer auf 0)
-          ...(isClassic() ? [] : row('Durchfluss', `${fmt(m.flow?.ml ?? m.flow?.volume, 0)} ml · ${fmt(m.flow?.rate)} ml/s`)),
-          ...row('Wassertank', m.tankOk === false ? 'leer' : m.tankOk ? 'ok' : '–'));
+          ...(isClassic() ? [] : row(t('home.live.flow'), `${fmt(m.flow?.ml ?? m.flow?.volume, 0)} ml · ${fmt(m.flow?.rate)} ml/s`)),
+          ...row(t('home.live.tank'), m.tankOk === false ? t('home.live.tankEmpty') : m.tankOk ? t('home.live.tankOk') : '–'));
       }
   }
 }
@@ -930,12 +931,12 @@ function fitIntoView(el, dir = 0) {
 // Ein gespeicherter Wert bleibt stehen, bis die Maschine ihn meldet (höchstens 8 s).
 function targetsTile() {
   const rows = [
-    { key: 'BG_SET_TEMP', label: 'Brühgruppe', min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.groupSet },
-    { key: 'BB_SET_TEMP', label: 'Brühkessel', min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.boilerSet },
-    { key: 'SB_SET_PRESS', label: 'Dampfdruck', min: 0, max: 1.8, step: 0.1, unit: 'bar', read: (m) => m.pressure?.steamSet },
+    { key: 'BG_SET_TEMP', label: t('home.targets.group'), min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.groupSet },
+    { key: 'BB_SET_TEMP', label: t('home.targets.boiler'), min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.boilerSet },
+    { key: 'SB_SET_PRESS', label: t('home.targets.steamPressure'), min: 0, max: 1.8, step: 0.1, unit: 'bar', read: (m) => m.pressure?.steamSet },
   ].map((r) => {
     const st = { ...r, value: null, timer: null, hold: null };
-    const val = h('button', { class: 'tgt-val num', type: 'button', title: 'Wert eingeben', onclick: async (e) => {
+    const val = h('button', { class: 'tgt-val num', type: 'button', title: t('home.targets.enterValue'), onclick: async (e) => {
       e.stopPropagation();
       const n = await promptNumber(r.label, { value: st.value, min: r.min, max: r.max, step: 0.1, unit: r.unit });
       if (n === null || Number.isNaN(n)) return;
@@ -950,14 +951,14 @@ function targetsTile() {
         try {
           await api('/api/machine/settings', { method: 'POST', body: { changes: { [r.key]: st.value } } });
           st.hold = { value: st.value, until: Date.now() + 8000 };
-          snackbar(`${r.label}: ${fmt(st.value)} ${r.unit} gespeichert`);
+          snackbar(t('home.targets.saved', { label: r.label, value: fmt(st.value), unit: r.unit }));
         } catch (e) { snackbar(e.message); }
       }, delay);
     };
     st.el = h('div', { class: 'tgt-row' }, h('span', { class: 'grow' }, r.label),
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': `${r.label} verringern`, onclick: (e) => { e.stopPropagation(); if (st.value !== null) set(st.value - r.step); } }, icon('more', 's20')),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('home.targets.decrease', { label: r.label }), onclick: (e) => { e.stopPropagation(); if (st.value !== null) set(st.value - r.step); } }, icon('more', 's20')),
       val,
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': `${r.label} erhöhen`, onclick: (e) => { e.stopPropagation(); if (st.value !== null) set(st.value + r.step); } }, icon('less', 's20')));
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('home.targets.increase', { label: r.label }), onclick: (e) => { e.stopPropagation(); if (st.value !== null) set(st.value + r.step); } }, icon('less', 's20')));
     st.val = val;
     return st;
   });
@@ -973,7 +974,7 @@ function targetsTile() {
           r.val.textContent = `${fmt(v)} ${r.unit}`;
         }
       }
-      return { extra: m.online ? null : h('span', { class: 'badge bad' }, 'Offline') };
+      return { extra: m.online ? null : h('span', { class: 'badge bad' }, t('home.targets.offline')) };
     },
   };
 }
@@ -989,9 +990,9 @@ function careTile() {
       box.replaceChildren(h('div', { class: `care-row ${b.due ? 'due' : ''}` },
         ring(pct, b.daysSince === null ? '–' : `${b.daysSince} d`),
         h('div', {},
-          h('div', { class: 'label' }, b.due ? 'Backflush fällig' : 'Backflush ok'),
-          h('div', { class: 'muted small' }, b.lastAt ? `${fmtInt(b.shotsSince)} Bezüge seit dem letzten · alle ${b.intervalDays} Tage` : 'Noch nie eingetragen'))));
-      return { extra: b.due ? h('span', { class: 'badge warn' }, 'fällig') : '' };
+          h('div', { class: 'label' }, b.due ? t('home.care.due') : t('home.care.ok')),
+          h('div', { class: 'muted small' }, b.lastAt ? t('home.care.since', { shots: fmtInt(b.shotsSince), days: b.intervalDays }) : t('home.care.never')))));
+      return { extra: b.due ? h('span', { class: 'badge warn' }, t('home.care.dueBadge')) : '' };
     },
   };
 }

@@ -1,5 +1,6 @@
 // Auswertung eines Bezugs: Zielkurve aus den Skript-Schritten, Kennzahlen aus der Kurve und ein Mahlgrad-Tipp.
 // Läuft im Browser (Detailansicht) und in den Tests. Kurvenpunkte: [Zeit s, Druck bar, Gewicht g, Menge ml].
+import { t } from './i18n.js';
 
 // Soll-Druck über die Zeit aus Skript-Schritten (Anzeigeeinheiten wie im Editor: bar, s).
 // Pumpendruck (4) gibt den Druck für eine Dauer vor; Warten (12) nach „Pumpe aus“ ist drucklos.
@@ -161,16 +162,16 @@ export function grindAdvice(shot, m = shotMetrics(shot)) {
   const long = m.ratio !== null && m.ratio > 2.6;
   const short = m.ratio !== null && m.ratio < 1.7;
   if (taste === 'sour') {
-    if (short) return { dir: 'longer', text: 'Sauer und kurzes Verhältnis: etwas mehr Ausbeute laufen lassen oder feiner mahlen.' };
-    return { dir: 'finer', text: 'Sauer: feiner mahlen (oder Brühtemperatur leicht erhöhen).' };
+    if (short) return { dir: 'longer', text: t('shots.analysis.grind.sourShort') };
+    return { dir: 'finer', text: t('shots.analysis.grind.sour') };
   }
   if (taste === 'bitter') {
-    if (long) return { dir: 'shorter', text: 'Bitter und langes Verhältnis: früher stoppen oder gröber mahlen.' };
-    return { dir: 'coarser', text: 'Bitter: gröber mahlen (oder Brühtemperatur leicht senken).' };
+    if (long) return { dir: 'shorter', text: t('shots.analysis.grind.bitterLong') };
+    return { dir: 'coarser', text: t('shots.analysis.grind.bitter') };
   }
-  if (taste === 'balanced') return { dir: 'keep', text: 'Ausgewogen: so lassen und als Referenz merken.' };
-  if (fast) return { dir: 'finer', text: `Mit ${m.timeS} s eher schnell: feiner mahlen.` };
-  if (slow) return { dir: 'coarser', text: `Mit ${m.timeS} s eher langsam: gröber mahlen.` };
+  if (taste === 'balanced') return { dir: 'keep', text: t('shots.analysis.grind.balanced') };
+  if (fast) return { dir: 'finer', text: t('shots.analysis.grind.fast', { s: m.timeS }) };
+  if (slow) return { dir: 'coarser', text: t('shots.analysis.grind.slow', { s: m.timeS }) };
   return null;
 }
 
@@ -178,16 +179,21 @@ export function grindAdvice(shot, m = shotMetrics(shot)) {
 // Wie der „Coffee Compass“: Geschmack (sauer ↔ bitter) sagt, ob mehr oder weniger extrahiert werden muss (Mahlgrad),
 // Stärke (dünn ↔ kräftig) sagt, ob das Verhältnis passt (Ausbeute/Dosis). Dazu die Zeit und der Verlauf der letzten
 // bewerteten Bezüge derselben Bohne: zweimal sauer → mutiger feiner; von bitter nach sauer → halber Schritt zurück.
-export const STRENGTH = { weak: 'dünn', ok: 'passt', strong: 'kräftig' };
-
-const DIAL_TITLE = {
-  finer: ['Etwas feiner', 'Feiner mahlen', 'Deutlich feiner'],
-  coarser: ['Etwas gröber', 'Gröber mahlen', 'Deutlich gröber'],
-  keep: ['So lassen', 'So lassen', 'So lassen'],
-  longer: ['Mehr Ausbeute', 'Mehr Ausbeute', 'Mehr Ausbeute'],
-  shorter: ['Weniger Ausbeute', 'Weniger Ausbeute', 'Weniger Ausbeute'],
-  puck: ['Puck prüfen', 'Puck prüfen', 'Puck prüfen'],
+// Bezeichnungen erst beim Lesen (Sprache je Gerät); Schlüssel, `in` und Object.entries wie bei einem festen Objekt
+export const STRENGTH = {
+  get weak() { return t('shots.analysis.strength.weak'); },
+  get ok() { return t('shots.analysis.strength.ok'); },
+  get strong() { return t('shots.analysis.strength.strong'); },
 };
+
+const DIAL_TITLE = () => ({
+  finer: [t('shots.analysis.dialTitle.slightlyFiner'), t('shots.analysis.dialTitle.finer'), t('shots.analysis.dialTitle.muchFiner')],
+  coarser: [t('shots.analysis.dialTitle.slightlyCoarser'), t('shots.analysis.dialTitle.coarser'), t('shots.analysis.dialTitle.muchCoarser')],
+  keep: Array(3).fill(t('shots.analysis.dialTitle.keep')),
+  longer: Array(3).fill(t('shots.analysis.dialTitle.longer')),
+  shorter: Array(3).fill(t('shots.analysis.dialTitle.shorter')),
+  puck: Array(3).fill(t('shots.analysis.dialTitle.puck')),
+});
 
 // Pumpzeit des Skripts (für lange Profile wie Blooming gelten andere Zeiten)
 function plannedSeconds(steps) {
@@ -215,34 +221,34 @@ export function dialIn(shot, earlier = []) {
   const long = planned !== null && planned > 32; // Profil mit langer Pumpzeit: Zeitregeln gelten nicht
   const fast = !long && m.timeS !== null && m.timeS < 22;
   const slow = !long && m.timeS !== null && m.timeS > 35;
-  const t = m.timeS !== null ? `${String(m.timeS).replace('.', ',')} s` : '';
+  const time = m.timeS !== null ? `${String(m.timeS).replace('.', ',')} s` : '';
   const pt = prev?.notes?.taste;
-  const out = (dir, size, text) => ({ dir, size, title: DIAL_TITLE[dir][size], text, anchor, trail });
+  const out = (dir, size, text) => ({ dir, size, title: DIAL_TITLE()[dir][size], text, anchor, trail });
 
   if (n.taste === 'sour') {
-    if (n.strength === 'strong') return out('longer', 1, 'Sauer, aber kräftig: mehr Ausbeute laufen lassen (Verhältnis etwa +0,3), Mahlgrad lassen.');
-    if (slow) return out('puck', 1, `Sauer trotz ${t}: eher ungleichmäßig durchströmt oder zu kühl. Kaffee im Sieb gleichmäßig verteilen, Brühtemperatur 1 °C höher – Mahlgrad erst einmal lassen.`);
-    if (pt === 'bitter') return out('finer', 0, 'Vorher bitter, jetzt sauer: der Punkt liegt dazwischen. Einen halben Schritt zurück Richtung feiner.');
-    if (pt === 'sour') return out('finer', 2, 'Wieder sauer: diesmal einen größeren Schritt feiner.');
-    if (fast) return out('finer', 2, `Sauer und schnell (${t}): deutlich feiner mahlen.`);
-    return out('finer', 1, n.strength === 'weak' ? 'Sauer und dünn: feiner mahlen (oder 0,5 g mehr Dosis).' : 'Sauer: feiner mahlen.');
+    if (n.strength === 'strong') return out('longer', 1, t('shots.analysis.dial.sourStrong'));
+    if (slow) return out('puck', 1, t('shots.analysis.dial.sourSlow', { time }));
+    if (pt === 'bitter') return out('finer', 0, t('shots.analysis.dial.sourAfterBitter'));
+    if (pt === 'sour') return out('finer', 2, t('shots.analysis.dial.sourAgain'));
+    if (fast) return out('finer', 2, t('shots.analysis.dial.sourFast', { time }));
+    return out('finer', 1, n.strength === 'weak' ? t('shots.analysis.dial.sourWeak') : t('shots.analysis.dial.sour'));
   }
   if (n.taste === 'bitter') {
-    if (n.strength === 'weak') return out('shorter', 1, 'Bitter und dünn: früher stoppen (Verhältnis etwa −0,3), Mahlgrad lassen.');
-    if (fast) return out('puck', 1, `Bitter trotz schnellem Durchlauf (${t}): Hinweis auf Kanäle im Kaffeebett. Verteilen und gerade tampen statt gröber mahlen.`);
-    if (pt === 'sour') return out('coarser', 0, 'Vorher sauer, jetzt bitter: der Punkt liegt dazwischen. Einen halben Schritt zurück Richtung gröber.');
-    if (pt === 'bitter' || slow) return out('coarser', 2, slow ? `Bitter und langsam (${t}): deutlich gröber mahlen.` : 'Wieder bitter: diesmal einen größeren Schritt gröber.');
-    return out('coarser', 1, 'Bitter: gröber mahlen.');
+    if (n.strength === 'weak') return out('shorter', 1, t('shots.analysis.dial.bitterWeak'));
+    if (fast) return out('puck', 1, t('shots.analysis.dial.bitterFast', { time }));
+    if (pt === 'sour') return out('coarser', 0, t('shots.analysis.dial.bitterAfterSour'));
+    if (pt === 'bitter' || slow) return out('coarser', 2, slow ? t('shots.analysis.dial.bitterSlow', { time }) : t('shots.analysis.dial.bitterAgain'));
+    return out('coarser', 1, t('shots.analysis.dial.bitter'));
   }
   if (n.taste === 'balanced') {
-    if (n.strength === 'weak') return out('shorter', 1, 'Ausgewogen, aber dünn: weniger Ausbeute oder 0,5–1 g mehr Dosis. Mahlgrad halten.');
-    if (n.strength === 'strong') return out('longer', 1, 'Ausgewogen, aber zu kräftig: mehr Ausbeute oder etwas weniger Dosis. Mahlgrad halten.');
-    return out('keep', 1, 'Getroffen. Mahlgrad halten und den Bezug als Referenz merken.');
+    if (n.strength === 'weak') return out('shorter', 1, t('shots.analysis.dial.balancedWeak'));
+    if (n.strength === 'strong') return out('longer', 1, t('shots.analysis.dial.balancedStrong'));
+    return out('keep', 1, t('shots.analysis.dial.balanced'));
   }
-  if (n.strength === 'weak') return out('shorter', 1, 'Dünn: weniger Ausbeute oder mehr Dosis.');
-  if (n.strength === 'strong') return out('longer', 1, 'Zu kräftig: mehr Ausbeute oder weniger Dosis.');
+  if (n.strength === 'weak') return out('shorter', 1, t('shots.analysis.dial.weak'));
+  if (n.strength === 'strong') return out('longer', 1, t('shots.analysis.dial.strong'));
   // ohne Bewertung: nur die Zeit
-  if (fast) return out('finer', 1, `Mit ${t} eher schnell: feiner mahlen. Wie hat er geschmeckt?`);
-  if (slow) return out('coarser', 1, `Mit ${t} eher langsam: gröber mahlen. Wie hat er geschmeckt?`);
+  if (fast) return out('finer', 1, t('shots.analysis.dial.fast', { time }));
+  if (slow) return out('coarser', 1, t('shots.analysis.dial.slow', { time }));
   return null;
 }

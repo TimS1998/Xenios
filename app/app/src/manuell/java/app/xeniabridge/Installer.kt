@@ -23,7 +23,7 @@ internal object Installer {
         try {
             activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.url)))
         } catch (_: Exception) {
-            AppUpdate.report("", "Kein Browser gefunden")
+            AppUpdate.report("", activity.getString(R.string.update_install_no_browser))
         }
     }
 

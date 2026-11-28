@@ -11,11 +11,11 @@ import { logger, setLogLevel } from './log.js';
 import { Sessions, LoginLimiter, tokenFromRequest } from './auth.js';
 import { authRoutes, makeSetupCode } from './admin.js';
 import { communityRoutes } from './community.js';
-import { PushService, PUSH_TOPICS, normalizePrefs, generateVapidKeys } from './push.js';
+import { PushService, pushTopics, pushTestMessage, normalizePrefs, generateVapidKeys } from './push.js';
 import { Machine, httpError } from './machine.js';
 import { deviceRoutes, createRouter } from '../web/shared/routes.js';
 import { Grinder } from './grinder.js';
-import { Scheduler, SCHEDULE_ACTIONS } from './schedule.js';
+import { Scheduler, scheduleActions } from './schedule.js';
 import { Wake } from './wake.js';
 import { GbsProxy, gbsRoutes } from './gbs.js';
 import { JsonStore } from './store.js';
@@ -23,6 +23,7 @@ import { securityHeaders, sendJson, readJson, readBuffer, makeStatic } from './h
 import { packBackup, applyBackupFiles, refreshLiveConfig, BACKUP_MAX } from './backup.js';
 import { ensureCert, certFingerprint } from './tls.js';
 import { LiveHistory, widgetExtras } from './widget.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('server');
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
@@ -174,7 +175,7 @@ export function createApp(cfg, hooks = {}) {
   const serverInfo = () => ({
     version: VERSION,
     features: cfg.features,
-    push: { enabled: push.enabled, publicKey: cfg.push.publicKey, topics: PUSH_TOPICS },
+    push: { enabled: push.enabled, publicKey: cfg.push.publicKey, topics: pushTopics() },
     machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs', look: lookState(cfg.machine.look) },
     grinder: { enabled: cfg.grinder.enabled, databaseDownload: Boolean(cfg.grinder.allowDatabaseDownload) },
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -220,7 +221,7 @@ export function createApp(cfg, hooks = {}) {
   // Nächstes geplantes Einschalten: Wecker-Automatik oder Server-Zeitplan, was früher kommt
   function nextPlannedOn() {
     const w = wake.state().plan;
-    const candidates = [w ? { at: w.at, reason: `Wecker ${w.device}` } : null, scheduler.nextOn()].filter((c) => c && c.at > Date.now());
+    const candidates = [w ? { at: w.at, reason: t('server.wake.nextReason', { device: w.device }) } : null, scheduler.nextOn()].filter((c) => c && c.at > Date.now());
     candidates.sort((a, b) => a.at - b.at);
     return candidates[0] || null;
   }
@@ -233,21 +234,21 @@ export function createApp(cfg, hooks = {}) {
   gbsRoutes(route, { gbs });
 
   // Zusätzliche Schaltzeiten (führt der Server aus)
-  route('GET', '/api/schedule', async () => ({ rules: scheduler.list(), actions: SCHEDULE_ACTIONS }));
+  route('GET', '/api/schedule', async () => ({ rules: scheduler.list(), actions: scheduleActions() }));
   route('PUT', '/api/schedule', async ({ body }) => ({ rules: scheduler.save(body.rules) }));
   // Wecker-Automatik: Android-App meldet den nächsten Wecker, Server schaltet vorher ein
   route('GET', '/api/wake', async () => wake.state());
   route('PUT', '/api/wake', async ({ body }) => wake.setConfig(body.config, body.devices));
   route('POST', '/api/wake/alarm', async ({ body, session }) => {
     const next = body.next === null || body.next === undefined ? null : Number(body.next);
-    return { plan: wake.report(session.id.slice(0, 12), session.device || session.ua || 'Handy', next) };
+    return { plan: wake.report(session.id.slice(0, 12), session.device || session.ua || t('server.wake.defaultDevice'), next) };
   });
   route('DELETE', '/api/wake/devices/:id', async ({ params }) => wake.removeDevice(params.id));
 
   // Push
-  route('GET', '/api/push/key', async () => ({ enabled: push.enabled, publicKey: cfg.push.publicKey, topics: PUSH_TOPICS }));
+  route('GET', '/api/push/key', async () => ({ enabled: push.enabled, publicKey: cfg.push.publicKey, topics: pushTopics() }));
   route('POST', '/api/push/subscribe', async ({ body, session }) => {
-    if (!push.enabled) throw httpError(409, 'Push ist nicht eingerichtet');
+    if (!push.enabled) throw httpError(409, t('server.push.notConfigured'));
     push.subscribe(body.subscription, body.prefs, session.id);
     return { ok: true, prefs: normalizePrefs(body.prefs) };
   });
@@ -258,8 +259,8 @@ export function createApp(cfg, hooks = {}) {
   });
   route('POST', '/api/push/test', async ({ body }) => {
     const sub = push.store.data.subs.find((s) => s.endpoint === body.endpoint);
-    if (!sub) throw httpError(404, 'Dieses Gerät hat keine Benachrichtigungen abonniert');
-    const ok = await push.sendToSub(sub, { topic: 'test', title: 'Xenios', body: 'Test-Benachrichtigung ☕', tag: 'test' });
+    if (!sub) throw httpError(404, t('server.push.noSubscription'));
+    const ok = await push.sendToSub(sub, pushTestMessage());
     return { ok };
   });
 
@@ -321,13 +322,13 @@ export function createApp(cfg, hooks = {}) {
       if (p === '/api/stream' && req.method === 'GET') return stream(req, res, ip);
       if (p.startsWith('/api/') || p.startsWith('/auth/')) {
         const { route: r, params, rawMatch, exists } = match(req.method, p);
-        if (!r) return sendJson(res, exists ? 405 : 404, { error: exists ? 'Methode nicht erlaubt' : 'Nicht gefunden' });
+        if (!r) return sendJson(res, exists ? 405 : 404, { error: exists ? t('server.http.methodNotAllowed') : t('server.http.notFound') });
         const token = tokenFromRequest(req);
         const session = sessions.check(token);
-        if (r.auth && !session) return sendJson(res, 401, { error: 'Nicht angemeldet' });
+        if (r.auth && !session) return sendJson(res, 401, { error: t('server.http.notLoggedIn') });
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           // CSRF-Schutz: eigener Header (nur per fetch setzbar) + Origin-Prüfung
-          if (req.headers['x-xenia'] !== '1' || !originOk(req, secure, trusted)) return sendJson(res, 403, { error: 'Ungültige Anfrage-Herkunft' });
+          if (req.headers['x-xenia'] !== '1' || !originOk(req, secure, trusted)) return sendJson(res, 403, { error: t('server.http.badOrigin') });
         }
         const body = req.method === 'GET' || req.method === 'HEAD' ? {}
           : r.body === 'raw' ? await readBuffer(req, BACKUP_MAX)
@@ -351,7 +352,7 @@ export function createApp(cfg, hooks = {}) {
         // App-Routen (z. B. /timer) liefern die App aus
         if (serveStatic(req, res, '/index.html')) return;
       }
-      sendJson(res, 404, { error: 'Nicht gefunden' });
+      sendJson(res, 404, { error: t('server.http.notFound') });
     } catch (e) {
       const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 500;
       const upstream = !e.expose && /Maschine|Mühle|fetch failed|Zeitüberschreitung|ECONN|timeout|aborted/i.test(e.message + (e.cause?.message || ''));
@@ -359,15 +360,15 @@ export function createApp(cfg, hooks = {}) {
       if (code >= 500) log.warn(`${req.method} ${p}: ${e.message}`);
       if (!res.headersSent) {
         const headers = e.retryAfter ? { 'Retry-After': String(e.retryAfter) } : {};
-        sendJson(res, code, { error: e.expose || upstream || code < 500 ? e.message : 'Interner Fehler' }, headers);
+        sendJson(res, code, { error: e.expose || upstream || code < 500 ? e.message : t('server.http.internal') }, headers);
       }
     }
   }
 
   function stream(req, res, ip) {
     const session = sessions.check(tokenFromRequest(req));
-    if (!session) return sendJson(res, 401, { error: 'Nicht angemeldet' });
-    if (streams.size >= MAX_STREAMS) return sendJson(res, 503, { error: 'Zu viele offene Verbindungen' });
+    if (!session) return sendJson(res, 401, { error: t('server.http.notLoggedIn') });
+    if (streams.size >= MAX_STREAMS) return sendJson(res, 503, { error: t('server.http.tooManyStreams') });
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
@@ -464,7 +465,7 @@ export class Listeners {
     server.keepAliveTimeout = 30000;
     const entry = { kind, spec, port: c.port, host: c.host, server, ok: false, error: null };
     server.on('error', (e) => {
-      entry.error = e.code === 'EADDRINUSE' ? `Port ${c.port} ist belegt` : e.code === 'EACCES' ? `Keine Berechtigung für Port ${c.port}` : e.message;
+      entry.error = e.code === 'EADDRINUSE' ? t('server.listeners.portInUse', { port: c.port }) : e.code === 'EACCES' ? t('server.listeners.portDenied', { port: c.port }) : e.message;
       log.error(`${kind.toUpperCase()} auf ${c.host}:${c.port} nicht möglich: ${entry.error}`);
     });
     server.listen(c.port, c.host, () => {

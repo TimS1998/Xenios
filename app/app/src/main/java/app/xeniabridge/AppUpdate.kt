@@ -106,14 +106,14 @@ object AppUpdate {
         if (manual) report("checking")
         worker.execute {
             try {
-                val latest = fetchLatest()
+                val latest = fetchLatest(app)
                 val prefs = Prefs(app)
                 prefs.updateRelease = latest?.toJson()
                 prefs.updateCheckedAt = System.currentTimeMillis()
                 if (latest?.newer != true) Installer.discard(app)
                 if (manual) error = null
             } catch (e: Exception) {
-                if (manual) error = message(e)
+                if (manual) error = message(app, e)
             } finally {
                 if (manual) phase = ""
                 changed()
@@ -121,7 +121,7 @@ object AppUpdate {
         }
     }
 
-    private fun fetchLatest(): Release? {
+    private fun fetchLatest(context: Context): Release? {
         val conn = URL(LATEST_URL).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = 8000
@@ -132,8 +132,8 @@ object AppUpdate {
             when (val code = conn.responseCode) {
                 200 -> Unit
                 404 -> return null // noch kein Release
-                403, 429 -> throw IOException("GitHub bremst gerade, später erneut versuchen")
-                else -> throw IOException("GitHub antwortet HTTP $code")
+                403, 429 -> throw IOException(context.getString(R.string.update_error_rate_limited))
+                else -> throw IOException(context.getString(R.string.update_error_http, code))
             }
             val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
             val assets = json.optJSONArray("assets") ?: return null
@@ -160,8 +160,8 @@ object AppUpdate {
         Installer.start(activity, release)
     }
 
-    internal fun message(e: Exception): String = when (e) {
-        is java.net.UnknownHostException, is java.net.ConnectException, is java.net.SocketTimeoutException -> "Keine Verbindung zu GitHub"
+    internal fun message(context: Context, e: Exception): String = when (e) {
+        is java.net.UnknownHostException, is java.net.ConnectException, is java.net.SocketTimeoutException -> context.getString(R.string.update_error_no_connection)
         else -> e.message ?: e.javaClass.simpleName
     }
 }

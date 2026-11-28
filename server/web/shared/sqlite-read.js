@@ -1,9 +1,10 @@
 // Minimaler, nur lesender SQLite-Parser (ohne Abhängigkeiten) für die Datenbank der Mühle.
 // Unterstützt Tabellen mit und ohne ROWID, Überlaufseiten und alle Spaltentypen.
+import { t } from './i18n.js';
 
 export function openSqlite(buffer) {
   const u8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  if (new TextDecoder().decode(u8.subarray(0, 15)) !== 'SQLite format 3') throw new Error('Keine SQLite-Datei');
+  if (new TextDecoder().decode(u8.subarray(0, 15)) !== 'SQLite format 3') throw new Error(t('core.grinder.notSqlite'));
   const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   let pageSize = dv.getUint16(16);
   if (pageSize === 1) pageSize = 65536;

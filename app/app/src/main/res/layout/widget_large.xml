@@ -19,12 +19,10 @@
         <FrameLayout
             android:id="@+id/head"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="18" />
+            android:layout_height="16dp" />
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
+            android:layout_height="4dp" />
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -89,12 +87,10 @@
         <FrameLayout
             android:id="@+id/live_head"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="18" />
+            android:layout_height="16dp" />
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
+            android:layout_height="4dp" />
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"

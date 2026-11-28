@@ -1,12 +1,13 @@
 // Zwei Xenia-APIs: die aktuelle Brew-by-Sync-Firmware und die ältere DBL-API
 // (https://www.xenia-espresso.de/api.html, xenia-home).
 // Werte: machine.api = 'bbs' | 'classic'
+import { t } from './i18n.js';
 
 export const MACHINE_API = {
   bbs: {
     id: 'bbs',
-    label: 'Neue Xenia',
-    detail: 'Brew-by-Sync / aktuelle Firmware',
+    get label() { return t('core.machineApi.bbs.label'); },
+    get detail() { return t('core.machineApi.bbs.detail'); },
     livePath: '/api/v2/diagram/get',
     scriptsList: ['/api/v2/scriptslist', '/api/v2/scripts/list'],
     general: true,
@@ -18,8 +19,8 @@ export const MACHINE_API = {
   },
   classic: {
     id: 'classic',
-    label: 'Alte Xenia',
-    detail: 'DBL / offizielle API',
+    get label() { return t('core.machineApi.classic.label'); },
+    get detail() { return t('core.machineApi.classic.detail'); },
     livePath: '/api/v2/overview',
     scriptsList: ['/api/v2/scripts/list', '/api/v2/scriptslist'],
     general: false,

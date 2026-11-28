@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { JsonStore } from './store.js';
 import { logger } from './log.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('push');
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
@@ -56,16 +57,26 @@ export function encryptPayload(plaintext, keys, { salt = crypto.randomBytes(16),
   return Buffer.concat([header, asPublic, body]);
 }
 
-export const PUSH_TOPICS = {
-  heated: 'Maschine aufgeheizt',
-  shot: 'Bezug fertig',
-  steam: 'Dampf bereit',
-  tank: 'Wassertank leer',
-  power: 'Ein-/Ausgeschaltet (Timer)',
-  fault: 'Störung',
-  offline: 'Maschine/Mühle nicht erreichbar',
-  grinder: 'Mühle',
-};
+export const PUSH_TOPIC_KEYS = ['heated', 'shot', 'steam', 'tank', 'power', 'fault', 'offline', 'grinder'];
+// Themen mit Namen für die App (Text erst beim Gebrauch, optional in einer anderen Sprache)
+export function pushTopics(lang) {
+  const names = {
+    heated: t('server.push.topics.heated', null, lang),
+    shot: t('server.push.topics.shot', null, lang),
+    steam: t('server.push.topics.steam', null, lang),
+    tank: t('server.push.topics.tank', null, lang),
+    power: t('server.push.topics.power', null, lang),
+    fault: t('server.push.topics.fault', null, lang),
+    offline: t('server.push.topics.offline', null, lang),
+    grinder: t('server.push.topics.grinder', null, lang),
+  };
+  return Object.fromEntries(PUSH_TOPIC_KEYS.map((k) => [k, names[k]]));
+}
+
+// Test-Benachrichtigung (Einstellungen → Benachrichtigungen)
+export function pushTestMessage(lang) {
+  return { topic: 'test', title: t('server.push.testTitle', null, lang), body: t('server.push.testBody', null, lang), tag: 'test' };
+}
 
 export class PushService {
   constructor(cfg) {
@@ -79,7 +90,7 @@ export class PushService {
 
   subscribe(sub, prefs, sessionId) {
     if (!isPushEndpoint(sub?.endpoint) || typeof sub.keys?.p256dh !== 'string' || typeof sub.keys?.auth !== 'string' || sub.keys.p256dh.length > 200 || sub.keys.auth.length > 100) {
-      throw Object.assign(new Error('Ungültiges Push-Abo'), { status: 400, expose: true });
+      throw Object.assign(new Error(t('server.push.invalidSubscription')), { status: 400, expose: true });
     }
     const list = this.store.data.subs.filter((s) => s.endpoint !== sub.endpoint);
     list.push({
@@ -160,6 +171,6 @@ export function isPushEndpoint(endpoint) {
 
 export function normalizePrefs(prefs) {
   const out = {};
-  for (const k of Object.keys(PUSH_TOPICS)) out[k] = prefs?.[k] !== false;
+  for (const k of PUSH_TOPIC_KEYS) out[k] = prefs?.[k] !== false;
   return out;
 }

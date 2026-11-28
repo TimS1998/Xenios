@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { JsonStore } from './store.js';
+import { t } from '../web/shared/i18n.js';
 
 const SCRYPT = { N: 32768, r: 8, p: 1, keylen: 32, maxmem: 64 * 1024 * 1024 };
 
@@ -25,10 +26,10 @@ export function verifyPassword(password, stored) {
 
 // Mindestanforderung ans App-Passwort; null = ok.
 export function passwordProblem(pw) {
-  if (typeof pw !== 'string' || pw.length < 10) return 'mindestens 10 Zeichen';
-  if (pw.length > 256) return 'höchstens 256 Zeichen';
-  if (/^(.)\1+$/.test(pw)) return 'nicht nur ein Zeichen wiederholen';
-  if (/^(0123456789|1234567890|passwort\d*|password\d*|qwertz\w*|qwerty\w*)$/i.test(pw)) return 'zu leicht zu erraten';
+  if (typeof pw !== 'string' || pw.length < 10) return t('server.password.tooShort');
+  if (pw.length > 256) return t('server.password.tooLong');
+  if (/^(.)\1+$/.test(pw)) return t('server.password.repeated');
+  if (/^(0123456789|1234567890|passwort\d*|password\d*|qwertz\w*|qwerty\w*)$/i.test(pw)) return t('server.password.guessable');
   return null;
 }
 

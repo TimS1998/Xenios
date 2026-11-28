@@ -95,11 +95,11 @@ Dann `https://<IP-des-Servers>:8443` öffnen und der Einrichtung folgen (wie obe
 - **Aktualisieren:** in der App unter *Einstellungen → System → Aktualisieren*. `install.sh` richtet dafür den Dienst `xenios-update.timer` ein (Debian, Ubuntu, Raspberry Pi OS 64-Bit). Der Knopf holt Git und das Image und startet neu; Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den `curl`-Befehl. Einmal `sh ~/xenios/install.sh` richtet ihn nach, eine vorhandene `.env` bleibt. Nur holen: `sh ~/xenios/install.sh --update`. Ohne das Skript: `git pull && docker compose up -d`.
 - Härtung: schreibgeschütztes Dateisystem, eigener Benutzer statt root, keine Linux-Capabilities, Speicher- und Prozessgrenzen (siehe `compose.yaml`).
 
-Oder ohne Docker mit systemd: [`server/deploy/linux/xenios.service`](../server/deploy/linux/xenios.service).
+Oder ohne Docker mit systemd, in einem Befehl samt Node.js-Prüfung, eigenem Benutzer und Update-Dienst für den Knopf in der App: `curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/native-update.sh | sudo sh -s -- --install` (siehe [Raspberry Pi, Ohne Docker](Installation-Raspberry-Pi.md#ohne-docker)). Von Hand: [`server/deploy/linux/xenios.service`](../server/deploy/linux/xenios.service).
 
 ## 5. Einstellungen
 
-Alles lässt sich in der App unter **Einstellungen** ändern (Gruppen Kaffeemaschine und Server). Die Werte landen in `config.json` und wirken sofort, auch Ports und Zertifikat (die Zugänge werden ohne Neustart neu gebunden).
+Alles lässt sich in der App unter **Einstellungen** ändern (Gruppen Espressomaschine und Server). Die Werte landen in `config.json` und wirken sofort, auch Ports und Zertifikat (die Zugänge werden ohne Neustart neu gebunden).
 
 | In der App | Schlüssel in `config.json` | Standard |
 |---|---|---|

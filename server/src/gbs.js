@@ -10,6 +10,7 @@ import { buildScript, httpError } from './machine.js';
 import { JsonStore } from './store.js';
 import { logger } from './log.js';
 import { DblBrew, DBL_DEFAULT_SCRIPT } from './gbs-dbl.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('gbs');
 
@@ -106,9 +107,9 @@ export class GbsProxy {
     const weight = Number(lastGrind?.weight);
     if (!scriptId || !(weight >= 1 && weight <= 400)) return null;
     const src = await this.machine.readScript(scriptId).catch((e) => {
-      throw new Error(`Profil (Skript ${scriptId}) nicht lesbar – gelöscht? (${e.message})`);
+      throw new Error(t('server.gbs.scriptUnreadable', { id: scriptId, error: e.message }));
     });
-    if (!src.steps?.length) throw new Error(`Profil (Skript ${scriptId}) ist leer`);
+    if (!src.steps?.length) throw new Error(t('server.gbs.scriptEmpty', { id: scriptId }));
     const steps = gbsSteps(src.steps, weight, { extend });
     const instruction = buildScript(steps);
     const helpers = (await this.machine.scripts()).filter((s) => s.title === HELPER_NAME);
@@ -118,7 +119,7 @@ export class GbsProxy {
       await this.machine.writeScript({ id: id ?? undefined, name: HELPER_NAME, instruction });
       if (id === null) {
         id = (await this.machine.scripts()).filter((s) => s.title === HELPER_NAME).at(-1)?.id ?? null;
-        if (id === null) throw new Error('Hilfsskript ließ sich nicht anlegen');
+        if (id === null) throw new Error(t('server.gbs.helperFailed'));
       }
       this.store.data.helper = { id, instruction };
       this.store.save();
@@ -149,16 +150,16 @@ export class GbsProxy {
     if (scriptId !== undefined) {
       if (scriptId !== null) {
         const n = Number(scriptId);
-        if (!Number.isInteger(n) || n < 10 || n > 199) throw httpError(400, 'Profil: eigenes Skript (ID 10–199) oder keins');
+        if (!Number.isInteger(n) || n < 10 || n > 199) throw httpError(400, t('server.gbs.badScript'));
         // Alte Xenia: das Skript läuft unverändert, Xenios schreibt nichts auf die Maschine
-        if (!this.emulating && !this.cfg.features.scriptEditor) throw httpError(403, 'Skript-Editor ist deaktiviert (das Profil wird als Skript auf der Maschine angelegt)');
-        if (n === d.helper?.id) throw httpError(400, 'Das Hilfsskript selbst kann nicht gewählt werden');
+        if (!this.emulating && !this.cfg.features.scriptEditor) throw httpError(403, t('server.gbs.editorOff'));
+        if (n === d.helper?.id) throw httpError(400, t('server.gbs.helperChosen'));
         scriptId = n;
       }
       d.scriptId = scriptId;
     }
     if (extend !== undefined) {
-      if (typeof extend !== 'boolean') throw httpError(400, 'extend: an/aus erwartet');
+      if (typeof extend !== 'boolean') throw httpError(400, t('server.gbs.extendBool'));
       d.extend = extend;
     }
     this.state.lastError = null;
@@ -276,8 +277,8 @@ export class GbsProxy {
     const { scriptId, lastGrind } = this.store.data;
     const run = scriptId ?? DBL_DEFAULT_SCRIPT;
     const title = scriptId
-      ? (await this.machine.scripts().catch(() => [])).find((s) => s.id === scriptId)?.title ?? `Skript ${scriptId}`
-      : this.machine.builtinScripts()[DBL_DEFAULT_SCRIPT] ?? `Skript ${DBL_DEFAULT_SCRIPT}`;
+      ? (await this.machine.scripts().catch(() => [])).find((s) => s.id === scriptId)?.title ?? t('server.gbs.scriptN', { id: scriptId })
+      : this.machine.builtinScripts()[DBL_DEFAULT_SCRIPT] ?? t('server.gbs.scriptN', { id: DBL_DEFAULT_SCRIPT });
     const weight = Number(lastGrind?.weight);
     try {
       const r = await this.dbl.start({ scriptId: run, weight, title });

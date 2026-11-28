@@ -5,6 +5,7 @@
 // Eigene Umsetzung nach der Protokollbeschreibung in docs/API-Xenia.md (Abschnitt 14) und docs/API-Muehle-E64WS.md.
 import { httpError } from './machine.js';
 import { logger } from './log.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('gbs');
 
@@ -132,10 +133,10 @@ export class DblBrew {
   async start({ scriptId, weight, title }) {
     if (this.brew) return { repeat: true };
     const target = Number(weight);
-    if (!(target >= 1 && target <= 400)) throw httpError(409, 'Kein Zielgewicht von der Mühle (erst über Grind-by-Sync mahlen)');
+    if (!(target >= 1 && target <= 400)) throw httpError(409, t('server.gbs.noTarget'));
     const s = this.machine.state;
-    if (!s.online) throw httpError(502, 'Maschine nicht erreichbar');
-    if (s.scaleLink && s.scaleLink.connected === false) throw httpError(409, 'Bluetooth-Waage an der Xenia nicht verbunden – ohne sie kann Xenios nicht am Gewicht stoppen');
+    if (!s.online) throw httpError(502, t('server.gbs.machineOffline'));
+    if (s.scaleLink && s.scaleLink.connected === false) throw httpError(409, t('server.gbs.noScale'));
     const at = this.now();
     this.brew = { phase: 'starting', at, target, scriptId, title, base: null, prevW: null, yieldG: null, samples: [], sawWeight: false };
     try {

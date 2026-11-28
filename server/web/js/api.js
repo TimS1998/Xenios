@@ -1,5 +1,6 @@
 // Server-API, Live-Zustand (Server-Sent Events) und einfacher Store.
 import { isHidden } from './prefs.js';
+import { t } from '../shared/i18n.js';
 
 const listeners = new Set();
 export const store = {
@@ -62,7 +63,7 @@ if (backend) {
 export async function api(path, { method = 'GET', body, raw = false, binary = false } = {}) {
   if (backend) {
     const r = await backend.handle(method, path, body ?? {});
-    if (r.status >= 400) throw new ApiError(r.status, r.data?.error || `Fehler ${r.status}`);
+    if (r.status >= 400) throw new ApiError(r.status, r.data?.error || t('app.api.error', { status: r.status }));
     return r.data;
   }
   const headers = { Accept: raw ? '*/*' : 'application/json' };
@@ -77,7 +78,7 @@ export async function api(path, { method = 'GET', body, raw = false, binary = fa
   try {
     res = await fetch(path, { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store' });
   } catch {
-    throw new ApiError(0, 'Keine Verbindung zum Server');
+    throw new ApiError(0, t('app.conn.noServer'));
   }
   if (raw && res.ok) return res;
   let data = null;
@@ -85,7 +86,7 @@ export async function api(path, { method = 'GET', body, raw = false, binary = fa
   if (res.status === 401 && !path.startsWith('/auth/')) {
     onUnauthorized();
   }
-  if (!res.ok) throw new ApiError(res.status, data?.error || `Fehler ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, data?.error || t('app.api.error', { status: res.status }));
   return data;
 }
 

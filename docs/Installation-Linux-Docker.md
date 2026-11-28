@@ -109,6 +109,26 @@ Dieselbe Ausgabe nennt den Zertifikats-Fingerabdruck, Zeile beginnend mit `HTTPS
 docker compose -f /home/test/xenios/docker/compose.yaml logs xenios | grep Einrichtungscode
 ```
 
+### Ohne Docker
+
+Statt Docker geht es auch mit Node.js direkt als systemd-Dienst. Das braucht weniger Speicher und Platz, verzichtet aber auf die Abschottung des Containers. Ein Befehl:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/native-update.sh | sudo sh -s -- --install
+```
+
+Das Skript prüft Node.js (mindestens 20; fehlt es oder ist es älter, lädt es Node.js 22 LTS von nodejs.org und prüft die Prüfsumme), legt den Benutzer `xenios` an, holt das neueste Release nach `/opt/xenios` (gehört root, für den Dienst nur lesbar), legt die Daten in `/var/lib/xenios` ab und startet den gehärteten Dienst `xenios`. Den Update-Dienst richtet es gleich mit ein, damit der Knopf *Aktualisieren* in der App funktioniert. Am Ende stehen Adresse und Einrichtungscode, weiter wie unten in Abschnitt 5.
+
+| Was | Befehl |
+|---|---|
+| Läuft er? | `systemctl status xenios` |
+| Protokoll | `journalctl -u xenios -f` (Strg+C beendet nur die Anzeige) |
+| Einrichtungscode | `journalctl -u xenios \| grep Einrichtungscode` |
+| Neu starten | `sudo systemctl restart xenios` |
+| Aktualisieren von Hand | `sudo xenios-update` |
+
+Der Cloudflare-Tunnel läuft ohne Docker als eigener Dienst: den Befehl `sudo cloudflared service install …` aus der App direkt auf dem Pi ausführen (nach der Installation von `cloudflared`), als Ziel im Tunnel `http://127.0.0.1:8080`.
+
 ## 5. Im Browser einrichten
 
 Auf einem anderen Gerät im selben Netz (oder auf dem Server selbst) öffnen:
@@ -243,6 +263,27 @@ Am Ende ist `xenios` `healthy`. Im Browser die Seite neu laden. Unter *Einstellu
 Eine feste Version: in `.env` zum Beispiel `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`, danach `--update`. Auf einem Windows-PC ohne dieses Skript prüft der Knopf nur, ob eine neuere Version da ist. Geholt wird sie dort mit `git pull` und einem Neustart des Servers, siehe [Einrichtung](Einrichtung.md#1-server-installieren-windows-pc-läuft-dauerhaft).
 
 Der **Direkt-Modus** der Android-App spricht die Maschine ohne diesen Server an. Die Oberfläche und die Wahl **Alte Xenia** stecken in der APK. Dafür die App aus Release 2.2.0 installieren, siehe [Android-App](Android-App.md#direkt-modus-ohne-server-nur-im-heimnetz).
+
+### Ohne Docker (Server als systemd-Dienst)
+
+Läuft Xenios ohne Docker, übernimmt `native-update.sh` die Aufgabe von `install.sh`. Mit `--install` eingerichtet (siehe Abschnitt 4), läuft der Update-Dienst schon. Für eine ältere Installation von Hand, etwa als Kopie von `server/` in `/opt/xenios` mit einem systemd-Dienst `xenios`, einmal einrichten:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/native-update.sh | sudo sh -s -- --setup
+```
+
+Das Skript liest Programmordner, Konfiguration und Datenordner aus dem Dienst (`ExecStart`, `--config`, `XENIOS_CONFIG`, `XENIOS_DATA_DIR`), zeigt, was es gefunden hat, und richtet den Timer `xenios-update.timer` ein. Heißt der Dienst anders: `… --setup --service <name>`. Danach funktioniert der Knopf in der App.
+
+Beim Aktualisieren lädt es das neueste Release von GitHub, übernimmt Dateien im Programmordner, die das Release nicht mitbringt (z. B. eine `config.json`), hält den Dienst an, tauscht den Ordner aus und startet neu. Der vorige Stand bleibt als `/opt/xenios.alt`. Läuft der neue Stand nicht stabil an, kommt der alte zurück und die App zeigt den Fehler. Von Hand, auch mit fester Version:
+
+```bash
+sudo xenios-update
+```
+```bash
+sudo xenios-update v2.5.2
+```
+
+Protokoll: `journalctl -u xenios-update`. Den Tunnel (cloudflared) richtet dieser Dienst nicht ein; ohne Docker läuft cloudflared als eigener Dienst.
 
 | Was | Befehl |
 |---|---|

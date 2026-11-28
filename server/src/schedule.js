@@ -3,9 +3,22 @@ import path from 'node:path';
 import { JsonStore } from './store.js';
 import { logger } from './log.js';
 import { httpError } from './machine.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('zeitplan');
-export const SCHEDULE_ACTIONS = { on: 'Einschalten', eco: 'Eco', off: 'Ausschalten' };
+export const SCHEDULE_ACTION_KEYS = ['on', 'eco', 'off'];
+// Namen der Aktionen (Text erst beim Gebrauch, optional in einer anderen Sprache)
+export function scheduleActions(lang) {
+  return { on: t('server.schedule.actions.on', null, lang), eco: t('server.schedule.actions.eco', null, lang), off: t('server.schedule.actions.off', null, lang) };
+}
+// Benachrichtigung, wenn eine Schaltzeit ausgeführt wurde
+export function scheduleEventText(action, time, label, lang) {
+  const a = scheduleActions(lang)[action];
+  return {
+    title: t('server.schedule.title', null, lang),
+    body: label ? t('server.schedule.firedLabel', { action: a, time, label }, lang) : t('server.schedule.fired', { action: a, time }, lang),
+  };
+}
 const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 export class Scheduler {
@@ -22,13 +35,13 @@ export class Scheduler {
   }
 
   save(rules) {
-    if (!Array.isArray(rules) || rules.length > 50) throw httpError(400, 'Höchstens 50 Schaltzeiten');
+    if (!Array.isArray(rules) || rules.length > 50) throw httpError(400, t('server.schedule.tooMany'));
     const clean = rules.map((r, i) => {
       const time = String(r.time || '');
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw httpError(400, `Schaltzeit ${i + 1}: Uhrzeit HH:MM erwartet`);
-      if (!(r.action in SCHEDULE_ACTIONS)) throw httpError(400, `Schaltzeit ${i + 1}: Aktion on, eco oder off erwartet`);
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw httpError(400, t('server.schedule.badTime', { n: i + 1 }));
+      if (!SCHEDULE_ACTION_KEYS.includes(r.action)) throw httpError(400, t('server.schedule.badAction', { n: i + 1 }));
       const days = [...new Set((Array.isArray(r.days) ? r.days : []).map(Number))].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort();
-      if (!days.length) throw httpError(400, `Schaltzeit ${i + 1}: mindestens ein Wochentag`);
+      if (!days.length) throw httpError(400, t('server.schedule.noDays', { n: i + 1 }));
       return {
         id: /^[a-z0-9]{1,12}$/.test(String(r.id || '')) ? String(r.id) : Math.random().toString(36).slice(2, 10),
         enabled: r.enabled !== false,
@@ -67,10 +80,10 @@ export class Scheduler {
       try {
         await this.machine.power(r.action, r.steam ?? undefined);
         this.lastRun.set(r.id, key);
-        log.info(`${SCHEDULE_ACTIONS[r.action]} (${hhmm}${r.label ? `, ${r.label}` : ''})`);
-        this.onEvent({ topic: 'power', title: 'Zeitplan', body: `${SCHEDULE_ACTIONS[r.action]} um ${hhmm}${r.label ? ` – ${r.label}` : ''}`, tag: 'schedule', at: now.toISOString() });
+        log.info(`${scheduleActions()[r.action]} (${hhmm}${r.label ? `, ${r.label}` : ''})`);
+        this.onEvent({ topic: 'power', ...scheduleEventText(r.action, hhmm, r.label), tag: 'schedule', at: now.toISOString() });
       } catch (e) {
-        log.warn(`${SCHEDULE_ACTIONS[r.action]} um ${hhmm} fehlgeschlagen: ${e.message}`);
+        log.warn(`${scheduleActions()[r.action]} um ${hhmm} fehlgeschlagen: ${e.message}`);
       }
     }
   }
@@ -84,7 +97,7 @@ export class Scheduler {
       for (let i = 0; i < 8; i++) {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, hh, mm);
         if (d <= now || !r.days.includes((d.getDay() + 6) % 7)) continue;
-        if (!best || d.getTime() < best.at) best = { at: d.getTime(), reason: r.label || 'Zeitplan' };
+        if (!best || d.getTime() < best.at) best = { at: d.getTime(), reason: r.label || t('server.schedule.title') };
         break;
       }
     }
@@ -92,6 +105,6 @@ export class Scheduler {
   }
 
   describe(r) {
-    return `${r.days.map((d) => DAY_SHORT[d]).join(', ')} ${r.time} ${SCHEDULE_ACTIONS[r.action]}`;
+    return `${r.days.map((d) => DAY_SHORT[d]).join(', ')} ${r.time} ${scheduleActions()[r.action]}`;
   }
 }

@@ -60,7 +60,7 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Xenia.Invisible" />
 
-        <!-- Reihenfolge wie in der Widget-Auswahl gewünscht: Ein/Aus, Ein ohne Dampf/Aus, Kaffeemaschine, Schalter, dann wie die Home-Kacheln -->
+        <!-- Reihenfolge wie in der Widget-Auswahl gewünscht: Ein/Aus, Ein ohne Dampf/Aus, Espressomaschine, Schalter, dann wie die Home-Kacheln -->
         <receiver
             android:name=".PowerWidget"
             android:exported="false"

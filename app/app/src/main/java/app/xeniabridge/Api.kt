@@ -39,16 +39,16 @@ object Api {
 
     fun request(context: Context, method: String, path: String, body: JSONObject? = null): JSONObject {
         val prefs = Prefs(context)
-        val token = prefs.token ?: throw ApiException(401, "Nicht angemeldet")
+        val token = prefs.token ?: throw ApiException(401, context.getString(R.string.api_error_not_logged_in))
         val base = activeBase(context)
         return try {
-            call(base, method, path, body, token)
+            call(context, base, method, path, body, token)
         } catch (e: IOException) {
             // Netzwechsel (WLAN ↔ mobil): einmal mit der anderen Adresse versuchen
             if (e is ApiException || prefs.bases.size < 2) throw e
             val other = activeBase(context, fresh = true)
             if (other == base) throw e
-            call(other, method, path, body, token)
+            call(context, other, method, path, body, token)
         }
     }
 
@@ -62,7 +62,7 @@ object Api {
         val prefs = Prefs(context)
         val local = prefs.localUrl?.takeIf { it.isNotBlank() }
         val remote = prefs.baseUrl?.takeIf { it.isNotBlank() }
-        if (local == null) return remote ?: throw ApiException(0, "Nicht eingerichtet")
+        if (local == null) return remote ?: throw ApiException(0, context.getString(R.string.api_error_not_configured))
         if (remote == null) return local
         val c = chosen
         if (!fresh && c != null && System.currentTimeMillis() < c.second && (c.first == local || c.first == remote)) return c.first
@@ -89,7 +89,7 @@ object Api {
         false
     }
 
-    fun call(base: String, method: String, path: String, body: JSONObject?, token: String?): JSONObject {
+    fun call(context: Context, base: String, method: String, path: String, body: JSONObject?, token: String?): JSONObject {
         val conn = URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
         LocalTls.prepare(conn)
         try {
@@ -114,8 +114,8 @@ object Api {
             if (code !in 200..299) {
                 val msg = json.optString("error").ifBlank {
                     when (code) {
-                        301, 302, 303, 307, 308 -> "Weiterleitung – evtl. Cloudflare Access aktiv? Die App braucht direkten Zugang."
-                        else -> "Fehler $code"
+                        301, 302, 303, 307, 308 -> context.getString(R.string.api_error_redirect)
+                        else -> context.getString(R.string.api_error_http, code)
                     }
                 }
                 throw ApiException(code, msg)
@@ -208,31 +208,31 @@ object Api {
     /** noSteam: immer ohne Dampfkessel einschalten (Widget „Ein ohne Dampf/Aus“) */
     fun toggle(context: Context, noSteam: Boolean = false): String {
         val s = state(context)
-        if (!s.online) throw ApiException(502, "Maschine nicht erreichbar")
-        if (s.shot) throw ApiException(409, "Bezug läuft – bitte an der Maschine stoppen")
+        if (!s.online) throw ApiException(502, context.getString(R.string.api_error_machine_unreachable))
+        if (s.shot) throw ApiException(409, context.getString(R.string.api_error_shot_running))
         val mode = if (s.isOn) "off" else if (noSteam) MODE_ON_NO_STEAM else "on"
         power(context, mode)
         return mode
     }
 
     /** Neue Geräte-Anmeldung. Liefert Token und Cookie-Namen für die WebView. */
-    fun registerDevice(base: String, password: String, name: String): Pair<String, String> {
-        val r = call(base, "POST", "/auth/device", JSONObject().put("password", password).put("name", name), null)
+    fun registerDevice(context: Context, base: String, password: String, name: String): Pair<String, String> {
+        val r = call(context, base, "POST", "/auth/device", JSONObject().put("password", password).put("name", name), null)
         val token = r.optString("token")
-        if (token.isBlank()) throw ApiException(500, "Server liefert kein Token – Xenios aktualisieren?")
+        if (token.isBlank()) throw ApiException(500, context.getString(R.string.api_error_no_token))
         return token to r.optString("cookie", "__Host-xs")
     }
 
-    fun logout(base: String, token: String) {
-        try { call(base, "POST", "/auth/logout", null, token) } catch (_: Exception) { }
+    fun logout(context: Context, base: String, token: String) {
+        try { call(context, base, "POST", "/auth/logout", null, token) } catch (_: Exception) { }
     }
 
-    fun message(e: Throwable): String = when (e) {
-        is ApiException -> e.message ?: "Fehler"
-        is java.net.UnknownHostException -> "Server nicht gefunden"
-        is java.net.SocketTimeoutException -> "Zeitüberschreitung"
-        is javax.net.ssl.SSLException -> "TLS-Fehler: Zertifikat ungültig oder geändert (lokale Adresse neu eintragen)"
-        is java.net.ConnectException -> "Keine Verbindung (${e.message ?: "abgelehnt"})"
+    fun message(context: Context, e: Throwable): String = when (e) {
+        is ApiException -> e.message ?: context.getString(R.string.error_generic)
+        is java.net.UnknownHostException -> context.getString(R.string.api_error_unknown_host)
+        is java.net.SocketTimeoutException -> context.getString(R.string.api_error_timeout)
+        is javax.net.ssl.SSLException -> context.getString(R.string.api_error_tls)
+        is java.net.ConnectException -> context.getString(R.string.api_error_no_connection, e.message ?: context.getString(R.string.api_error_refused))
         else -> e.message ?: e.javaClass.simpleName
     }
 }

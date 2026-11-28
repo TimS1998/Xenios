@@ -17,32 +17,32 @@
 <body>
   <div id="app" class="app" hidden>
     <header class="topbar">
-      <button class="icon-btn gone" id="back-btn" type="button" aria-label="Zurück" title="Zurück" data-noanim></button>
+      <button class="icon-btn gone" id="back-btn" type="button" aria-label="Zurück" title="Zurück" data-i18n-aria-label="common.back" data-i18n-title="common.back" data-noanim></button>
       <h1 class="topbar-title" id="title" data-noanim><span class="tt">Xenios</span></h1>
       <div class="topbar-actions" id="topbar-actions"></div>
-      <span class="conn-dot" id="conn-dot" title="Verbindung"></span>
+      <span class="conn-dot" id="conn-dot" title="Verbindung" data-i18n-title="app.shell.connection"></span>
     </header>
     <nav class="tabs" id="tabs" hidden></nav>
     <div class="model-hint" id="model-hint" role="alert" hidden></div>
     <main class="view" id="view" tabindex="-1"></main>
-    <nav class="navbar" id="navbar" aria-label="Hauptnavigation"></nav>
+    <nav class="navbar" id="navbar" aria-label="Hauptnavigation" data-i18n-aria-label="app.shell.mainNav"></nav>
   </div>
 
   <section id="login" class="login" hidden>
     <form class="login-card" id="login-form" autocomplete="on">
       <img src="/icons/icon.svg" alt="" class="login-icon" width="72" height="72">
       <h1>Xenios</h1>
-      <p class="muted">Bitte mit dem App-Passwort anmelden.</p>
+      <p class="muted" data-i18n="app.login.prompt">Bitte mit dem App-Passwort anmelden.</p>
       <label class="field">
-        <span>Passwort</span>
+        <span data-i18n="app.login.password">Passwort</span>
         <input type="password" name="password" id="login-password" autocomplete="current-password" required autofocus>
       </label>
       <label class="check">
         <input type="checkbox" id="login-remember" checked>
-        <span>Auf diesem Gerät angemeldet bleiben</span>
+        <span data-i18n="app.login.remember">Auf diesem Gerät angemeldet bleiben</span>
       </label>
       <p class="error" id="login-error" role="alert"></p>
-      <button class="btn filled wide" type="submit" id="login-submit">Anmelden</button>
+      <button class="btn filled wide" type="submit" id="login-submit" data-i18n="app.login.submit">Anmelden</button>
     </form>
   </section>
 

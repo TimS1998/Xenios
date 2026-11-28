@@ -3,6 +3,7 @@
 // (window.XeniaApp.http), weil Maschine und Mühle keine CORS-Header senden und die Mühle ein selbstsigniertes Zertifikat hat.
 import { Machine, httpError } from '../../shared/machine-core.js';
 import { Grinder } from '../../shared/grinder-core.js';
+import { t } from '../../shared/i18n.js';
 import { deviceRoutes, createRouter } from '../../shared/routes.js';
 
 // --- HTTP über die App ----------------------------------------------------------------
@@ -13,7 +14,7 @@ window.__xeniaHttpDone = (id, json) => {
   if (!p) return;
   pending.delete(id);
   let r;
-  try { r = JSON.parse(json); } catch { r = { error: 'Ungültige Antwort der App' }; }
+  try { r = JSON.parse(json); } catch { r = { error: t('app.direct.badAnswer') }; }
   if (r.error) p.reject(new Error(r.error));
   else p.resolve(r);
 };
@@ -66,7 +67,7 @@ class GrinderBridgeHttp {
     if (this.cookies.size) h.Cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
     // Gemerkter Fingerprint geht mit: die App prüft ihn im TLS-Handshake, bevor Cookie oder Passwort gesendet werden
     const pinned = localGet('grinderPin');
-    const changed = () => Object.assign(new Error('Zertifikat der Mühle hat sich geändert – möglicher Angriff. In der App unter „Verbindung“ neu einrichten.'), { status: 502 });
+    const changed = () => Object.assign(new Error(t('app.direct.grinderCertChanged')), { status: 502 });
     let r;
     try {
       r = await bridgeHttp({ method, url: this.base + path, headers: h, body: payload, timeoutMs: this.timeoutMs, insecureTls: true, pin: pinned });
@@ -140,7 +141,7 @@ export function createDirectBackend() {
 
   const { route, match } = createRouter();
   deviceRoutes(route, { machine, grinder, cfg });
-  const serverOnly = async () => { throw httpError(409, 'Nur mit Server verfügbar (Direkt-Modus)'); };
+  const serverOnly = async () => { throw httpError(409, t('app.direct.serverOnly')); };
   route('GET', '/auth/session', async () => ({ authenticated: true }));
   route('POST', '/auth/logout', async () => { window.XeniaApp.reauth(); return { ok: true }; });
   route('GET', '/api/state', async () => ({ machine: machine.snapshot(), grinder: grinder.snapshot(), server: info() }));
@@ -164,7 +165,7 @@ export function createDirectBackend() {
     // Wie fetch auf die Server-API: → { status, data } oder { status, download }
     async handle(method, path, body = {}) {
       const { route: r, params, rawMatch, exists } = match(method, path.split('?')[0]);
-      if (!r) return { status: exists ? 405 : 404, data: { error: exists ? 'Methode nicht erlaubt' : 'Nicht gefunden' } };
+      if (!r) return { status: exists ? 405 : 404, data: { error: exists ? t('server.http.methodNotAllowed') : t('server.http.notFound') } };
       try {
         const result = await r.handler({ params, body, rawMatch });
         if (result?.download) return { status: 200, download: result.download };

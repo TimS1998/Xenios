@@ -262,17 +262,17 @@ class MainActivity : Activity() {
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
         getSystemService(DownloadManager::class.java).enqueue(req)
-        Toast.makeText(this, "Download: $name", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.main_toast_download, name), Toast.LENGTH_SHORT).show()
     }
 
     private fun showLoadError(message: String) {
         if (errorShown || isFinishing) return
         errorShown = true
         AlertDialog.Builder(this)
-            .setTitle(if (direct) "Seite nicht ladbar" else "Server nicht erreichbar")
+            .setTitle(if (direct) R.string.main_error_title_page else R.string.main_error_title_server)
             .setMessage(if (direct) message else "$message\n\n${prefs.bases.joinToString("\n")}")
-            .setPositiveButton("Erneut versuchen") { _, _ -> errorShown = false; load(intent, fresh = true) }
-            .setNeutralButton("Verbindung ändern") { _, _ -> errorShown = false; openSetup() }
+            .setPositiveButton(R.string.main_error_retry) { _, _ -> errorShown = false; load(intent, fresh = true) }
+            .setNeutralButton(R.string.main_error_change) { _, _ -> errorShown = false; openSetup() }
             .setOnCancelListener { errorShown = false }
             .show()
     }
@@ -309,7 +309,7 @@ class MainActivity : Activity() {
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (!request.isForMainFrame) return
             if (enterFallback(request.url.path)) return
-            showLoadError(error.description?.toString() ?: "Unbekannter Fehler")
+            showLoadError(error.description?.toString() ?: getString(R.string.main_error_unknown))
         }
 
         // Tunnel steht, Server dahinter nicht (Cloudflare liefert dann eine eigene Fehlerseite)
@@ -426,7 +426,7 @@ class MainActivity : Activity() {
                 .put("machineApi", prefs.machineApi)
                 .put("grinderUrl", prefs.grinderIp?.takeIf { it.isNotBlank() }?.let { "https://$it" } ?: JSONObject.NULL)
                 .put("grinderPassword", prefs.grinderPassword ?: "")
-                .put("version", "App " + BuildConfigInfo.VERSION)
+                .put("version", getString(R.string.main_direct_version, BuildConfigInfo.VERSION))
                 .toString()
         }
 
@@ -435,7 +435,7 @@ class MainActivity : Activity() {
         fun http(id: Int, json: String) {
             httpPool.execute {
                 val result = try {
-                    if (!direct) throw IllegalStateException("Nur im Direkt-Modus")
+                    if (!direct) throw IllegalStateException(getString(R.string.main_http_direct_only))
                     val hosts = listOfNotNull(prefs.machineIp, prefs.grinderIp).filter { it.isNotBlank() }.toSet()
                     DirectHttp.request(JSONObject(json), hosts)
                 } catch (e: Exception) {
@@ -455,11 +455,11 @@ class MainActivity : Activity() {
                     put(MediaStore.Downloads.DISPLAY_NAME, safe)
                     put(MediaStore.Downloads.MIME_TYPE, mime.substringBefore(';'))
                 }
-                val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw IllegalStateException("Speichern nicht möglich")
+                val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw IllegalStateException(getString(R.string.main_save_impossible))
                 contentResolver.openOutputStream(uri)?.use { it.write(android.util.Base64.decode(base64, android.util.Base64.DEFAULT)) }
-                runOnUiThread { Toast.makeText(this@MainActivity, "Gespeichert in Downloads: $safe", Toast.LENGTH_SHORT).show() }
+                runOnUiThread { Toast.makeText(this@MainActivity, getString(R.string.main_save_done, safe), Toast.LENGTH_SHORT).show() }
             } catch (e: Exception) {
-                runOnUiThread { Toast.makeText(this@MainActivity, "Speichern fehlgeschlagen: ${e.message}", Toast.LENGTH_LONG).show() }
+                runOnUiThread { Toast.makeText(this@MainActivity, getString(R.string.main_save_failed, e.message.toString()), Toast.LENGTH_LONG).show() }
             }
         }
 
@@ -494,7 +494,7 @@ class MainActivity : Activity() {
                 try {
                     startActivity(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
                 } catch (_: Exception) {
-                    Toast.makeText(this@MainActivity, "Keine Uhr-App gefunden", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, R.string.main_no_clock_app, Toast.LENGTH_SHORT).show()
                 }
             }
         }

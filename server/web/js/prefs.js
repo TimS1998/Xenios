@@ -1,5 +1,6 @@
 // Einstellungen dieses Geräts (localStorage): sichtbare Tabs, ausgeblendete Komponenten, Einschalten ohne Dampf.
 // Ändert sich etwas, gibt es das Ereignis „xenios-prefs“ (Navigation und offene Seiten zeichnen sich neu).
+import { t } from '../shared/i18n.js';
 
 function get(k) {
   try { return localStorage.getItem(k); } catch { return null; }
@@ -30,9 +31,9 @@ export function setTabHidden(path, hidden) {
 
 // --- Komponenten komplett ausblenden ---
 export const COMPONENTS = [
-  { id: 'grinder', title: 'Mühle', sub: 'Mühlen-Tab, Mühlen-Kacheln, Mahlvorgänge auf der Startseite' },
-  { id: 'scale', title: 'Waage', sub: 'Gewicht und Bezugsgewichte der internen Waage' },
-  { id: 'care', title: 'Pflege (Backflush)', sub: 'Backflush-Erinnerung und Pflege-Kachel' },
+  { id: 'grinder', get title() { return t('app.components.grinderTitle'); }, get sub() { return t('app.components.grinderSub'); } },
+  { id: 'scale', get title() { return t('app.components.scaleTitle'); }, get sub() { return t('app.components.scaleSub'); } },
+  { id: 'care', get title() { return t('app.components.careTitle'); }, get sub() { return t('app.components.careSub'); } },
 ];
 export const isHidden = (id) => readSet('hiddenComponents').has(id);
 export function setComponentHidden(id, hidden) {
