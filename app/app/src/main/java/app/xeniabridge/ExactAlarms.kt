@@ -32,10 +32,10 @@ object ExactAlarms {
         if (allowed(activity) || prefs.exactAlarmAsked || !Widgets.hasWidgets(activity)) return
         prefs.exactAlarmAsked = true
         AlertDialog.Builder(activity)
-            .setTitle("Widgets aktuell halten")
-            .setMessage("Damit sich die Widgets alle 5 Sekunden aktualisieren, braucht die App die Erlaubnis „Wecker und Erinnerungen“. Das Handy wird dabei nicht geweckt; bei ausgeschaltetem Bildschirm wird nichts abgefragt.\n\nOhne die Erlaubnis aktualisieren sich die Widgets langsamer. Sie lässt sich jederzeit unter Einstellungen → Widgets erteilen.")
-            .setPositiveButton("Erlauben") { _, _ -> openSettings(activity) }
-            .setNegativeButton("Später", null)
+            .setTitle(R.string.exact_title)
+            .setMessage(R.string.exact_text)
+            .setPositiveButton(R.string.exact_allow) { _, _ -> openSettings(activity) }
+            .setNegativeButton(R.string.exact_later, null)
             .show()
     }
 }

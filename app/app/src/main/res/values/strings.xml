@@ -59,4 +59,228 @@
     <string name="setup_connect">Verbinden</string>
     <string name="state_offline">Offline</string>
     <string name="state_login">Anmelden</string>
+    <!-- Allgemein: Fehlertext ohne Einzelheiten (Widgets, Toasts) -->
+    <string name="error_generic">Fehler</string>
+
+    <!-- Zustand der Maschine: Widgets und Schnelleinstellungs-Kachel -->
+    <string name="state_shot">Bezug läuft</string>
+    <string name="state_off">Aus</string>
+    <string name="state_eco">Eco</string>
+    <string name="state_fault">Störung</string>
+    <string name="state_ready">Bereit</string>
+    <string name="state_heating">Heizt auf</string>
+
+    <!-- Hinweis, solange ein Schaltbefehl läuft (Widgets, Kachel) -->
+    <string name="switch_note_on">Schaltet ein …</string>
+    <string name="switch_note_off">Schaltet aus …</string>
+    <string name="switch_note_eco">Schaltet auf Eco …</string>
+    <string name="switch_note_steam_on">Dampfkessel ein …</string>
+    <string name="switch_note_steam_off">Dampfkessel aus …</string>
+
+    <!-- Widgets: Titel in der Kopfzeile (WidgetPainter.head setzt „Xenios – “ davor) -->
+    <string name="widget_head_title">Xenios – %1$s</string>
+    <string name="widget_title_power">Ein/Aus</string>
+    <string name="widget_title_powerns">Ein ohne Dampf/Aus</string>
+    <string name="widget_title_mode">Ein/Eco/Aus</string>
+    <string name="widget_title_switch">Schalter</string>
+    <string name="widget_title_large">Espressomaschine</string>
+    <string name="widget_title_gauges">Instrumente</string>
+    <string name="widget_title_targets">Sollwerte</string>
+    <string name="widget_title_care">Pflege</string>
+    <string name="widget_title_history">Verlauf (10 min)</string>
+    <string name="widget_title_lastshot">Letzter Bezug</string>
+    <string name="widget_title_shots">Bezüge</string>
+
+    <!-- Widgets: Fehler und fehlende Daten -->
+    <string name="widget_error_direct_only">Im Direkt-Modus nur in der App</string>
+    <string name="widget_error_render">Widget-Fehler: %1$s %2$s</string>
+    <string name="widget_error_login">Xenios – %1$s</string>
+    <string name="widget_error_tap_reload">Antippen zum Neuladen</string>
+    <string name="widget_missing_care">Pflege nur mit Server</string>
+    <string name="widget_missing_history">Verlauf nur mit Server</string>
+    <string name="widget_missing_shots">Bezüge nur mit Server</string>
+    <string name="widget_missing_update_server">Server aktualisieren (ab 2.12.13)</string>
+
+    <!-- Widgets „Ein/Aus“ und „Ein ohne Dampf/Aus“: Zeile unter dem Zustand -->
+    <string name="widget_power_temp_nosteam">%1$s °C · ohne Dampf</string>
+    <string name="widget_power_nosteam">ohne Dampf</string>
+
+    <!-- Widgets: Knöpfe Ein/Eco/Aus und Kippschalter -->
+    <string name="widget_seg_on">Ein</string>
+    <string name="widget_seg_eco">Eco</string>
+    <string name="widget_seg_off">Aus</string>
+    <string name="widget_toggle_steam">Dampfkessel</string>
+    <string name="widget_toggle_steam_value">an · %1$s bar</string>
+    <string name="widget_toggle_on">an</string>
+    <string name="widget_toggle_off">aus</string>
+    <string name="widget_toggle_nosteam">Ohne Dampf einschalten</string>
+
+    <!-- Widget „Espressomaschine groß“: Statuszeile und Abzeichen -->
+    <string name="widget_large_group">Brühgruppe %1$s °C</string>
+    <string name="widget_large_steam">Dampf %1$s bar</string>
+    <string name="widget_large_next_on">Nächstes Einschalten %1$s</string>
+    <string name="widget_large_no_next">Kein Einschalten geplant</string>
+    <string name="widget_badge_tank_ok">Tank ok</string>
+    <string name="widget_badge_tank_empty">Tank leer</string>
+    <string name="widget_badge_steam_on">Dampf an</string>
+    <string name="widget_badge_steam_off">Dampf aus</string>
+    <string name="widget_badge_scale">Waage verbunden</string>
+    <!-- bisher ohne Einzahl (auch „1 Bezüge heute“); Wortlaut unverändert übernommen -->
+    <plurals name="widget_badge_shots_today">
+        <item quantity="one">%1$d Bezüge heute</item>
+        <item quantity="other">%1$d Bezüge heute</item>
+    </plurals>
+
+    <!-- Widget „Instrumente“: Beschriftungen und Ziele unter den Manometern -->
+    <string name="widget_gauge_pressure">Druck</string>
+    <string name="widget_gauge_group">Brühgruppe</string>
+    <string name="widget_gauge_boiler">Brühkessel</string>
+    <string name="widget_gauge_steam">Dampfkessel</string>
+    <string name="widget_gauge_target_bar">Ziel %1$s bar</string>
+    <string name="widget_gauge_target_celsius">Ziel %1$s °C</string>
+    <string name="widget_gauge_target_bar_off">aus · Ziel %1$s bar</string>
+
+    <!-- Widget „Sollwerte“: Zeilen -->
+    <string name="widget_target_group">Gruppe</string>
+    <string name="widget_target_boiler">Kessel</string>
+    <string name="widget_target_steam">Dampf</string>
+
+    <!-- Widget „Pflege“ -->
+    <string name="widget_care_days_short">%1$d T</string>
+    <string name="widget_care_backflush">Backflush</string>
+    <string name="widget_care_due">fällig</string>
+    <string name="widget_care_tomorrow">morgen</string>
+    <string name="widget_care_in_days">in %1$d Tagen</string>
+
+    <!-- Widgets „Letzter Bezug“ und „Bezüge“ -->
+    <string name="widget_shot_last_at">Letzter · %1$s</string>
+    <string name="widget_shot_none">Noch kein Bezug</string>
+    <string name="widget_shots_total_7d">%1$d in 7 Tagen</string>
+    <string name="widget_shots_per_day">Pro Tag</string>
+    <string name="widget_shots_times">Bezugszeiten</string>
+
+    <!-- Widgets: leere Diagramme (WidgetDraw) -->
+    <string name="widget_chart_no_curve">Keine Kurve</string>
+    <string name="widget_chart_no_history">Noch kein Verlauf</string>
+    <string name="widget_chart_no_shots">Noch keine Bezüge</string>
+
+    <!-- Server-Aufrufe (Api): Fehlermeldungen in Widgets, Toasts und Einrichtung -->
+    <string name="api_error_not_logged_in">Nicht angemeldet</string>
+    <string name="api_error_not_configured">Nicht eingerichtet</string>
+    <string name="api_error_redirect">Weiterleitung – evtl. Cloudflare Access aktiv? Die App braucht direkten Zugang.</string>
+    <string name="api_error_http">Fehler %1$d</string>
+    <string name="api_error_machine_unreachable">Maschine nicht erreichbar</string>
+    <string name="api_error_shot_running">Bezug läuft – bitte an der Maschine stoppen</string>
+    <string name="api_error_no_token">Server liefert kein Token – Xenios aktualisieren?</string>
+    <string name="api_error_unknown_host">Server nicht gefunden</string>
+    <string name="api_error_timeout">Zeitüberschreitung</string>
+    <string name="api_error_tls">TLS-Fehler: Zertifikat ungültig oder geändert (lokale Adresse neu eintragen)</string>
+    <string name="api_error_no_connection">Keine Verbindung (%1$s)</string>
+    <string name="api_error_refused">abgelehnt</string>
+
+    <!-- Direkt-Modus (DirectMachine, NetworkScan): Fehlermeldungen und Gerätename -->
+    <string name="direct_error_no_machine_ip">Keine Maschinen-IP eingerichtet</string>
+    <string name="direct_error_machine_unreachable">Maschine nicht erreichbar (nur im Heimnetz)</string>
+    <string name="direct_error_machine_http">Maschine antwortet HTTP %1$d</string>
+    <string name="direct_error_unexpected">Unerwartete Antwort der Maschine</string>
+    <string name="direct_error_invalid_mode">Ungültiger Modus</string>
+    <string name="direct_scan_grinder">Mühle</string>
+
+    <!-- Hauptfenster (MainActivity): Toasts, Ladefehler-Dialog, Brücke zur Web-App -->
+    <string name="main_toast_download">Download: %1$s</string>
+    <string name="main_error_title_page">Seite nicht ladbar</string>
+    <string name="main_error_title_server">Server nicht erreichbar</string>
+    <string name="main_error_retry">Erneut versuchen</string>
+    <string name="main_error_change">Verbindung ändern</string>
+    <string name="main_error_unknown">Unbekannter Fehler</string>
+    <string name="main_direct_version">App %1$s</string>
+    <string name="main_http_direct_only">Nur im Direkt-Modus</string>
+    <string name="main_save_impossible">Speichern nicht möglich</string>
+    <string name="main_save_done">Gespeichert in Downloads: %1$s</string>
+    <string name="main_save_failed">Speichern fehlgeschlagen: %1$s</string>
+    <string name="main_no_clock_app">Keine Uhr-App gefunden</string>
+
+    <!-- Einrichtung (SetupActivity): Fehlermeldungen -->
+    <string name="setup_error_local_network">Ohne die Berechtigung „Geräte im lokalen Netzwerk“ kann die App Maschine und Mühle nicht suchen. Sie lässt sich in den Android-Einstellungen der App erteilen – oder die IPs von Hand eintragen.</string>
+    <string name="setup_error_no_server_found">Kein Xenios-Server im WLAN gefunden (gesucht: HTTPS Port 8443, HTTP Port 80/8080). Gleiches WLAN? Sonst die IP des Servers von Hand eintragen.</string>
+    <string name="setup_error_nothing_found">Nichts gefunden. Ist das Handy im selben WLAN wie Maschine und Mühle? Sonst die IPs von Hand eintragen (Anleitung).</string>
+    <string name="setup_error_machine_ip">Maschine: bitte eine IP-Adresse im Heimnetz eingeben, z. B. 192.168.178.55</string>
+    <string name="setup_error_grinder_ip">Mühle: bitte eine IP-Adresse im Heimnetz eingeben, z. B. 192.168.178.54</string>
+    <string name="setup_error_no_xenia">Unter %1$s antwortet keine Xenia. Gleiches WLAN? IP richtig?</string>
+    <string name="setup_error_server_url">Server-Adresse: https:// (http nur im eigenen Netz)</string>
+    <string name="setup_error_local_url">Lokale Adresse: nur Heimnetz-Adressen wie 192.168.178.32</string>
+    <string name="setup_error_no_address">Bitte mindestens eine Adresse eingeben</string>
+    <string name="setup_error_no_password">Bitte das App-Passwort eingeben</string>
+    <string name="setup_error_server_unreachable">Server nicht erreichbar</string>
+
+    <!-- Einrichtung: Suche im WLAN (Knopf, Fortschritt, Ergebnislisten) -->
+    <string name="setup_scan_button">Suche …</string>
+    <string name="setup_scan_subnet">Suche im WLAN (%1$s.1–254) …</string>
+    <string name="setup_scan_running">Suche im WLAN …</string>
+    <string name="setup_scan_progress">Suche im WLAN … %1$d von %2$d Adressen</string>
+    <string name="setup_scan_progress_found">Suche im WLAN … %1$d von %2$d Adressen · %3$d gefunden</string>
+    <string name="setup_scan_servers_title">Server gefunden – antippen zum Übernehmen</string>
+    <string name="setup_scan_found_title">Gefunden – antippen zum Übernehmen</string>
+    <string name="setup_scan_found_machine">Maschine: %1$s – %2$s</string>
+    <string name="setup_scan_found_grinder">Mühle: %1$s – %2$s</string>
+    <string name="setup_scan_done">Fertig</string>
+
+    <!-- Einrichtung: Anleitungen „IP finden“ (HTML; %1$s = setup_help_subnet oder leer) -->
+    <string name="setup_help_ok">OK</string>
+    <string name="setup_help_subnet"> (%1$s.1–254)</string>
+    <string name="setup_help_server_title">IP des Servers finden</string>
+    <string name="setup_help_server_html"><![CDATA[<p><b>Am einfachsten:</b> „Im WLAN suchen“ tippen. Die App fragt alle Geräte im WLAN dieses Handys ab%1$s und trägt den Xenios-Server ein.</p>
+<p><b>Raspberry Pi / Server:</b> Auf dem Gerät <b>hostname -I</b> eingeben – die erste Adresse ist die IP im WLAN.</p>
+<p><b>Fritz!Box</b> (Adressen 192.168.178.x): <b>fritz.box</b> öffnen → <b>Heimnetz → Netzwerk → Netzwerkverbindungen</b>. Der Pi heißt meist <b>raspberrypi</b>. Tipp: „Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“ anhaken.</p>
+<p><b>Adresse:</b> Xenios lauscht auf <b>https://&lt;IP&gt;:8443</b> (oder http Port 80/8080).</p>
+<p><b>Prüfen:</b> Im Browser des Handys <b>https://&lt;IP&gt;:8443/</b> öffnen. Es erscheint die Anmeldung von Xenios (Zertifikatswarnung bestätigen).</p>]]></string>
+    <string name="setup_help_ip_title">IP-Adressen finden</string>
+    <string name="setup_help_ip_html"><![CDATA[<p><b>Am einfachsten:</b> „Im WLAN suchen“ tippen. Die App fragt alle Geräte im WLAN dieses Handys ab%1$s und zeigt Maschine und Mühle an.</p>
+<p><b>Fritz!Box</b> (Adressen 192.168.178.x):</p>
+<ol>
+<li>Im Browser <b>fritz.box</b> öffnen und anmelden.</li>
+<li><b>Heimnetz → Netzwerk → Netzwerkverbindungen</b>.</li>
+<li>Die <b>Maschine</b> heißt meist <b>ESP32-…</b> oder <b>espressif</b>, die <b>Mühle</b> <b>hemro_hsg_…</b> bzw. „Hemro“.</li>
+<li>Die IP-Adresse steht in der Spalte „IP-Adresse“.</li>
+<li>Tipp: Beim Gerät auf „Bearbeiten“ und <b>„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“</b> anhaken. Sonst kann sich die Adresse nach einem Neustart ändern.</li>
+</ol>
+<p><b>Andere Router:</b> In der Router-Oberfläche oder -App nach „Geräte“, „Clients“ oder „DHCP“ suchen und dort nach ESP32 bzw. Hemro schauen.</p>
+<p><b>An der Mühle:</b> Im Menü der E64 WS unter Netzwerk/WLAN steht ihre IP-Adresse.</p>
+<p><b>Prüfen:</b> Im Browser des Handys <b>http://&lt;IP&gt;/</b> öffnen. Bei der Maschine erscheint die Xenia-Oberfläche. Bei der Mühle <b>https://&lt;IP&gt;/</b> öffnen und die Zertifikatswarnung bestätigen.</p>]]></string>
+
+    <!-- Hinweis „Wecker und Erinnerungen“ (ExactAlarms), einmalig beim Öffnen der App -->
+    <string name="exact_title">Widgets aktuell halten</string>
+    <string name="exact_text">Damit sich die Widgets alle 5 Sekunden aktualisieren, braucht die App die Erlaubnis „Wecker und Erinnerungen“. Das Handy wird dabei nicht geweckt; bei ausgeschaltetem Bildschirm wird nichts abgefragt.\n\nOhne die Erlaubnis aktualisieren sich die Widgets langsamer. Sie lässt sich jederzeit unter Einstellungen → Widgets erteilen.</string>
+    <string name="exact_allow">Erlauben</string>
+    <string name="exact_later">Später</string>
+
+    <!-- App-Shortcuts (ActionActivity): Toast nach dem Schalten -->
+    <string name="action_on">Xenia wird eingeschaltet</string>
+    <string name="action_on_nosteam">Xenia wird ohne Dampf eingeschaltet</string>
+    <string name="action_eco">Eco-Modus aktiv</string>
+    <string name="action_off">Xenia ausgeschaltet</string>
+
+    <!-- App-Update (AppUpdate): Fehler in den Einstellungen der Web-App -->
+    <string name="update_error_rate_limited">GitHub bremst gerade, später erneut versuchen</string>
+    <string name="update_error_http">GitHub antwortet HTTP %1$d</string>
+    <string name="update_error_no_connection">Keine Verbindung zu GitHub</string>
+
+    <!-- App-Update, Installation (Installer.kt der Varianten „updater“ und „manuell“): Fehler in den Einstellungen der Web-App -->
+    <string name="update_install_no_setting">Einstellung „Unbekannte Apps installieren“ nicht gefunden</string>
+    <string name="update_install_bad_size">GitHub meldet eine unerwartete Größe der APK</string>
+    <string name="update_install_http">Download: HTTP %1$d</string>
+    <string name="update_install_too_big">APK größer als angekündigt</string>
+    <string name="update_install_incomplete">Download unvollständig</string>
+    <string name="update_install_checksum">Prüfsumme der APK stimmt nicht mit dem Release überein</string>
+    <string name="update_install_save_failed">APK ließ sich nicht speichern</string>
+    <string name="update_install_unreadable">APK nicht lesbar</string>
+    <string name="update_install_other_app">Die APK gehört zu einer anderen App</string>
+    <string name="update_install_build_mismatch">Build-Nummer der APK passt nicht zum Release</string>
+    <string name="update_install_other_key">Die APK ist mit einem anderen Schlüssel signiert als diese App (selbst gebaut?). Einmal von Hand aus dem Release installieren.</string>
+    <string name="update_install_no_dialog">Android verlangt eine Bestätigung, liefert aber keinen Dialog</string>
+    <string name="update_install_aborted">Installation abgebrochen</string>
+    <string name="update_install_failed">Installation fehlgeschlagen: %1$s</string>
+    <string name="update_install_unknown_reason">unbekannter Grund</string>
+    <string name="update_install_confirm_failed">Bestätigung ließ sich nicht öffnen: %1$s</string>
+    <string name="update_install_no_browser">Kein Browser gefunden</string>
 </resources>

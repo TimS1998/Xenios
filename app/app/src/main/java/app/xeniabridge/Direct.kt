@@ -156,7 +156,7 @@ object DirectHttp {
 
 /** Maschine direkt (für Widgets, Kachel und Shortcuts im Direkt-Modus). Gleiche Berechnung wie public/shared/machine-core.js. */
 object DirectMachine {
-    private fun base(context: Context): String = "http://" + (Prefs(context).machineIp ?: throw Api.ApiException(0, "Keine Maschinen-IP eingerichtet"))
+    private fun base(context: Context): String = "http://" + (Prefs(context).machineIp ?: throw Api.ApiException(0, context.getString(R.string.direct_error_no_machine_ip)))
 
     private fun get(context: Context, path: String): JSONObject {
         val (code, text) = try {
@@ -164,19 +164,19 @@ object DirectMachine {
         } catch (e: Api.ApiException) {
             throw e
         } catch (e: Exception) {
-            throw Api.ApiException(502, "Maschine nicht erreichbar (nur im Heimnetz)")
+            throw Api.ApiException(502, context.getString(R.string.direct_error_machine_unreachable))
         }
-        if (code != 200) throw Api.ApiException(code, "Maschine antwortet HTTP $code")
-        return try { JSONObject(text) } catch (_: Exception) { throw Api.ApiException(502, "Unerwartete Antwort der Maschine") }
+        if (code != 200) throw Api.ApiException(code, context.getString(R.string.direct_error_machine_http, code))
+        return try { JSONObject(text) } catch (_: Exception) { throw Api.ApiException(502, context.getString(R.string.direct_error_unexpected)) }
     }
 
     private fun post(context: Context, path: String, body: JSONObject) {
         val (code, _) = try {
             DirectHttp.text(base(context) + path, "POST", body.toString())
         } catch (e: Exception) {
-            throw Api.ApiException(502, "Maschine nicht erreichbar (nur im Heimnetz)")
+            throw Api.ApiException(502, context.getString(R.string.direct_error_machine_unreachable))
         }
-        if (code != 200) throw Api.ApiException(code, "Maschine antwortet HTTP $code")
+        if (code != 200) throw Api.ApiException(code, context.getString(R.string.direct_error_machine_http, code))
     }
 
     private fun JSONObject.num(k: String): Double? = if (!has(k) || isNull(k)) null else optString(k).toDoubleOrNull()
@@ -229,7 +229,7 @@ object DirectMachine {
             "eco" -> "2"
             // Alte Xenia: eigene Aktion „an ohne Dampfkessel“; neue: einschalten und Dampfkessel aus
             Api.MODE_ON_NO_STEAM -> if (classic) "5" else "1"
-            else -> throw Api.ApiException(400, "Ungültiger Modus")
+            else -> throw Api.ApiException(400, context.getString(R.string.direct_error_invalid_mode))
         }
         post(context, "/api/v2/machine/control", JSONObject().put("action", action))
         if (classic) return
@@ -291,7 +291,7 @@ object NetworkScan {
         for (i in 1..254) {
             val ip = "$subnet.$i"
             pool.execute {
-                try { probeDevice(ip, found) } finally { progress?.update(done.incrementAndGet(), 254, found.size) }
+                try { probeDevice(context, ip, found) } finally { progress?.update(done.incrementAndGet(), 254, found.size) }
             }
         }
         pool.shutdown()
@@ -299,7 +299,7 @@ object NetworkScan {
         return found.sortedBy { it.ip.substringAfterLast('.').toInt() }
     }
 
-    private fun probeDevice(ip: String, found: MutableList<Found>) {
+    private fun probeDevice(context: Context, ip: String, found: MutableList<Found>) {
                 try {
                     // der ESP32 der Xenia antwortet im Stromsparmodus mitunter erst nach über einer Sekunde
                     val (code, text) = DirectHttp.text("http://$ip/api/v2/machine", timeoutMs = 2500)
@@ -318,7 +318,8 @@ object NetworkScan {
                 try {
                     val (code, text) = DirectHttp.text("https://$ip/rest_api/get_machine_info", "POST", "", timeoutMs = 1200, insecureTls = true)
                     if (code == 200 && text.contains("grinderType")) {
-                        found += Found(ip, "grinder", JSONObject(text).optString("grinderTypeName", "Mühle").ifBlank { "Mühle" })
+                        val fallback = context.getString(R.string.direct_scan_grinder)
+                        found += Found(ip, "grinder", JSONObject(text).optString("grinderTypeName", fallback).ifBlank { fallback })
                     }
                 } catch (_: Exception) { }
     }

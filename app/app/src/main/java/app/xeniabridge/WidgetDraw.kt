@@ -95,6 +95,9 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
     val c = Canvas(bitmap)
     // Schrift je Design: Xenia „Open Sans“ wie die Web-Oberfläche der Maschine, Material die Systemschrift
     private fun font(id: Int, fallback: Typeface): Typeface = runCatching { ctx.resources.getFont(id) }.getOrDefault(fallback)
+    /** Text aus strings.xml (für die Widgets, die nur den Painter haben) */
+    fun str(id: Int, vararg args: Any): String = if (args.isEmpty()) ctx.getString(id) else ctx.getString(id, *args)
+    fun plural(id: Int, n: Int, vararg args: Any): String = ctx.resources.getQuantityString(id, n, *args)
     private val regular: Typeface = if (t.xenia) font(R.font.open_sans_regular, Typeface.SANS_SERIF) else Typeface.create("sans-serif", Typeface.NORMAL)
     private val medium: Typeface = if (t.xenia) font(R.font.open_sans_semibold, Typeface.SANS_SERIF) else Typeface.create("sans-serif-medium", Typeface.NORMAL)
     private val bold: Typeface = if (t.xenia) font(R.font.open_sans_semibold, Typeface.DEFAULT_BOLD) else Typeface.create("sans-serif", Typeface.BOLD)
@@ -201,7 +204,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
                 }
             }
         }
-        val title = "Xenios – $name"
+        val title = str(R.string.widget_head_title, name)
         val avail = r.width() - sz - 6 - rightW - 6
         // wo kein Platz für „Xenios – “ ist, nur den Namen
         val label = if (measure(title, 11.5f) <= avail) title else name
@@ -368,7 +371,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
     // --- Diagramme ---------------------------------------------------------------------------------------------
     /** Bezugskurve: Druck (blau, Fläche) und Gewicht (grün, gestrichelt) über die Zeit */
     fun shotChart(r: RectF, curve: List<DoubleArray>, minSeconds: Double = 20.0) {
-        if (curve.size < 2) { textMid("Keine Kurve", r, 11f, t.muted, 0, Paint.Align.CENTER); return }
+        if (curve.size < 2) { textMid(str(R.string.widget_chart_no_curve), r, 11f, t.muted, 0, Paint.Align.CENTER); return }
         val tMax = max(minSeconds, curve.maxOf { it[0] })
         val wMax = max(10.0, (curve.mapNotNull { if (it.size > 2 && !it[2].isNaN()) it[2] else null }.maxOrNull() ?: 0.0) * 1.1)
         val left = r.left + 14; val right = r.right - 16; val top = r.top + 4; val bottom = r.bottom - 12
@@ -393,7 +396,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
 
     /** Verlauf: Temperaturen (links, °C) und Drücke (rechts, bar) der letzten 10 Minuten */
     fun historyChart(r: RectF, samples: List<DoubleArray>) {
-        if (samples.size < 2) { textMid("Noch kein Verlauf", r, 11f, t.muted, 0, Paint.Align.CENTER); return }
+        if (samples.size < 2) { textMid(str(R.string.widget_chart_no_history), r, 11f, t.muted, 0, Paint.Align.CENTER); return }
         val left = r.left + 20; val right = r.right - 16; val top = r.top + 4; val bottom = r.bottom - 12
         val grid = stroke(t.outlineVariant, 0.6f)
         for (k in 0..4) {
@@ -420,7 +423,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
 
     /** Säulen mit Werten darüber und Beschriftung darunter; die letzte hervorgehoben */
     fun barChart(r: RectF, values: List<Pair<String, Double>>, unit: String = "") {
-        if (values.isEmpty()) { textMid("Noch keine Bezüge", r, 11f, t.muted, 0, Paint.Align.CENTER); return }
+        if (values.isEmpty()) { textMid(str(R.string.widget_chart_no_shots), r, 11f, t.muted, 0, Paint.Align.CENTER); return }
         val vMax = max(1.0, values.maxOf { it.second })
         val top = r.top + 12; val bottom = r.bottom - 12
         val slot = r.width() / values.size

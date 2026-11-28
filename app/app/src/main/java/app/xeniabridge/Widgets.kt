@@ -126,7 +126,7 @@ object Widgets {
             val fails = prefs.widgetFails + 1
             prefs.widgetFails = fails
             if (login || !quiet || fails > QUIET_FAILS) {
-                render(context, Data(null, if (login) context.getString(R.string.state_login) else Api.message(e), login, prefs.noSteamOn, prefs.direct))
+                render(context, Data(null, if (login) context.getString(R.string.state_login) else Api.message(context, e), login, prefs.noSteamOn, prefs.direct))
             }
             if (!login) schedule(context, retryDelay(fails))
             null
@@ -194,19 +194,19 @@ object Widgets {
     @Volatile private var switching: Switching? = null
 
     /** Erwarteter Zustand nach einem Schaltbefehl und der Hinweis dazu; null = keine sofortige Anzeige */
-    private fun expect(action: String?, mode: String?, s: Api.State, noSteamPref: Boolean): Pair<Api.State, String>? {
+    private fun expect(context: Context, action: String?, mode: String?, s: Api.State, noSteamPref: Boolean): Pair<Api.State, String>? {
         val off = s.isOff || !s.isOn && !s.isEco
-        fun on(noSteam: Boolean) = s.copy(status = "on", heated = s.heated && !off, steamOn = !noSteam) to "Schaltet ein …"
-        val toOff = s.copy(status = "off", steamOn = false) to "Schaltet aus …"
+        fun on(noSteam: Boolean) = s.copy(status = "on", heated = s.heated && !off, steamOn = !noSteam) to context.getString(R.string.switch_note_on)
+        val toOff = s.copy(status = "off", steamOn = false) to context.getString(R.string.switch_note_off)
         return when (action) {
             ACTION_TOGGLE -> if (s.isOn) toOff else on(noSteamPref)
             ACTION_TOGGLE_NOSTEAM -> if (s.isOn) toOff else on(true)
             ACTION_POWER -> when (mode) {
                 "off" -> toOff
-                "eco" -> s.copy(status = "eco") to "Schaltet auf Eco …"
+                "eco" -> s.copy(status = "eco") to context.getString(R.string.switch_note_eco)
                 else -> on(noSteamPref)
             }
-            ACTION_STEAM -> if (mode == "on") s.copy(steamOn = true) to "Dampfkessel ein …" else s.copy(steamOn = false) to "Dampfkessel aus …"
+            ACTION_STEAM -> if (mode == "on") s.copy(steamOn = true) to context.getString(R.string.switch_note_steam_on) else s.copy(steamOn = false) to context.getString(R.string.switch_note_steam_off)
             else -> null
         }
     }
@@ -249,7 +249,7 @@ object Widgets {
                             switching = Switching(System.currentTimeMillis() + 25_000) // länger als das Warten auf die Bestätigung (20 s)
                         }
                         // Sofort zeigen, was der Tipp bewirkt (erwarteter Zustand und „Schaltet ein …“)
-                        val exp = lastState?.let { expect(intent.action, intent.getStringExtra(EXTRA_MODE), it, prefs.noSteamOn) }
+                        val exp = lastState?.let { expect(app, intent.action, intent.getStringExtra(EXTRA_MODE), it, prefs.noSteamOn) }
                         if (isSwitch && exp != null) render(app, Data(exp.first, null, false, prefs.noSteamOn, prefs.direct, exp.second))
                         try {
                             when (intent.action) {
@@ -257,7 +257,7 @@ object Widgets {
                                 ACTION_TOGGLE_NOSTEAM -> Api.toggle(app, noSteam = true)
                                 ACTION_POWER -> Api.power(app, intent.getStringExtra(EXTRA_MODE) ?: "on")
                                 ACTION_STEAM, ACTION_STOP, ACTION_TARGET -> {
-                                    if (prefs.direct) throw Api.ApiException(0, "Im Direkt-Modus nur in der App")
+                                    if (prefs.direct) throw Api.ApiException(0, app.getString(R.string.widget_error_direct_only))
                                     when (intent.action) {
                                         ACTION_STEAM -> Api.steam(app, intent.getStringExtra(EXTRA_MODE) == "on")
                                         ACTION_STOP -> Api.stopScript(app)
@@ -298,7 +298,7 @@ object Widgets {
                                 }
                             } else Thread.sleep(1200)
                         } catch (e: Exception) {
-                            toast(app, Api.message(e))
+                            toast(app, Api.message(app, e))
                         } finally {
                             if (isSwitch) switching = null
                         }
@@ -332,7 +332,7 @@ object Widgets {
                     m.updateAppWidget(id, views(context, m, id, k, d, theme))
                 } catch (e: Exception) {
                     // Fehler sichtbar machen statt leer zu bleiben (ein Widget darf die anderen nicht aufhalten)
-                    runCatching { m.updateAppWidget(id, errorViews(context, k, theme, "Widget-Fehler: ${e.javaClass.simpleName} ${e.message ?: ""}")) }
+                    runCatching { m.updateAppWidget(id, errorViews(context, k, theme, context.getString(R.string.widget_error_render, e.javaClass.simpleName, e.message ?: ""))) }
                 }
             }
         }
@@ -393,8 +393,8 @@ object Widgets {
             return rv
         }
         when (k.cls) {
-            PowerWidget::class.java -> { drawPower(p, s, "Ein/Aus", note = d.note, dim = d.dim); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE)) }
-            PowerNoSteamWidget::class.java -> { drawPower(p, s, "Ein ohne Dampf/Aus", noSteam = true, note = d.note, dim = d.dim); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE_NOSTEAM)) }
+            PowerWidget::class.java -> { drawPower(p, s, p.str(R.string.widget_title_power), note = d.note, dim = d.dim); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE)) }
+            PowerNoSteamWidget::class.java -> { drawPower(p, s, p.str(R.string.widget_title_powerns), noSteam = true, note = d.note, dim = d.dim); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE_NOSTEAM)) }
             ModeWidget::class.java -> { drawMode(p, p.layout("mode"), s, d); bindSeg(context, rv, s) }
             SwitchWidget::class.java -> { drawSwitch(p, p.layout("switch"), s, d); bindSwitch(context, rv, s) }
             LargeWidget::class.java -> {
@@ -441,14 +441,14 @@ object Widgets {
         rv.setOnClickPendingIntent(R.id.tg_nosteam, broadcast(context, ACTION_NOSTEAM))
     }
 
-    private fun stateLabel(s: Api.State): String = when {
-        !s.online -> "Offline"
-        s.shot -> "Bezug läuft"
-        s.isOff -> "Aus"
-        s.isEco -> "Eco"
-        s.status == "fault" -> "Störung"
-        s.heated -> "Bereit"
-        else -> "Heizt auf"
+    private fun stateLabel(p: WidgetPainter, s: Api.State): String = when {
+        !s.online -> p.str(R.string.state_offline)
+        s.shot -> p.str(R.string.state_shot)
+        s.isOff -> p.str(R.string.state_off)
+        s.isEco -> p.str(R.string.state_eco)
+        s.status == "fault" -> p.str(R.string.state_fault)
+        s.heated -> p.str(R.string.state_ready)
+        else -> p.str(R.string.state_heating)
     }
 
     private fun stateDot(p: WidgetPainter, s: Api.State) = when {
@@ -462,13 +462,13 @@ object Widgets {
     private fun fmt(v: Double?, digits: Int = 1) = WidgetPainter.fmt(v, digits)
 
     /** Zusatzdaten fehlen: Direkt-Modus (kein Server) oder Server zu alt (vor 2.12.13) */
-    private fun missing(d: Data, what: String) = if (d.raw == null) "$what nur mit Server" else "Server aktualisieren (ab 2.12.13)"
+    private fun missing(p: WidgetPainter, d: Data, noServer: Int) = p.str(if (d.raw == null) noServer else R.string.widget_missing_update_server)
 
     private fun drawError(p: WidgetPainter, d: Data) {
         val pad = WidgetSpecs.PAD
         val r = RectF(pad, pad, p.wDp - pad, p.hDp - pad)
-        p.textMid(if (d.login) "Xenios – ${d.error}" else (d.error ?: "Fehler"), r, 12f, p.t.muted, 0, Paint.Align.CENTER)
-        if (!d.login && p.hDp > 70) p.text("Antippen zum Neuladen", r.centerX(), r.bottom - 2, 10f, p.t.outline, 0, Paint.Align.CENTER)
+        p.textMid(if (d.login) p.str(R.string.widget_error_login, d.error.toString()) else (d.error ?: p.str(R.string.error_generic)), r, 12f, p.t.muted, 0, Paint.Align.CENTER)
+        if (!d.login && p.hDp > 70) p.text(p.str(R.string.widget_error_tap_reload), r.centerX(), r.bottom - 2, 10f, p.t.outline, 0, Paint.Align.CENTER)
     }
 
     private fun drawPower(p: WidgetPainter, s: Api.State, title: String, noSteam: Boolean = false, note: String? = null, dim: Boolean = false) {
@@ -482,9 +482,9 @@ object Widgets {
         p.roundRect(RectF(r.left, r.centerY() - d / 2, r.left + d, r.centerY() + d / 2), d / 2, if (dim) p.withAlpha(circle, 0.55f) else circle)
         p.icon(R.drawable.wi_power, r.left + d / 2 - 11, r.centerY() - 11, 22f, if (on) p.t.onPrimary else p.t.onSurface)
         val tx = RectF(r.left + d + 10, r.top, r.right, r.bottom)
-        val sub = if (s.online && !s.isOff && s.group != null) "${fmt(s.group)} °C${if (noSteam && !s.steamOn) " · ohne Dampf" else ""}"
-            else if (noSteam && s.online) "ohne Dampf" else null
-        val label = note ?: stateLabel(s)
+        val sub = if (s.online && !s.isOff && s.group != null) (if (noSteam && !s.steamOn) p.str(R.string.widget_power_temp_nosteam, fmt(s.group)) else "${fmt(s.group)} °C")
+            else if (noSteam && s.online) p.str(R.string.widget_power_nosteam) else null
+        val label = note ?: stateLabel(p, s)
         if (sub == null || note != null) p.textMid(label, tx, 14f, p.t.onSurface, 1)
         else {
             p.textMid(label, RectF(tx.left, tx.top, tx.right, tx.centerY() + 1), 14f, p.t.onSurface, 1)
@@ -494,35 +494,35 @@ object Widgets {
 
     private fun drawSeg(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, dim: Boolean = false) {
         val reachable = s.online
-        r["btn_on"]?.let { p.segButton(it, R.drawable.wi_power, "Ein", s.isOn, reachable, dim) }
-        r["btn_eco"]?.let { p.segButton(it, R.drawable.wi_eco, "Eco", s.isEco, reachable && !s.isOff, dim) }
-        r["btn_off"]?.let { p.segButton(it, R.drawable.wi_close, "Aus", s.isOff, reachable && !s.isOff, dim) }
+        r["btn_on"]?.let { p.segButton(it, R.drawable.wi_power, p.str(R.string.widget_seg_on), s.isOn, reachable, dim) }
+        r["btn_eco"]?.let { p.segButton(it, R.drawable.wi_eco, p.str(R.string.widget_seg_eco), s.isEco, reachable && !s.isOff, dim) }
+        r["btn_off"]?.let { p.segButton(it, R.drawable.wi_close, p.str(R.string.widget_seg_off), s.isOff, reachable && !s.isOff, dim) }
     }
 
     private fun drawToggles(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
-        r["tg_steam"]?.let { p.toggleRow(it, R.drawable.wi_cloud, "Dampfkessel", if (s.steamOn && s.steam != null) "an · ${fmt(s.steam, 2)} bar" else if (s.steamOn) "an" else "aus", s.steamOn, s.online && s.isOn && !d.direct) }
-        r["tg_nosteam"]?.let { p.toggleRow(it, R.drawable.wi_power, "Ohne Dampf einschalten", null, d.noSteam) }
+        r["tg_steam"]?.let { p.toggleRow(it, R.drawable.wi_cloud, p.str(R.string.widget_toggle_steam), if (s.steamOn && s.steam != null) p.str(R.string.widget_toggle_steam_value, fmt(s.steam, 2)) else if (s.steamOn) p.str(R.string.widget_toggle_on) else p.str(R.string.widget_toggle_off), s.steamOn, s.online && s.isOn && !d.direct) }
+        r["tg_nosteam"]?.let { p.toggleRow(it, R.drawable.wi_power, p.str(R.string.widget_toggle_nosteam), null, d.noSteam) }
     }
 
     /** 4×1 wie das frühere Widget: Status und Brühgruppe links, Ein/Eco/Aus rechts */
     private fun drawMode(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
         // Kopfzeile mit Symbol und Titel, Zustand rechts (wie „Schalter“), darunter Ein/Eco/Aus über die ganze Breite
-        val label = d.note ?: stateLabel(s)
+        val label = d.note ?: stateLabel(p, s)
         val right = if (d.note == null && s.online && !s.isOff && s.group != null) "$label · ${fmt(s.group)} °C" else label
-        r["head"]?.let { p.head(it, R.drawable.wi_power, "Ein/Eco/Aus", right, dot = stateDot(p, s)) }
+        r["head"]?.let { p.head(it, R.drawable.wi_power, p.str(R.string.widget_title_mode), right, dot = stateDot(p, s)) }
         drawSeg(p, r, s, d.dim)
     }
 
     private fun drawSwitch(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
-        r["head"]?.let { p.head(it, R.drawable.wi_toggle_tile, "Schalter", d.note ?: stateLabel(s), dot = stateDot(p, s)) }
+        r["head"]?.let { p.head(it, R.drawable.wi_toggle_tile, p.str(R.string.widget_title_switch), d.note ?: stateLabel(p, s), dot = stateDot(p, s)) }
         drawSeg(p, r, s, d.dim)
         drawToggles(p, r, s, d)
     }
 
     private fun drawLarge(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
-        val label = d.note ?: stateLabel(s)
+        val label = d.note ?: stateLabel(p, s)
         // ohne Zustand rechts oben: den zeigt groß die Zeile darunter
-        r["head"]?.let { p.head(it, R.drawable.wi_power, "Espressomaschine") }
+        r["head"]?.let { p.head(it, R.drawable.wi_power, p.str(R.string.widget_title_large)) }
         r["status"]?.let { st ->
             val dia = min(46f, st.height())
             val on = s.isOn || s.isEco
@@ -531,22 +531,24 @@ object Widgets {
             val tx = RectF(st.left + dia + 12, st.top, st.right, st.bottom)
             p.textMid(label, RectF(tx.left, tx.top, tx.right, tx.centerY() + 4), 22f, p.t.onSurface, 1)
             val parts = mutableListOf<String>()
-            if (s.online && !s.isOff && s.group != null) parts += "Brühgruppe ${fmt(s.group)} °C"
-            if (s.online && s.steamOn && s.steam != null) parts += "Dampf ${fmt(s.steam, 2)} bar"
-            if (parts.isEmpty()) parts += s.nextAt?.let { "Nächstes Einschalten ${java.text.SimpleDateFormat("EE HH:mm", Locale.GERMANY).format(java.util.Date(it))}" } ?: "Kein Einschalten geplant"
+            if (s.online && !s.isOff && s.group != null) parts += p.str(R.string.widget_large_group, fmt(s.group))
+            if (s.online && s.steamOn && s.steam != null) parts += p.str(R.string.widget_large_steam, fmt(s.steam, 2))
+            if (parts.isEmpty()) parts += s.nextAt?.let { p.str(R.string.widget_large_next_on, java.text.SimpleDateFormat("EE HH:mm", Locale.GERMANY).format(java.util.Date(it))) } ?: p.str(R.string.widget_large_no_next)
             p.textMid(parts.joinToString(" · "), RectF(tx.left, tx.centerY() + 4, tx.right, tx.bottom), 11.5f, p.t.muted)
         }
         r["badges"]?.let { b ->
             var x = b.left
-            x += p.badge(if (s.tankOk) "Tank ok" else "Tank leer", x, b.centerY(), if (s.tankOk) p.withAlpha(p.t.success, 0.22f) else p.t.danger, if (s.tankOk) p.t.success else p.t.onDanger) + 4
-            x += p.badge(if (s.steamOn) "Dampf an" else "Dampf aus", x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer) + 4
+            x += p.badge(if (s.tankOk) p.str(R.string.widget_badge_tank_ok) else p.str(R.string.widget_badge_tank_empty), x, b.centerY(), if (s.tankOk) p.withAlpha(p.t.success, 0.22f) else p.t.danger, if (s.tankOk) p.t.success else p.t.onDanger) + 4
+            x += p.badge(if (s.steamOn) p.str(R.string.widget_badge_steam_on) else p.str(R.string.widget_badge_steam_off), x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer) + 4
             // Nur zeichnen, was noch ganz in die Zeile passt
             fun fits(str: String) = x + p.measure(str, 10f, 1) + 12 <= b.right
             // Alte Xenia (DBL): verbundene Bluetooth-Waage, wie in der Status-Kachel
-            if (d.raw?.optBoolean("scaleConnected") == true && fits("Waage verbunden"))
-                x += p.badge("Waage verbunden", x, b.centerY(), p.withAlpha(p.t.success, 0.22f), p.t.success) + 4
+            val scale = p.str(R.string.widget_badge_scale)
+            if (d.raw?.optBoolean("scaleConnected") == true && fits(scale))
+                x += p.badge(scale, x, b.centerY(), p.withAlpha(p.t.success, 0.22f), p.t.success) + 4
             val today = d.raw?.optJSONArray("days")?.let { a -> a.optJSONObject(a.length() - 1)?.optInt("count") }
-            if (today != null && fits("$today Bezüge heute")) p.badge("$today Bezüge heute", x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer)
+            val todayText = today?.let { p.plural(R.plurals.widget_badge_shots_today, it, it) }
+            if (todayText != null && fits(todayText)) p.badge(todayText, x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer)
         }
         drawSeg(p, r, s, d.dim)
         drawToggles(p, r, s, d)
@@ -563,7 +565,7 @@ object Widgets {
     }
 
     private fun drawGauges(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
-        r["head"]?.let { p.head(it, R.drawable.wi_thermo, "Instrumente") }
+        r["head"]?.let { p.head(it, R.drawable.wi_thermo, p.str(R.string.widget_title_gauges)) }
         val body = r["body"] ?: return
         val gap = 6f
         // eher quadratisch: 2 × 2 wie im Dashboard, sonst 1 × 4
@@ -581,18 +583,18 @@ object Widgets {
         val live = s.online // wie die Home-Kachel: Werte auch bei ausgeschalteter Maschine
         val pump = d.raw?.optDouble("pump")?.takeIf { !it.isNaN() }
         val pumpSet = d.raw?.optDouble("pumpSet")?.takeIf { !it.isNaN() }
-        p.gauge(cell(0), "Druck", if (live) pump else null, 1, "bar", pumpSet?.let { "Ziel ${fmt(it)} bar" },
+        p.gauge(cell(0), p.str(R.string.widget_gauge_pressure), if (live) pump else null, 1, "bar", pumpSet?.let { p.str(R.string.widget_gauge_target_bar, fmt(it)) },
             WidgetPainter.Scale(0.0, 12.0, 2.0, 0.5, 2.0, 11.0), WidgetPainter.Scale(0.0, 16.0, 2.0, 1.0, 2.0, null, "POMPA"))
         val tFlat = WidgetPainter.Scale(20.0, 110.0, 10.0, 2.5, 20.0, 100.0)
-        p.gauge(cell(1), "Brühgruppe", if (live) s.group else null, 1, "°C", s.groupSet?.let { "Ziel ${fmt(it)} °C" }, tFlat, WidgetPainter.Scale(0.0, 120.0, 20.0, 5.0, 20.0, null, "GRUPPO"))
-        p.gauge(cell(2), "Brühkessel", if (live) s.boiler else null, 1, "°C", s.boilerSet?.let { "Ziel ${fmt(it)} °C" }, tFlat, WidgetPainter.Scale(0.0, 120.0, 20.0, 5.0, 20.0, null, "CAFFÈ"))
-        p.gauge(cell(3), "Dampfkessel", if (live) s.steam else null, 2, "bar", s.steamSet?.let { "${if (s.steamOn) "" else "aus · "}Ziel ${fmt(it)} bar" },
+        p.gauge(cell(1), p.str(R.string.widget_gauge_group), if (live) s.group else null, 1, "°C", s.groupSet?.let { p.str(R.string.widget_gauge_target_celsius, fmt(it)) }, tFlat, WidgetPainter.Scale(0.0, 120.0, 20.0, 5.0, 20.0, null, "GRUPPO"))
+        p.gauge(cell(2), p.str(R.string.widget_gauge_boiler), if (live) s.boiler else null, 1, "°C", s.boilerSet?.let { p.str(R.string.widget_gauge_target_celsius, fmt(it)) }, tFlat, WidgetPainter.Scale(0.0, 120.0, 20.0, 5.0, 20.0, null, "CAFFÈ"))
+        p.gauge(cell(3), p.str(R.string.widget_gauge_steam), if (live) s.steam else null, 2, "bar", s.steamSet?.let { p.str(if (s.steamOn) R.string.widget_gauge_target_bar else R.string.widget_gauge_target_bar_off, fmt(it)) },
             WidgetPainter.Scale(0.0, 2.5, 0.5, 0.1, 1.0, 2.0), WidgetPainter.Scale(0.0, 3.0, 0.5, 0.1, 0.5, null, "CALDAIA"))
     }
 
     private fun drawTargets(p: WidgetPainter, r: Map<String, RectF>, s: Api.State) {
-        r["head"]?.let { p.head(it, R.drawable.wi_thermo, "Sollwerte") }
-        val rows = listOf(Triple("t1", "Gruppe", s.groupSet?.let { fmt(it) }), Triple("t2", "Kessel", s.boilerSet?.let { fmt(it) }), Triple("t3", "Dampf", s.steamSet?.let { fmt(it) }))
+        r["head"]?.let { p.head(it, R.drawable.wi_thermo, p.str(R.string.widget_title_targets)) }
+        val rows = listOf(Triple("t1", p.str(R.string.widget_target_group), s.groupSet?.let { fmt(it) }), Triple("t2", p.str(R.string.widget_target_boiler), s.boilerSet?.let { fmt(it) }), Triple("t3", p.str(R.string.widget_target_steam), s.steamSet?.let { fmt(it) }))
         for ((key, label, value) in rows) {
             val minus = r["${key}_minus"] ?: continue
             val plus = r["${key}_plus"] ?: continue
@@ -610,26 +612,26 @@ object Widgets {
 
     private fun drawCare(p: WidgetPainter, rows: Map<String, RectF>, d: Data) {
         // Kopfzeile wie bei den anderen Widgets: Symbol der Home-Kachel „Pflege“ und Titel
-        rows["head"]?.let { p.head(it, R.drawable.wi_check, "Pflege") }
+        rows["head"]?.let { p.head(it, R.drawable.wi_check, p.str(R.string.widget_title_care)) }
         val r = rows["body"] ?: return
         val care = d.raw?.optJSONObject("care")
-        if (care == null) { p.textMid(missing(d, "Pflege"), r, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
+        if (care == null) { p.textMid(missing(p, d, R.string.widget_missing_care), r, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         val interval = max(1, care.optInt("intervalDays", 7))
         val since = if (care.isNull("daysSince")) null else care.optInt("daysSince")
         val left = since?.let { interval - it }
         val rad = min(26f, r.height() / 2)
-        p.ring(r.left + rad, r.centerY(), rad, if (left == null) 1f else (left.toFloat() / interval).coerceIn(0f, 1f), if (left == null || left <= 0) "!" else "$left T")
+        p.ring(r.left + rad, r.centerY(), rad, if (left == null) 1f else (left.toFloat() / interval).coerceIn(0f, 1f), if (left == null || left <= 0) "!" else p.str(R.string.widget_care_days_short, left))
         val tx = RectF(r.left + rad * 2 + 10, r.top, r.right, r.bottom)
-        p.textMid("Backflush", RectF(tx.left, tx.top, tx.right, tx.centerY() + 2), 13f, p.t.onSurface, 1)
-        val sub = when { since == null -> "fällig"; left != null && left <= 0 -> "fällig"; left == 1 -> "morgen"; else -> "in $left Tagen" }
+        p.textMid(p.str(R.string.widget_care_backflush), RectF(tx.left, tx.top, tx.right, tx.centerY() + 2), 13f, p.t.onSurface, 1)
+        val sub = when { since == null -> p.str(R.string.widget_care_due); left != null && left <= 0 -> p.str(R.string.widget_care_due); left == 1 -> p.str(R.string.widget_care_tomorrow); else -> p.str(R.string.widget_care_in_days, left ?: 0) }
         p.textMid(sub, RectF(tx.left, tx.centerY() + 2, tx.right, tx.bottom - 4), 11.5f, if (care.optBoolean("due")) p.t.warning else p.t.muted)
     }
 
     private fun drawHistory(p: WidgetPainter, r: Map<String, RectF>, d: Data) {
-        r["head"]?.let { p.head(it, R.drawable.wi_history, "Verlauf (10 min)") }
+        r["head"]?.let { p.head(it, R.drawable.wi_history, p.str(R.string.widget_title_history)) }
         val body = r["body"] ?: return
         val h = d.raw?.optJSONArray("history")
-        if (h == null) { p.textMid(missing(d, "Verlauf"), body, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
+        if (h == null) { p.textMid(missing(p, d, R.string.widget_missing_history), body, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         p.historyChart(body, curveOf(h))
     }
 
@@ -638,17 +640,17 @@ object Widgets {
         val at = ls.optLong("at", 0)
         val parts = listOfNotNull(ls.optDouble("yieldG").takeIf { !it.isNaN() }?.let { "${fmt(it)} g" }, ls.optDouble("ratio").takeIf { !it.isNaN() }?.let { "1:${fmt(it)}" })
         val third = r.height() / 3
-        if (at > 0) p.textMid("Letzter · ${java.text.SimpleDateFormat("HH:mm", Locale.GERMANY).format(java.util.Date(at))}", RectF(r.left, r.top, r.right, r.top + third), 11.5f, p.t.muted)
+        if (at > 0) p.textMid(p.str(R.string.widget_shot_last_at, java.text.SimpleDateFormat("HH:mm", Locale.GERMANY).format(java.util.Date(at))), RectF(r.left, r.top, r.right, r.top + third), 11.5f, p.t.muted)
         p.textMid(if (time != null) "${fmt(time, 0)} s" else "–", RectF(r.left, r.top + third, r.right, r.top + 2 * third), big, p.t.onSurface, 1)
         p.textMid(parts.joinToString(" · ").ifBlank { " " }, RectF(r.left, r.top + 2 * third, r.right, r.bottom), 11.5f, p.t.muted)
     }
 
     private fun drawLastShot(p: WidgetPainter, r: Map<String, RectF>, d: Data) {
-        r["head"]?.let { p.head(it, R.drawable.wi_coffee_line, "Letzter Bezug") }
+        r["head"]?.let { p.head(it, R.drawable.wi_coffee_line, p.str(R.string.widget_title_lastshot)) }
         val ls = d.raw?.optJSONObject("lastShot")
         val kpi = r["kpi"] ?: return
         val body = r["body"] ?: return
-        if (ls == null) { p.textMid(if (d.raw?.has("days") == true) "Noch kein Bezug" else missing(d, "Bezüge"), RectF(kpi.left, kpi.top, kpi.right, body.bottom), 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
+        if (ls == null) { p.textMid(if (d.raw?.has("days") == true) p.str(R.string.widget_shot_none) else missing(p, d, R.string.widget_missing_shots), RectF(kpi.left, kpi.top, kpi.right, body.bottom), 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         val time = ls.optDouble("timeS").takeIf { !it.isNaN() }
         val tw = p.textMid(if (time != null) "${fmt(time, 0)} s" else "–", kpi, 22f, p.t.onSurface, 1)
         val parts = listOfNotNull(ls.optDouble("yieldG").takeIf { !it.isNaN() }?.let { "${fmt(it)} g" }, ls.optDouble("ratio").takeIf { !it.isNaN() }?.let { "1:${fmt(it)}" })
@@ -663,8 +665,8 @@ object Widgets {
         val timeVals = (0 until (times?.length() ?: 0)).mapNotNull { k -> times?.optJSONObject(k)?.let { it.optString("label") to it.optDouble("s") } }
         val total = dayVals.sumOf { it.second }.roundToInt()
         val avg = if (timeVals.isNotEmpty()) timeVals.sumOf { it.second } / timeVals.size else null
-        r["head"]?.let { p.head(it, R.drawable.wi_calendar_bars, "Bezüge", if (large) avg?.let { a -> "Ø ${fmt(a, 0)} s" } else "$total in 7 Tagen") }
-        if (d.raw?.has("days") != true) { (r["body"] ?: r["top"])?.let { p.textMid(missing(d, "Bezüge"), it, 11.5f, p.t.muted, 0, Paint.Align.CENTER) }; return }
+        r["head"]?.let { p.head(it, R.drawable.wi_calendar_bars, p.str(R.string.widget_title_shots), if (large) avg?.let { a -> "Ø ${fmt(a, 0)} s" } else p.str(R.string.widget_shots_total_7d, total)) }
+        if (d.raw?.has("days") != true) { (r["body"] ?: r["top"])?.let { p.textMid(missing(p, d, R.string.widget_missing_shots), it, 11.5f, p.t.muted, 0, Paint.Align.CENTER) }; return }
         val ls = d.raw?.optJSONObject("lastShot")
         if (!large) {
             val body = r["body"] ?: return
@@ -678,12 +680,12 @@ object Widgets {
             if (ls != null) {
                 shotSummary(p, left, ls, 22f)
                 p.shotChart(RectF(left.right + 8, top.top, top.right, top.bottom), curveOf(ls.optJSONArray("curve")))
-            } else p.textMid("Noch kein Bezug", top, 11.5f, p.t.muted, 0, Paint.Align.CENTER)
+            } else p.textMid(p.str(R.string.widget_shot_none), top, 11.5f, p.t.muted, 0, Paint.Align.CENTER)
             val half = (bottom.width() - 10) / 2
             val b1 = RectF(bottom.left, bottom.top, bottom.left + half, bottom.bottom)
             val b2 = RectF(bottom.right - half, bottom.top, bottom.right, bottom.bottom)
-            p.text("Pro Tag", b1.left, b1.top + 10, 10f, p.t.muted)
-            p.text("Bezugszeiten", b2.left, b2.top + 10, 10f, p.t.muted)
+            p.text(p.str(R.string.widget_shots_per_day), b1.left, b1.top + 10, 10f, p.t.muted)
+            p.text(p.str(R.string.widget_shots_times), b2.left, b2.top + 10, 10f, p.t.muted)
             p.barChart(RectF(b1.left, b1.top + 14, b1.right, b1.bottom), dayVals)
             p.barChart(RectF(b2.left, b2.top + 14, b2.right, b2.bottom), timeVals)
         }

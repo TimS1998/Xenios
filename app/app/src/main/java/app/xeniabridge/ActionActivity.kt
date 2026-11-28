@@ -21,13 +21,13 @@ class ActionActivity : Activity() {
             val msg = try {
                 Api.power(app, mode!!)
                 when (mode) {
-                    "on" -> "Xenia wird eingeschaltet"
-                    Api.MODE_ON_NO_STEAM -> "Xenia wird ohne Dampf eingeschaltet"
-                    "eco" -> "Eco-Modus aktiv"
-                    else -> "Xenia ausgeschaltet"
+                    "on" -> app.getString(R.string.action_on)
+                    Api.MODE_ON_NO_STEAM -> app.getString(R.string.action_on_nosteam)
+                    "eco" -> app.getString(R.string.action_eco)
+                    else -> app.getString(R.string.action_off)
                 }
             } catch (e: Exception) {
-                Api.message(e)
+                Api.message(app, e)
             }
             runOnUiThread { Toast.makeText(app, msg, Toast.LENGTH_SHORT).show() }
             Thread.sleep(1500)

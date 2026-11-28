@@ -54,7 +54,7 @@ internal object Installer {
             try {
                 activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")))
             } catch (_: Exception) {
-                AppUpdate.report("", "Einstellung „Unbekannte Apps installieren“ nicht gefunden")
+                AppUpdate.report("", activity.getString(R.string.update_install_no_setting))
             }
             return
         }
@@ -69,7 +69,7 @@ internal object Installer {
                 commit(app, apk)
                 // Weiter geht es in onStatus; bei Erfolg beendet Android die App, um sie zu ersetzen
             } catch (e: Exception) {
-                AppUpdate.report("", AppUpdate.message(e))
+                AppUpdate.report("", AppUpdate.message(app, e))
             }
         }
     }
@@ -80,7 +80,7 @@ internal object Installer {
     }
 
     private fun download(context: Context, r: AppUpdate.Release): File {
-        if (r.size !in 1..MAX_SIZE) throw IOException("GitHub meldet eine unerwartete Größe der APK")
+        if (r.size !in 1..MAX_SIZE) throw IOException(context.getString(R.string.update_install_bad_size))
         val dir = File(context.cacheDir, "update").apply { mkdirs() }
         val file = File(dir, "Xenios-${r.build}.apk")
         dir.listFiles()?.forEach { if (it != file) it.delete() }
@@ -93,7 +93,7 @@ internal object Installer {
             conn.readTimeout = 30_000
             conn.setRequestProperty("User-Agent", AppUpdate.UA)
             // github.com leitet zum Download-Server von GitHub weiter (HttpURLConnection folgt nur https → https)
-            if (conn.responseCode != 200) throw IOException("Download: HTTP ${conn.responseCode}")
+            if (conn.responseCode != 200) throw IOException(context.getString(R.string.update_install_http, conn.responseCode))
             val md = MessageDigest.getInstance("SHA-256")
             var done = 0L
             conn.inputStream.use { input ->
@@ -103,16 +103,16 @@ internal object Installer {
                         val n = input.read(buf)
                         if (n < 0) break
                         done += n
-                        if (done > r.size) throw IOException("APK größer als angekündigt")
+                        if (done > r.size) throw IOException(context.getString(R.string.update_install_too_big))
                         md.update(buf, 0, n)
                         out.write(buf, 0, n)
                         AppUpdate.progress((done * 100 / r.size).toInt())
                     }
                 }
             }
-            if (done != r.size) throw IOException("Download unvollständig")
-            if (r.sha256 != null && hex(md.digest()) != r.sha256) throw IOException("Prüfsumme der APK stimmt nicht mit dem Release überein")
-            if (!part.renameTo(file)) throw IOException("APK ließ sich nicht speichern")
+            if (done != r.size) throw IOException(context.getString(R.string.update_install_incomplete))
+            if (r.sha256 != null && hex(md.digest()) != r.sha256) throw IOException(context.getString(R.string.update_install_checksum))
+            if (!part.renameTo(file)) throw IOException(context.getString(R.string.update_install_save_failed))
             return file
         } finally {
             conn.disconnect()
@@ -126,14 +126,14 @@ internal object Installer {
      */
     private fun verify(context: Context, apk: File, r: AppUpdate.Release) {
         val pm = context.packageManager
-        val info = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES) ?: throw IOException("APK nicht lesbar")
-        if (info.packageName != context.packageName) throw IOException("Die APK gehört zu einer anderen App")
-        if (info.longVersionCode != r.build) throw IOException("Build-Nummer der APK passt nicht zum Release")
+        val info = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES) ?: throw IOException(context.getString(R.string.update_install_unreadable))
+        if (info.packageName != context.packageName) throw IOException(context.getString(R.string.update_install_other_app))
+        if (info.longVersionCode != r.build) throw IOException(context.getString(R.string.update_install_build_mismatch))
         val si = info.signingInfo ?: return // manche Android-Versionen lesen die Signatur eines Archivs nicht
         val theirs = (if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory)?.toSet().orEmpty()
         val own = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo?.apkContentsSigners?.toSet().orEmpty()
         if (theirs.isNotEmpty() && own.isNotEmpty() && own.none { it in theirs }) {
-            throw IOException("Die APK ist mit einem anderen Schlüssel signiert als diese App (selbst gebaut?). Einmal von Hand aus dem Release installieren.")
+            throw IOException(context.getString(R.string.update_install_other_key))
         }
     }
 
@@ -175,13 +175,13 @@ internal object Installer {
                 @Suppress("DEPRECATION")
                 val dialog: Intent? = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
                 else intent.getParcelableExtra(Intent.EXTRA_INTENT)
-                if (dialog == null) return AppUpdate.report("", "Android verlangt eine Bestätigung, liefert aber keinen Dialog")
+                if (dialog == null) return AppUpdate.report("", context.getString(R.string.update_install_no_dialog))
                 // Nur in der sichtbaren App öffnen; sonst beim nächsten Öffnen
                 if (Widgets.appVisible) showConfirm(context, dialog) else { pendingConfirm = dialog }
             }
             PackageInstaller.STATUS_SUCCESS -> AppUpdate.report("")
-            PackageInstaller.STATUS_FAILURE_ABORTED -> AppUpdate.report("", "Installation abgebrochen")
-            else -> AppUpdate.report("", "Installation fehlgeschlagen: " + (intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "unbekannter Grund"))
+            PackageInstaller.STATUS_FAILURE_ABORTED -> AppUpdate.report("", context.getString(R.string.update_install_aborted))
+            else -> AppUpdate.report("", context.getString(R.string.update_install_failed, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: context.getString(R.string.update_install_unknown_reason)))
         }
     }
 
@@ -189,7 +189,7 @@ internal object Installer {
         try {
             context.startActivity(dialog.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: Exception) {
-            AppUpdate.report("", "Bestätigung ließ sich nicht öffnen: ${e.message}")
+            AppUpdate.report("", context.getString(R.string.update_install_confirm_failed, e.message.toString()))
         }
     }
 
