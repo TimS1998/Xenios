@@ -1,6 +1,7 @@
 // Analoges Rundinstrument (SVG) wie in der Xenia-App: Skala, rote Zone, Nadel, Wert in der Mitte.
 import { h, fmt } from './ui.js';
 import { taredCurve } from '../shared/shot-analysis.js';
+import { t } from '../shared/i18n.js';
 
 const START = 135;   // Winkel in Grad (SVG: 0° = rechts, im Uhrzeigersinn)
 const SWEEP = 270;
@@ -109,7 +110,7 @@ export function sparkline(curve, { height = 64 } = {}) {
   const yP = (p) => height - 4 - ((p || 0) / pMax) * (height - 8);
   const yW = (g) => height - 4 - ((g || 0) / wMax) * (height - 8);
   const pts = (fy, idx) => curve.map((p) => `${x(p[0] || 0).toFixed(1)},${fy(p[idx]).toFixed(1)}`).join(' ');
-  return h('svg', { class: 'spark', viewBox: `0 0 ${w} ${height}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': 'Druckverlauf' },
+  return h('svg', { class: 'spark', viewBox: `0 0 ${w} ${height}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': t('home.charts.sparkline') },
     h('line', { x1: 0, y1: height - 4, x2: w, y2: height - 4, class: 'axis' }),
     curve.some((p) => p[2]) ? h('polyline', { points: pts(yW, 2), class: 'w' }) : null,
     h('polyline', { points: pts(yP, 1), class: 'p' }),
@@ -192,7 +193,7 @@ export function shotChart(curve, { width = 320, height = 150, live = false, minS
     else if (seg.length) { targetLines.push(clip(seg)); seg = []; }
   }
   if (seg.length) targetLines.push(clip(seg));
-  return h('svg', { class: 'shot-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Bezugskurve: Druck und Gewicht' },
+  return h('svg', { class: 'shot-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': t('home.charts.shot') },
     h('text', { x: 2, y: 9, class: 'lbl' }, 'bar'), h('text', { x: width - 2, y: 9, class: 'lbl', 'text-anchor': 'end' }, 'g'),
     ...grid,
     ...compare.map(clean).map(clip).filter((c) => c.length > 1).map((c) => h('polyline', { class: 'cmp', points: lineOf(c, yP, 1) })),
@@ -237,7 +238,7 @@ export function targetBar(value, target, { max = null, width = 300, height = 26,
   const off = target ? Math.abs((value || 0) - target) / target : 0;
   const below = heating && (value || 0) < target;
   const cls = !target ? '' : off <= 0.03 ? 'ok' : below ? '' : off <= 0.08 ? 'warn' : 'bad';
-  return h('svg', { class: 'target-bar', viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': target ? `${fmt(value)} von ${fmt(target)}` : fmt(value) },
+  return h('svg', { class: 'target-bar', viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': target ? t('home.charts.targetOf', { value: fmt(value), target: fmt(target) }) : fmt(value) },
     h('rect', { x: 2, y: 7, width: width - 4, height: 12, rx: 6, class: 'track' }),
     h('rect', { x: 2, y: 7, width: Math.max(0, x(value) - 2), height: 12, rx: 6, class: `fill ${cls}` }),
     target ? h('line', { x1: x(target), x2: x(target), y1: 2, y2: height - 2, class: 'mark' }) : null);
@@ -275,7 +276,7 @@ export function liveChart(samples, series, { width = 320, height = 150, spanMs =
     const pts = samples.filter((p) => p.t >= now - spanMs && Number.isFinite(p[s.key])).map((p) => `${x(p.t).toFixed(1)},${y(p[s.key], s.axis).toFixed(1)}`);
     return pts.length > 1 ? h('polyline', { points: pts.join(' '), class: `ln ${s.cls}` }) : null;
   });
-  return h('svg', { class: 'live-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Verlauf: ${series.map((s) => s.label).join(', ')}` },
+  return h('svg', { class: 'live-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': t('home.charts.live', { series: series.map((s) => s.label).join(', ') }) },
     h('text', { x: 2, y: 10, class: 'lbl' }, '°C'), h('text', { x: width - 2, y: 10, class: 'lbl', 'text-anchor': 'end' }, 'bar'),
     ...grid, ...lines);
 }

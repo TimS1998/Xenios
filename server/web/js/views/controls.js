@@ -2,6 +2,7 @@
 import { h, icon, fmt, snackbar, confirmDialog, switchEl } from '../ui.js';
 import { api, store, subscribe, machineOn, isClassic, hasPaddle, directMode } from '../api.js';
 import { contrastOn, navigate } from '../app.js';
+import { t } from '../../shared/i18n.js';
 
 export function controlsView(root) {
   return switchesTab(root);
@@ -10,8 +11,8 @@ export function controlsView(root) {
 // Eigener Tab „Paddle“: Pumpe direkt steuern
 export function paddleView(root) {
   if (!hasPaddle()) {
-    root.append(h('div', { class: 'card low' }, h('h3', {}, 'Paddle'),
-      h('p', { class: 'muted' }, store.machine?.info ? 'Diese Xenia bietet die Paddle-Steuerung nicht über die API an (ältere Firmware).' : 'Maschine noch nicht erreicht – Paddle ist verfügbar, sobald die Firmware erkannt ist.')));
+    root.append(h('div', { class: 'card low' }, h('h3', {}, t('home.paddle.title')),
+      h('p', { class: 'muted' }, store.machine?.info ? t('home.paddle.oldFirmware') : t('home.paddle.notReached'))));
     return () => {};
   }
   return paddleTab(root);
@@ -22,10 +23,10 @@ export function paddleView(root) {
 // die übrigen drei Taster tragen je ein Skript für kurz/lang drücken (SWITCH_SET_<Taster>_<0|1>).
 // Lage der Taster je Ansicht: im Render auf den Seitenleisten über den Ventilen, in der vereinfachten Ansicht an den Rändern
 const BUTTONS = [
-  { key: 'POWER', label: 'Oben links', render: [56, 54], simple: [52, 96], glyph: 'power', fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
-  { key: 'RIGHT_RIGHT', label: 'Oben rechts', render: [264, 54], simple: [268, 96], glyph: 'cup1' },
-  { key: 'LEFT_LEFT', label: 'Unten links', render: [56, 94], simple: [52, 132], glyph: 'crown' },
-  { key: 'RIGHT_LEFT', label: 'Unten rechts', render: [264, 94], simple: [268, 132], glyph: 'cup2' },
+  { key: 'POWER', get label() { return t('home.switches.topLeft'); }, render: [56, 54], simple: [52, 96], glyph: 'power', get fixed() { return { short: t('home.switches.fixedShort'), long: t('home.switches.fixedLong') }; } },
+  { key: 'RIGHT_RIGHT', get label() { return t('home.switches.topRight'); }, render: [264, 54], simple: [268, 96], glyph: 'cup1' },
+  { key: 'LEFT_LEFT', get label() { return t('home.switches.bottomLeft'); }, render: [56, 94], simple: [52, 132], glyph: 'crown' },
+  { key: 'RIGHT_LEFT', get label() { return t('home.switches.bottomRight'); }, render: [264, 94], simple: [268, 132], glyph: 'cup2' },
 ];
 
 // Alte Xenia (DBL): zwei kleine Kippschalter, jeder lässt sich nach links und nach rechts drücken (kurz/lang).
@@ -33,10 +34,10 @@ const BUTTONS = [
 // ③ rechts◀ (am Tassen-Symbol), ④ rechts▶. Die API kennt die drei belegbaren Positionen
 // SWITCH_SET_LEFT_LEFT/RIGHT_LEFT/RIGHT_RIGHT; LEFT_RIGHT fehlt dort, weil fest Ein/Aus.
 const DBL_BUTTONS = [
-  { key: 'LEFT_LEFT', no: 1, label: 'Links ◀', lever: 'left', dir: -1 },
-  { key: 'POWER', no: 2, label: 'Links ▶', lever: 'left', dir: 1, fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
-  { key: 'RIGHT_LEFT', no: 3, label: 'Rechts ◀', lever: 'right', dir: -1 },
-  { key: 'RIGHT_RIGHT', no: 4, label: 'Rechts ▶', lever: 'right', dir: 1 },
+  { key: 'LEFT_LEFT', no: 1, get label() { return t('home.switches.leftBack'); }, lever: 'left', dir: -1 },
+  { key: 'POWER', no: 2, get label() { return t('home.switches.leftFwd'); }, lever: 'left', dir: 1, get fixed() { return { short: t('home.switches.fixedShort'), long: t('home.switches.fixedLong') }; } },
+  { key: 'RIGHT_LEFT', no: 3, get label() { return t('home.switches.rightBack'); }, lever: 'right', dir: -1 },
+  { key: 'RIGHT_RIGHT', no: 4, get label() { return t('home.switches.rightFwd'); }, lever: 'right', dir: 1 },
 ];
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -321,7 +322,7 @@ function xeniaSvg({ classic, look: look0, onPick }) {
   }
 
   const svg = s('svg', { class: `machine-svg render${classic ? ' dbl' : ''}`, viewBox: '20 14 280 326', role: 'img',
-    'aria-label': classic ? 'Xenia DBL von vorn mit den zwei Kippschaltern' : 'Xenia von vorn mit den vier Tastern' },
+    'aria-label': classic ? t('home.switches.renderDbl') : t('home.switches.render') },
   defs, ...rail, ...shell, ...tray, ...front, ...controls, ...parts.valves, wands, ...parts.group);
   // Maserung von Siebträger und Hebelgriffen in der Griff-Farbe (per CSSOM, ein style-Attribut verbietet die CSP)
   svg.style.setProperty('--grip-grain', grain);
@@ -334,12 +335,12 @@ function xeniaSvg({ classic, look: look0, onPick }) {
 // Brühgruppe, Lanzen und Manometer).
 function simpleSvg({ classic, onPick }) {
   if (!classic) {
-    const svg = s('svg', { class: 'machine-svg schema', viewBox: '30 72 260 84', role: 'img', 'aria-label': 'Xenia: die vier Taster an der Front' },
+    const svg = s('svg', { class: 'machine-svg schema', viewBox: '30 72 260 84', role: 'img', 'aria-label': t('home.switches.simple') },
       s('rect', { class: 'body', x: 30.5, y: 72.5, width: 259, height: 83, rx: 6 }));
     return xeniaButtons(svg, 'simple', 1.05, onPick);
   }
   // DBL: Symbole wie an der Maschine (Ein/Aus rechts vom linken, Tasse links vom rechten Schalter)
-  const svg = s('svg', { class: 'machine-svg schema dbl', viewBox: '30 32 260 82', role: 'img', 'aria-label': 'Xenia DBL: die zwei Kippschalter an der Front' },
+  const svg = s('svg', { class: 'machine-svg schema dbl', viewBox: '30 32 260 82', role: 'img', 'aria-label': t('home.switches.simpleDbl') },
     s('rect', { class: 'front', x: 30.5, y: 32.5, width: 259, height: 81, rx: 6 }),
     s('path', { class: 'sym', d: 'M121.5 77 A8 8 0 1 0 130.5 77 M126 72 V81' }),
     s('path', { class: 'sym', d: 'M188 75 H200 V83 A4 4 0 0 1 196 87 H192 A4 4 0 0 1 188 83 Z M200 77.5 H202.5 A2.5 2.5 0 0 1 202.5 82.5 H200' }));
@@ -350,7 +351,7 @@ function simpleSvg({ classic, onPick }) {
 function xeniaButtons(svg, view, k, onPick) {
   for (const b of BUTTONS) {
     const [cx, cy] = b[view];
-    svg.append(pickable(s('g', { class: 'mbtn', 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': `Taster ${b.label}` },
+    svg.append(pickable(s('g', { class: 'mbtn', 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': t('home.switches.button', { label: b.label }) },
       s('circle', { class: 'halo', cx, cy, r: 15 * k }),
       s('circle', { class: 'cap', cx, cy, r: 10 * k }),
       s('circle', { class: 'cap-in', cx, cy, r: 7.6 * k }),
@@ -370,7 +371,7 @@ function dblToggles(svg, pos, k, onPick) {
     tips[side] = { tip, cx };
     const halves = DBL_BUTTONS.filter((b) => b.lever === side).map((b) => {
       const nx = cx + b.dir * 15 * k;
-      return pickable(s('g', { class: `mbtn lever-side${b.fixed ? ' fixed' : ''}`, 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': `Schalter ${b.no} ${b.label}` },
+      return pickable(s('g', { class: `mbtn lever-side${b.fixed ? ' fixed' : ''}`, 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': t('home.switches.toggle', { no: b.no, label: b.label }) },
         s('rect', { class: 'halo', x: b.dir < 0 ? cx - 19 * k : cx + k, y: cy - 13 * k, width: 18 * k, height: 26 * k, rx: 8 * k }),
         s('circle', { class: 'pos-ring', cx: nx, cy: cy - 22 * k, r: 7.5 * k }),
         s('text', { class: 'pos-no', x: nx, y: cy - 22 * k + 3.4, 'text-anchor': 'middle' }, String(b.no)),
@@ -406,7 +407,7 @@ function switchesTab(root) {
   const features = store.server?.features || {};
   const classic = isClassic();
   const BTNS = classic ? DBL_BUTTONS : BUTTONS;
-  const box = h('div', {}, h('div', { class: 'empty' }, 'Lade Belegung …'));
+  const box = h('div', {}, h('div', { class: 'empty' }, t('home.switches.loading')));
   root.append(box);
   (async () => {
     try {
@@ -415,7 +416,7 @@ function switchesTab(root) {
         ...Object.entries(sc.builtin).map(([id, title]) => ({ id: Number(id), title: classic && id === '7' && sw.singleDoseG ? `${title} ${sw.singleDoseG} g/ml` : classic && id === '8' && sw.doubleDoseG ? `${title} ${sw.doubleDoseG} g/ml` : title })),
         ...sc.scripts.filter((x) => x.id > 9).map((x) => ({ id: x.id, title: x.title })),
       ];
-      const nm = (id) => options.find((o) => o.id === id)?.title || (id ? `Skript ${id}` : 'Keine');
+      const nm = (id) => options.find((o) => o.id === id)?.title || (id ? t('home.switches.script', { id }) : t('home.switches.none'));
       const assign = {};
       for (const b of BTNS) if (!b.fixed) assign[b.key] = { short: sw.buttons[b.key]?.short ?? 0, long: sw.buttons[b.key]?.long ?? 0 };
       const changed = {};
@@ -426,12 +427,12 @@ function switchesTab(root) {
         try {
           await api('/api/machine/switches', { method: 'PUT', body: { buttons: changed } });
           for (const k of Object.keys(changed)) delete changed[k];
-          snackbar('Tastenbelegung gespeichert');
+          snackbar(t('home.switches.saved'));
         } catch (e) {
           snackbar(e.message);
           saveBtn.disabled = false;
         }
-      } }, icon('check', 's18'), 'Belegung speichern');
+      } }, icon('check', 's18'), t('home.switches.save'));
 
       const cards = {};
       let selected = null;
@@ -445,7 +446,7 @@ function switchesTab(root) {
         if (selected) cards[selected].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
       const select = (b, press) => {
-        const el = h('select', { class: 'text', 'aria-label': `${b.label} ${press === 'short' ? 'kurz' : 'lang'}`, disabled: !editable },
+        const el = h('select', { class: 'text', 'aria-label': press === 'short' ? t('home.switches.selectShort', { label: b.label }) : t('home.switches.selectLong', { label: b.label }), disabled: !editable },
           options.map((o) => h('option', { value: o.id, selected: o.id === assign[b.key][press] }, o.title)));
         if (!options.some((o) => o.id === assign[b.key][press])) el.append(h('option', { value: assign[b.key][press], selected: true }, nm(assign[b.key][press])));
         el.addEventListener('change', () => {
@@ -458,26 +459,26 @@ function switchesTab(root) {
       };
       const grid = h('div', { class: 'btn-assign' }, BTNS.map((b) => {
         const c = h('div', { class: 'assign-card', onclick: (e) => { if (e.target.tagName !== 'SELECT') pick(b.key); } },
-          h('div', { class: 'ttl' }, classic ? `${'①②③④'[b.no - 1]} Schalter ${b.label}` : b.label, b.fixed ? h('span', { class: 'badge' }, 'gesperrt') : null),
+          h('div', { class: 'ttl' }, classic ? t('home.switches.dblCard', { mark: '①②③④'[b.no - 1], label: b.label }) : b.label, b.fixed ? h('span', { class: 'badge' }, t('home.switches.locked')) : null),
           b.fixed
-            ? [h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Kurz'), h('span', { class: 'v' }, b.fixed.short)),
-              h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Lang'), h('span', { class: 'v' }, b.fixed.long))]
-            : [h('label', { class: 'kv' }, h('span', { class: 'k' }, 'Kurz'), select(b, 'short')),
-              h('label', { class: 'kv' }, h('span', { class: 'k' }, 'Lang'), select(b, 'long'))]);
+            ? [h('div', { class: 'kv' }, h('span', { class: 'k' }, t('home.switches.short')), h('span', { class: 'v' }, b.fixed.short)),
+              h('div', { class: 'kv' }, h('span', { class: 'k' }, t('home.switches.long')), h('span', { class: 'v' }, b.fixed.long))]
+            : [h('label', { class: 'kv' }, h('span', { class: 'k' }, t('home.switches.short')), select(b, 'short')),
+              h('label', { class: 'kv' }, h('span', { class: 'k' }, t('home.switches.long')), select(b, 'long'))]);
         cards[b.key] = c;
         return c;
       }));
 
       box.replaceChildren(
         h('div', { class: 'card' },
-          h('h3', {}, 'Tastenbelegung'),
+          h('h3', {}, t('home.switches.title')),
           h('p', { class: 'muted small' }, classic
-            ? 'Alte Xenia (DBL): Eine Position ①–④ antippen und auswählen, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
-            : 'Einen Taster antippen und auswählen, was kurzes bzw. langes Drücken startet. Eigene Abläufe entstehen unter „Skripte“.'),
+            ? t('home.switches.introDbl')
+            : t('home.switches.intro')),
           h('div', { class: 'machine-wrap' }, svg,
-            directMode || !look.editButton ? null : h('button', { class: 'btn text', type: 'button', onclick: () => navigate('/einstellungen/modell#aussehen') }, icon('settings', 's18'), 'Ansicht ändern')),
+            directMode || !look.editButton ? null : h('button', { class: 'btn text', type: 'button', onclick: () => navigate('/einstellungen/modell#aussehen') }, icon('settings', 's18'), t('home.switches.changeLook'))),
           grid,
-          editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')));
+          editable ? saveBtn : h('p', { class: 'muted small' }, t('home.switches.readOnly'))));
     } catch (e) {
       box.replaceChildren(h('div', { class: 'empty' }, e.message));
     }
@@ -491,7 +492,7 @@ function switchesTab(root) {
 function paddleTab(root) {
   const features = store.server?.features || {};
   if (!features.paddle) {
-    root.append(h('div', { class: 'empty' }, 'Paddle-Steuerung ist in der Server-Konfiguration deaktiviert.'));
+    root.append(h('div', { class: 'empty' }, t('home.paddle.disabled')));
     return () => {};
   }
   let active = false;
@@ -507,24 +508,24 @@ function paddleTab(root) {
   const fill = h('div', { class: 'fill' });
   const knob = h('div', { class: 'knob' });
   const lvl = h('div', { class: 'lvl' }, '0 %');
-  const paddle = h('div', { class: 'paddle locked', role: 'slider', 'aria-label': 'Pumpenleistung', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': 0, 'aria-disabled': 'true', tabindex: 0 },
+  const paddle = h('div', { class: 'paddle locked', role: 'slider', 'aria-label': t('home.paddle.slider'), 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': 0, 'aria-disabled': 'true', tabindex: 0 },
     h('div', { class: 'lines' }), fill, lvl, knob);
-  const stopBtn = h('button', { class: 'btn danger wide big', onclick: () => stopPump(true) }, icon('power', 's20'), 'PUMPE STOPPEN');
-  const enable = switchEl({ label: 'Paddle aktivieren', onChange: (on) => setActive(on) });
+  const stopBtn = h('button', { class: 'btn danger wide big', onclick: () => stopPump(true) }, icon('power', 's20'), t('home.paddle.stop'));
+  const enable = switchEl({ label: t('home.paddle.enable'), onChange: (on) => setActive(on) });
   const enableInput = enable.querySelector('input');
-  const recSw = switchEl({ label: 'Aufnahme', onChange: (on) => setRecording(on) });
+  const recSw = switchEl({ label: t('home.paddle.record'), onChange: (on) => setRecording(on) });
   const recInput = recSw.querySelector('input');
-  const recInfo = h('div', { class: 'muted small' }, 'Bewegungen des Reglers als Paddle-Skript speichern.');
-  const hint = h('div', { class: 'offline-banner', hidden: true }, icon('warn', 's20'), h('span', {}, 'Maschine ist aus – Paddle nicht verfügbar.'));
+  const recInfo = h('div', { class: 'muted small' }, t('home.paddle.recordHint'));
+  const hint = h('div', { class: 'offline-banner', hidden: true }, icon('warn', 's20'), h('span', {}, t('home.paddle.machineOffBanner')));
 
   root.append(
     hint,
-    h('div', { class: 'card low row' }, h('div', { class: 'grow' }, h('strong', {}, 'Paddle-Modus'), h('div', { class: 'muted small' }, 'Pumpenleistung direkt steuern (Vorinfusion, Profil von Hand). Ausschalten stoppt die Pumpe.')), enable),
-    h('div', { class: 'card low row' }, icon('record'), h('div', { class: 'grow' }, h('strong', {}, 'Aufnahme'), recInfo), recSw),
+    h('div', { class: 'card low row' }, h('div', { class: 'grow' }, h('strong', {}, t('home.paddle.mode')), h('div', { class: 'muted small' }, t('home.paddle.modeHint'))), enable),
+    h('div', { class: 'card low row' }, icon('record'), h('div', { class: 'grow' }, h('strong', {}, t('home.paddle.record')), recInfo), recSw),
     h('div', { class: 'readouts' },
-      h('div', {}, vP, h('div', { class: 'k' }, 'Druck (bar)')),
-      h('div', {}, vL, h('div', { class: 'k' }, 'Pumpe (%)')),
-      h('div', {}, vT, h('div', { class: 'k' }, 'Zeit (s)'))),
+      h('div', {}, vP, h('div', { class: 'k' }, t('home.paddle.readPressure'))),
+      h('div', {}, vL, h('div', { class: 'k' }, t('home.paddle.readPump'))),
+      h('div', {}, vT, h('div', { class: 'k' }, t('home.paddle.readTime')))),
     paddle,
     stopBtn);
 
@@ -569,7 +570,7 @@ function paddleTab(root) {
       try {
         await api('/api/machine/paddle', { method: 'POST', body: { level: lv } });
       } catch (e) {
-        snackbar(e.status === 502 ? 'Pumpe nicht bereit (Maschine an? Gerade am Ablassen?)' : e.message);
+        snackbar(e.status === 502 ? t('home.paddle.notReady') : e.message);
         level = 0;
         paint();
       }
@@ -584,7 +585,7 @@ function paddleTab(root) {
     const run = inflight.then(async () => {
       try {
         await api('/api/machine/paddle/stop', { method: 'POST' });
-        if (notify) snackbar('Pumpe gestoppt');
+        if (notify) snackbar(t('home.paddle.stopped'));
       } catch (e) {
         if (notify) snackbar(e.message);
       }
@@ -615,7 +616,7 @@ function paddleTab(root) {
     flushSegment(now);
     rec.lastLevel = lv;
     rec.lastAt = now;
-    recInfo.textContent = `Aufnahme läuft · ${rec.steps.length / 2} Abschnitte`;
+    recInfo.textContent = t('home.paddle.recording', { n: rec.steps.length / 2 });
   }
   function flushSegment(now) {
     if (rec.lastAt === null) return;
@@ -631,22 +632,22 @@ function paddleTab(root) {
     recInput.checked = on;
     if (on) {
       rec = { steps: [], lastLevel: level, lastAt: level > 0 ? Date.now() : null };
-      recInfo.textContent = 'Aufnahme läuft · bewege den Regler';
+      recInfo.textContent = t('home.paddle.recordingStart');
       return;
     }
     if (!rec) return;
     if (rec.lastLevel > 0) flushSegment(Date.now());
     const steps = rec.steps;
     rec = null;
-    recInfo.textContent = 'Bewegungen des Reglers als Paddle-Skript speichern.';
+    recInfo.textContent = t('home.paddle.recordHint');
     if (!steps.length) return;
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
     const name = `paddle_${d.getFullYear()}_${p(d.getMonth() + 1)}_${p(d.getDate())}_${p(d.getHours())}_${p(d.getMinutes())}_${p(d.getSeconds())}`;
-    if (!(await confirmDialog('Aufnahme speichern?', `${steps.length / 2} Abschnitte als „${name}“ auf der Maschine speichern.`, 'Speichern'))) return;
+    if (!(await confirmDialog(t('home.paddle.saveTitle'), t('home.paddle.saveText', { n: steps.length / 2, name }), t('common.save')))) return;
     try {
       await api('/api/machine/scripts', { method: 'POST', body: { name, steps: [...steps, { op: 17, args: [] }], kind: 'paddle' } });
-      snackbar('Paddle-Aufnahme gespeichert');
+      snackbar(t('home.paddle.saved'));
     } catch (e) {
       snackbar(e.message);
     }
@@ -657,8 +658,8 @@ function paddleTab(root) {
     return ((r.bottom - e.clientY) / r.height) * 100;
   };
   paddle.addEventListener('pointerdown', (e) => {
-    if (!machineOn()) return snackbar('Maschine ist aus');
-    if (!active) return snackbar('Bitte zuerst „Paddle aktivieren“');
+    if (!machineOn()) return snackbar(t('home.paddle.machineOff'));
+    if (!active) return snackbar(t('home.paddle.enableFirst'));
     paddle.setPointerCapture(e.pointerId);
     setLevel(fromEvent(e));
   });
