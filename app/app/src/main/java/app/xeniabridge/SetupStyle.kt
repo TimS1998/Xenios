@@ -117,9 +117,15 @@ object SetupStyle {
         b.typeface = font
         b.letterSpacing = 0.007f
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        // eine Zeile; passt der Text nicht (schmale Handys, z. B. „IP finden – Anleitung“), wird die Schrift kleiner
+        // statt umzubrechen (der Knopf würde sonst abgeschnitten und aus der Reihe rutschen)
+        b.maxLines = 1
+        b.setAutoSizeTextTypeUniformWithConfiguration(10, 14, 1, TypedValue.COMPLEX_UNIT_SP)
         b.setTextColor(states(fg, alpha(t.onSurface, 0.38f)))
         b.minHeight = (40 * d).toInt()
         b.minimumHeight = (40 * d).toInt()
+        // feste Höhe wie .btn (40 px): die automatische Schriftgröße arbeitet nur mit fester Höhe zuverlässig
+        b.layoutParams?.let { lp -> lp.height = (40 * d).toInt(); b.layoutParams = lp }
         b.setPadding((16 * d).toInt(), 0, (16 * d).toInt(), 0)
     }
 
