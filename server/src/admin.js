@@ -10,28 +10,31 @@ import { ensureCert, certInfo } from './tls.js';
 import { setLogLevel, logger } from './log.js';
 import { updateInfo, requestUpdate, cancelUpdate, helperAlive, readUpdate } from './update.js';
 import { tunnelTokenFromPaste, requestTunnelToken, waitForTunnelApplied } from './tunnel-token.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('admin');
 
 // --- Prüfung der Eingaben ------------------------------------------------------------------------
 const bad = (msg) => httpError(400, msg);
+// Feldnamen als Funktion (Text erst beim Gebrauch) oder fertiger Text
+const lbl = (label) => (typeof label === 'function' ? label() : label);
 const bool = (label) => (v) => {
-  if (typeof v !== 'boolean') throw bad(`${label}: an/aus erwartet`);
+  if (typeof v !== 'boolean') throw bad(t('server.validate.bool', { label: lbl(label) }));
   return v;
 };
 const int = (label, min, max) => (v) => {
   const n = Number(v);
-  if (!Number.isInteger(n) || n < min || n > max) throw bad(`${label}: ganze Zahl von ${min} bis ${max}`);
+  if (!Number.isInteger(n) || n < min || n > max) throw bad(t('server.validate.int', { label: lbl(label), min, max }));
   return n;
 };
 const oneOf = (label, list) => (v) => {
-  if (!list.includes(v)) throw bad(`${label}: ${list.join(', ')}`);
+  if (!list.includes(v)) throw bad(t('server.validate.oneOf', { label: lbl(label), list: list.join(', ') }));
   return v;
 };
 const HOST_RE = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]{2,39})$/;
 const host = (label) => (v) => {
   const s = String(v ?? '').trim();
-  if (!HOST_RE.test(s)) throw bad(`${label}: Hostname oder IP erwartet`);
+  if (!HOST_RE.test(s)) throw bad(t('server.validate.host', { label: lbl(label) }));
   return s;
 };
 
@@ -41,10 +44,10 @@ export function deviceUrl(v, label) {
   try {
     u = new URL(String(v ?? '').trim());
   } catch {
-    throw bad(`${label}: z. B. http://192.168.178.55`);
+    throw bad(t('server.validate.urlExample', { label: lbl(label) }));
   }
   if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
-    throw bad(`${label}: nur http(s)://Adresse[:Port], ohne Pfad`);
+    throw bad(t('server.validate.urlOnly', { label: lbl(label) }));
   }
   return u.origin;
 }
@@ -55,10 +58,10 @@ export function publicUrl(v) {
   try {
     u = new URL(String(v ?? '').trim());
   } catch {
-    throw bad('Öffentliche Adresse: z. B. https://xenios.example.de');
+    throw bad(t('server.validate.publicUrlExample'));
   }
   if (u.protocol !== 'https:' || u.port || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
-    throw bad('Öffentliche Adresse: nur https://name.domain, ohne Port und Pfad');
+    throw bad(t('server.validate.publicUrlOnly'));
   }
   return u.origin;
 }
@@ -66,67 +69,67 @@ export function publicUrl(v) {
 function hexColor(label) {
   return (v) => {
     const s = String(v ?? '').trim().toLowerCase();
-    if (!/^#[0-9a-f]{6}$/.test(s)) throw bad(`${label}: #rrggbb`);
+    if (!/^#[0-9a-f]{6}$/.test(s)) throw bad(t('server.validate.hexColor', { label: lbl(label) }));
     return s;
   };
 }
 
 export const FIELDS = {
   publicUrl: (v) => (v === null || v === '' ? null : publicUrl(v)),
-  'machine.url': (v) => deviceUrl(v, 'Adresse der Xenia'),
-  'machine.api': oneOf('Xenia-Modell', ['bbs', 'classic']),
-  'machine.look.color': hexColor('Farbe der Xenia'),
-  'machine.look.grip': (v) => (v === null || v === '' ? null : v === 'chrome' ? 'chrome' : hexColor('Farbe der Griffe')(v)),
-  'machine.look.tray': (v) => (v === null || v === '' ? null : hexColor('Farbe des Abtropfgitters')(v)),
-  'machine.look.gauge': hexColor('Farbe der Manometer'),
-  'machine.look.style': oneOf('Ansicht', ['render', 'simple']),
-  'machine.look.steamSide': oneOf('Dampflanze', ['left', 'right']),
-  'machine.look.valves': oneOf('Ventile', ['lever', 'rotary']),
-  'machine.look.editButton': bool('Knopf „Ansicht ändern“'),
-  'grinder.enabled': bool('Mühle'),
-  'grinder.url': (v) => deviceUrl(v, 'Adresse der Mühle'),
+  'machine.url': (v) => deviceUrl(v, t('server.fields.machineUrl')),
+  'machine.api': oneOf(() => t('server.fields.machineApi'), ['bbs', 'classic']),
+  'machine.look.color': hexColor(() => t('server.fields.machineColor')),
+  'machine.look.grip': (v) => (v === null || v === '' ? null : v === 'chrome' ? 'chrome' : hexColor(t('server.fields.gripColor'))(v)),
+  'machine.look.tray': (v) => (v === null || v === '' ? null : hexColor(t('server.fields.trayColor'))(v)),
+  'machine.look.gauge': hexColor(() => t('server.fields.gaugeColor')),
+  'machine.look.style': oneOf(() => t('server.fields.lookStyle'), ['render', 'simple']),
+  'machine.look.steamSide': oneOf(() => t('server.fields.steamSide'), ['left', 'right']),
+  'machine.look.valves': oneOf(() => t('server.fields.valves'), ['lever', 'rotary']),
+  'machine.look.editButton': bool(() => t('server.fields.editButton')),
+  'grinder.enabled': bool(() => t('server.fields.grinder')),
+  'grinder.url': (v) => deviceUrl(v, t('server.fields.grinderUrl')),
   'grinder.password': (v) => {
-    if (typeof v !== 'string' || v.length > 128) throw bad('Mühlen-Passwort: höchstens 128 Zeichen');
+    if (typeof v !== 'string' || v.length > 128) throw bad(t('server.validate.grinderPassword'));
     return v;
   },
-  'grinder.allowDatabaseDownload': bool('Datenbank-Download'),
-  'features.paddle': bool('Paddle'),
-  'features.scriptEditor': bool('Skript-Editor'),
-  'features.settings': bool('Einstellungen ändern'),
-  'features.clockSync': bool('Uhr stellen'),
-  'auth.sessionDays': int('Anmeldedauer', 1, 365),
+  'grinder.allowDatabaseDownload': bool(() => t('server.fields.databaseDownload')),
+  'features.paddle': bool(() => t('server.fields.paddle')),
+  'features.scriptEditor': bool(() => t('server.fields.scriptEditor')),
+  'features.settings': bool(() => t('server.fields.settings')),
+  'features.clockSync': bool(() => t('server.fields.clockSync')),
+  'auth.sessionDays': int(() => t('server.fields.sessionDays'), 1, 365),
   'push.subject': (v) => {
     const s = String(v ?? '').trim();
-    if (!/^(mailto:[^\s@]+@[^\s@]+\.[^\s@]+|https:\/\/[^\s]+)$/.test(s) || s.length > 200) throw bad('Push-Kontakt: mailto:name@domain.de oder https://…');
+    if (!/^(mailto:[^\s@]+@[^\s@]+\.[^\s@]+|https:\/\/[^\s]+)$/.test(s) || s.length > 200) throw bad(t('server.validate.pushSubject'));
     return s;
   },
   timezone: (v) => {
     if (v === null || v === '') return null;
-    if (typeof v !== 'string' || !isTimezone(v)) throw bad('Unbekannte Zeitzone');
+    if (typeof v !== 'string' || !isTimezone(v)) throw bad(t('server.validate.timezone'));
     return v;
   },
-  logLevel: oneOf('Protokoll', ['debug', 'info', 'warn', 'error']),
-  trustProxy: oneOf('Vertrauter Proxy', ['loopback', 'private', 'all', 'none']),
-  'http.enabled': bool('Tunnel-Port'),
-  'http.host': host('Tunnel-Port: Adresse'),
-  'http.port': int('Tunnel-Port', 1, 65535),
-  'https.enabled': bool('HTTPS'),
-  'https.host': host('HTTPS: Adresse'),
-  'https.port': int('HTTPS-Port', 1, 65535),
+  logLevel: oneOf(() => t('server.fields.logLevel'), ['debug', 'info', 'warn', 'error']),
+  trustProxy: oneOf(() => t('server.fields.trustProxy'), ['loopback', 'private', 'all', 'none']),
+  'http.enabled': bool(() => t('server.fields.httpPort')),
+  'http.host': host(() => t('server.fields.httpHost')),
+  'http.port': int(() => t('server.fields.httpPort'), 1, 65535),
+  'https.enabled': bool(() => t('server.fields.https')),
+  'https.host': host(() => t('server.fields.httpsHost')),
+  'https.port': int(() => t('server.fields.httpsPort'), 1, 65535),
   'https.hosts': (v) => {
-    if (!Array.isArray(v) || v.length > 20) throw bad('Zertifikat: höchstens 20 Namen/IPs');
-    return [...new Set(v.map((x) => host('Zertifikat')(x)))];
+    if (!Array.isArray(v) || v.length > 20) throw bad(t('server.validate.certHosts'));
+    return [...new Set(v.map((x) => host(t('server.fields.cert'))(x)))];
   },
-  'lan.enabled': bool('Heimnetz-HTTP'),
-  'lan.host': host('Heimnetz-HTTP: Adresse'),
-  'lan.port': int('Heimnetz-HTTP-Port', 1, 65535),
-  'gbs.enabled': bool('Grind-by-Sync-Vermittler'),
-  'gbs.host': host('Grind-by-Sync: Adresse'),
-  'gbs.port': int('Grind-by-Sync-Port', 1, 65535),
+  'lan.enabled': bool(() => t('server.fields.lan')),
+  'lan.host': host(() => t('server.fields.lanHost')),
+  'lan.port': int(() => t('server.fields.lanPort'), 1, 65535),
+  'gbs.enabled': bool(() => t('server.fields.gbs')),
+  'gbs.host': host(() => t('server.fields.gbsHost')),
+  'gbs.port': int(() => t('server.fields.gbsPort'), 1, 65535),
   'gbs.grinderIp': (v) => {
     if (v === null || v === '') return null;
     const s = String(v).trim();
-    if (!net.isIP(s)) throw bad('IP der Mühle: z. B. 192.168.178.54');
+    if (!net.isIP(s)) throw bad(t('server.validate.grinderIp'));
     return s;
   },
 };
@@ -137,17 +140,17 @@ const LISTENER_FIELDS = Object.keys(FIELDS).filter((p) => /^(http|https|lan|gbs)
 function checkListeners(cfg, clean) {
   const v = (p) => (p in clean ? clean[p] : getPath(cfg, p));
   const on = ['http', 'https', 'lan'].filter((k) => v(`${k}.enabled`));
-  if (!on.length) throw bad('Mindestens ein Zugang (Tunnel-Port, HTTPS oder Heimnetz-HTTP) muss an bleiben');
+  if (!on.length) throw bad(t('server.validate.noAccess'));
   if (v('gbs.enabled')) on.push('gbs');
   const ports = on.map((k) => v(`${k}.port`));
   if (new Set(ports).size !== ports.length) {
     const lanClash = v('gbs.enabled') && v('lan.enabled') && v('gbs.port') === v('lan.port');
-    throw bad(lanClash ? 'Grind-by-Sync und Heimnetz-HTTP brauchen verschiedene Ports (die Mühle fragt immer Port 80 ab)' : 'Jeder Zugang braucht einen eigenen Port');
+    throw bad(lanClash ? t('server.validate.gbsLanPort') : t('server.validate.portClash'));
   }
   if (v('gbs.enabled') && !v('gbs.grinderIp')) {
     let h = '';
     try { h = new URL(v('grinder.url')).hostname.replace(/^\[|\]$/g, ''); } catch { /* leer */ }
-    if (!net.isIP(h)) throw bad('Grind-by-Sync: IP der Mühle eintragen (die Adresse der Mühle ist keine IP)');
+    if (!net.isIP(h)) throw bad(t('server.validate.gbsNeedsIp'));
   }
 }
 
@@ -167,56 +170,56 @@ export async function probeTunnel(url, instance, { fetchImpl = globalThis.fetch 
   try {
     res = await fetchImpl(`${url}/healthz`, { redirect: 'manual', headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(8000) });
   } catch (e) {
-    const why = e.name === 'TimeoutError' ? 'Zeitüberschreitung' : e.cause?.code === 'ENOTFOUND' ? 'Name unbekannt – DNS-Eintrag fehlt noch?' : e.cause?.code || e.message;
-    throw httpError(502, `Nicht erreichbar (${why})`);
+    const why = e.name === 'TimeoutError' ? t('server.common.timeout') : e.cause?.code === 'ENOTFOUND' ? t('server.tunnel.dnsMissing') : e.cause?.code || e.message;
+    throw httpError(502, t('server.tunnel.unreachable', { why }));
   }
   const id = res.headers.get('x-xenios-instance');
-  if (res.status === 200 && id === instance) return { ok: true, name: 'Tunnel funktioniert', detail: `${new URL(url).host} → dieser Server` };
-  if (id) throw httpError(502, 'Unter dieser Adresse antwortet ein anderer Xenios-Server');
-  if ([502, 503, 530].includes(res.status)) throw httpError(502, `Cloudflare erreicht den Server nicht (HTTP ${res.status}) – läuft cloudflared, stimmt die Service URL?`);
-  throw httpError(502, `Unerwartete Antwort (HTTP ${res.status}) – zeigt die Published Application auf den Tunnel?`);
+  if (res.status === 200 && id === instance) return { ok: true, name: t('server.tunnel.works'), detail: t('server.tunnel.worksDetail', { host: new URL(url).host }) };
+  if (id) throw httpError(502, t('server.tunnel.otherServer'));
+  if ([502, 503, 530].includes(res.status)) throw httpError(502, t('server.tunnel.cloudflareNoServer', { status: res.status }));
+  throw httpError(502, t('server.tunnel.unexpected', { status: res.status }));
 }
 
 export async function probeDevice({ kind, url, password }, { pinned = null, instance = null } = {}) {
   if (kind === 'tunnel') return probeTunnel(publicUrl(url), instance);
   if (kind === 'machine') {
-    const base = deviceUrl(url, 'Adresse der Xenia');
+    const base = deviceUrl(url, t('server.fields.machineUrl'));
     const client = new XeniaClient({ url: base, timeoutMs: 4000 });
     const m = await client.get('/api/v2/machine');
-    if (m?.MA_TYPE === undefined) throw httpError(502, 'Unter dieser Adresse antwortet keine Xenia');
+    if (m?.MA_TYPE === undefined) throw httpError(502, t('server.probe.noXenia'));
     let apiHint = 'classic';
     try { await client.get('/api/v2/general'); apiHint = 'bbs'; } catch { /* alte API hat /general nicht */ }
     return {
       ok: true,
-      name: (apiHint === 'classic' ? CLASSIC_TYPE : MA_TYPE)[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`,
-      detail: `Firmware ${m.FW_VERSION_MAJOR}.${m.FW_VERSION_MINOR}`,
+      name: (apiHint === 'classic' ? CLASSIC_TYPE : MA_TYPE)[m.MA_TYPE] || t('server.probe.xeniaType', { type: m.MA_TYPE }),
+      detail: t('server.probe.firmware', { major: m.FW_VERSION_MAJOR, minor: m.FW_VERSION_MINOR }),
       apiHint,
     };
   }
   if (kind === 'grinder') {
-    const base = deviceUrl(url, 'Adresse der Mühle');
-    const t = new GrinderHttp({ url: base, timeoutMs: 5000, pinnedFingerprint: pinned });
+    const base = deviceUrl(url, t('server.fields.grinderUrl'));
+    const gh = new GrinderHttp({ url: base, timeoutMs: 5000, pinnedFingerprint: pinned });
     let fingerprint = pinned;
-    t.onFingerprint = (fp) => { fingerprint = fp; };
+    gh.onFingerprint = (fp) => { fingerprint = fp; };
     try {
-      const r = await t.request('POST', '/rest_api/get_machine_info');
+      const r = await gh.request('POST', '/rest_api/get_machine_info');
       let info;
-      try { info = JSON.parse(r.text); } catch { throw httpError(502, 'Unter dieser Adresse antwortet keine Mahlkönig-Mühle'); }
+      try { info = JSON.parse(r.text); } catch { throw httpError(502, t('server.probe.noGrinder')); }
       let login = null;
       if (password) {
-        await t.request('GET', '/login.php');
-        await t.request('POST', '/login.php', { form: { userRole: 'Owner', password, login: '' } });
-        login = (await t.request('POST', '/rest_api/check_session')).text.trim() === 'session_valid';
+        await gh.request('GET', '/login.php');
+        await gh.request('POST', '/login.php', { form: { userRole: 'Owner', password, login: '' } });
+        login = (await gh.request('POST', '/rest_api/check_session')).text.trim() === 'session_valid';
       }
-      return { ok: true, name: info.grinderTypeName || 'Mühle', fingerprint, login };
+      return { ok: true, name: info.grinderTypeName || t('server.probe.grinderName'), fingerprint, login };
     } catch (e) {
       if (e.status) throw e;
-      throw httpError(502, `Mühle nicht erreichbar (${e.code || e.message})`);
+      throw httpError(502, t('server.probe.grinderUnreachable', { why: e.code || e.message }));
     } finally {
-      t.close();
+      gh.close();
     }
   }
-  throw bad('kind: machine, grinder oder tunnel');
+  throw bad(t('server.probe.badKind'));
 }
 
 // --- Routen -----------------------------------------------------------------------------------------
@@ -227,7 +230,7 @@ export function authRoutes(route, app) {
 
   async function throttle(ctx, ok) {
     const wait = limiter.retryAfter(ctx.ip);
-    if (wait > 0) throw Object.assign(httpError(429, `Zu viele Versuche. Bitte in ${Math.ceil(wait / 1000)} s erneut versuchen.`), { retryAfter: Math.ceil(wait / 1000) });
+    if (wait > 0) throw Object.assign(httpError(429, t('server.auth.tooManyAttempts', { s: Math.ceil(wait / 1000) })), { retryAfter: Math.ceil(wait / 1000) });
     if (await ok()) {
       limiter.success(ctx.ip);
       return true;
@@ -238,16 +241,16 @@ export function authRoutes(route, app) {
   }
 
   async function checkPassword(ctx, password = ctx.body.password) {
-    if (needsSetup()) throw httpError(409, 'Der Server ist noch nicht eingerichtet');
+    if (needsSetup()) throw httpError(409, t('server.auth.notSetUp'));
     const ok = await throttle(ctx, () => typeof password === 'string' && password.length <= 256 && verifyPassword(password, cfg.auth.passwordHash));
     if (!ok) {
       log.warn(`Falsches Passwort von ${ctx.ip}`);
-      throw httpError(401, 'Falsches Passwort');
+      throw httpError(401, t('server.auth.wrongPassword'));
     }
   }
 
   async function checkSetupCode(ctx) {
-    if (!needsSetup()) throw httpError(409, 'Der Server ist bereits eingerichtet');
+    if (!needsSetup()) throw httpError(409, t('server.auth.alreadySetUp'));
     const want = Buffer.from(normCode(app.setup.code));
     const ok = await throttle(ctx, () => {
       const got = Buffer.from(normCode(ctx.body.code));
@@ -256,7 +259,7 @@ export function authRoutes(route, app) {
     });
     if (!ok) {
       log.warn(`Falscher Einrichtungscode von ${ctx.ip}`);
-      throw httpError(401, 'Einrichtungscode stimmt nicht (steht im Server-Log)');
+      throw httpError(401, t('server.auth.wrongSetupCode'));
     }
   }
 
@@ -297,11 +300,11 @@ export function authRoutes(route, app) {
   }
 
   function validate(changes) {
-    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) throw bad('changes: Objekt erwartet');
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) throw bad(t('server.validate.changesObject'));
     const clean = {};
     for (const [p, v] of Object.entries(changes)) {
-      if (!(p in FIELDS)) throw bad(`Unbekannte Einstellung ${p}`);
-      if (cfg._locked.includes(p)) throw httpError(409, `${p} ist per Umgebungsvariable festgelegt`);
+      if (!(p in FIELDS)) throw bad(t('server.validate.unknownSetting', { path: p }));
+      if (cfg._locked.includes(p)) throw httpError(409, t('server.validate.locked', { path: p }));
       clean[p] = FIELDS[p](v);
     }
     checkListeners(cfg, clean);
@@ -318,15 +321,15 @@ export function authRoutes(route, app) {
   // Der Token bleibt im Datenordner, bis install.sh ihn in docker/.env schreibt und cloudflared startet.
   async function storeTunnelToken(pasted, ip) {
     const token = tunnelTokenFromPaste(pasted);
-    if (token === '') throw bad('Token fehlt');
-    if (!token) throw bad('Das ist kein Cloudflare-Token. Die Zeile „cloudflared service install …“ einfügen. Den Befehl nicht ausführen.');
+    if (token === '') throw bad(t('server.tunnel.tokenMissing'));
+    if (!token) throw bad(t('server.tunnel.notAToken'));
     if (!helperAlive(readUpdate(cfg.dataDir).helper)) {
-      throw httpError(409, 'Der Update-Dienst auf dem Server läuft nicht. Einmal im Ordner der Installation: sh install.sh');
+      throw httpError(409, t('server.tunnel.helperNotRunning'));
     }
     requestTunnelToken(cfg.dataDir, token);
     log.info(`Tunnel-Token für den Host hinterlegt (von ${ip})`);
     const applied = await waitForTunnelApplied(cfg.dataDir);
-    if (!applied) throw httpError(504, 'cloudflared wurde nicht gestartet. Auf dem Server im Ordner der Installation: sh install.sh --apply-requested');
+    if (!applied) throw httpError(504, t('server.tunnel.notApplied'));
     log.info(`Tunnel-Token vom Host übernommen (von ${ip})`);
     return { ok: true };
   }
@@ -403,9 +406,9 @@ export function authRoutes(route, app) {
     await checkSetupCode(ctx);
     const { password, machineUrl, machineApi, grinder: g = {}, timezone, publicUrl: pub, tunnelToken } = ctx.body;
     const token = tunnelTokenFromPaste(tunnelToken);
-    if (token === null) throw bad('Das ist kein Cloudflare-Token. Die Zeile „cloudflared service install …“ einfügen. Den Befehl nicht ausführen.');
+    if (token === null) throw bad(t('server.tunnel.notAToken'));
     const problem = passwordProblem(password);
-    if (problem) throw bad(`Passwort: ${problem}`);
+    if (problem) throw bad(t('server.auth.passwordProblem', { problem }));
     const wanted = { 'machine.url': machineUrl, 'machine.api': machineApi, 'grinder.enabled': g.enabled, 'grinder.url': g.enabled ? g.url : undefined, 'grinder.password': g.enabled && g.password ? g.password : undefined, timezone: timezone || undefined, publicUrl: pub || undefined };
     const changes = Object.fromEntries(Object.entries(wanted).filter(([p, v]) => v !== undefined && !cfg._locked.includes(p)));
     const clean = validate(changes);
@@ -425,7 +428,7 @@ export function authRoutes(route, app) {
   }));
   route('DELETE', '/api/sessions/:id', async ({ params, session, res, secure }) => {
     const id = sessions.destroyShort(String(params.id));
-    if (!id) throw httpError(404, 'Sitzung nicht gefunden');
+    if (!id) throw httpError(404, t('server.auth.sessionNotFound'));
     if (id === session.id) res.setHeader('Set-Cookie', sessionCookie('', { secure, maxAgeDays: 0 }));
     return { ok: true, self: id === session.id };
   });
@@ -442,9 +445,8 @@ export function authRoutes(route, app) {
     // Nicht den Zugang abschalten, über den diese Anfrage gerade kommt (sonst sperrt man sich aus)
     const sock = ctx.req?.socket;
     const kind = sock?.encrypted ? 'https' : ctx.req?.lanPort ? 'lan' : 'http';
-    const label = { https: 'HTTPS', lan: 'Heimnetz-HTTP', http: 'den Zugang über den Tunnel-Port' }[kind];
     if (ctx.req && clean[`${kind}.enabled`] === false) {
-      throw bad(`Diese Sitzung nutzt gerade ${label}. Zum Abschalten erst über einen anderen Zugang öffnen, sonst ist Xenios von hier nicht mehr erreichbar.`);
+      throw bad({ https: () => t('server.auth.accessInUse.https'), lan: () => t('server.auth.accessInUse.lan'), http: () => t('server.auth.accessInUse.http') }[kind]());
     }
     const applied = applyChanges(clean);
     return { ...view(ctx), applied };
@@ -452,15 +454,15 @@ export function authRoutes(route, app) {
   route('POST', '/api/admin/password', async (ctx) => {
     await checkPassword(ctx, ctx.body.current);
     const problem = passwordProblem(ctx.body.next);
-    if (problem) throw bad(`Neues Passwort: ${problem}`);
-    if (ctx.body.next === ctx.body.current) throw bad('Neues Passwort ist gleich dem alten');
+    if (problem) throw bad(t('server.auth.newPasswordProblem', { problem }));
+    if (ctx.body.next === ctx.body.current) throw bad(t('server.auth.samePassword'));
     applyChanges({ 'auth.passwordHash': hashPassword(ctx.body.next) });
     sessions.destroyAll(ctx.session.id); // andere Geräte müssen sich neu anmelden
     log.info(`App-Passwort geändert (von ${ctx.ip}); andere Sitzungen beendet`);
     return { ok: true };
   });
   route('POST', '/api/admin/probe', async ({ body }) => {
-    const same = body.kind === 'grinder' && deviceUrl(body.url, 'Adresse der Mühle') === cfg.grinder.url;
+    const same = body.kind === 'grinder' && deviceUrl(body.url, t('server.fields.grinderUrl')) === cfg.grinder.url;
     return probeDevice({ ...body, password: body.password || (same ? cfg.grinder.password : '') }, { pinned: same ? grinder.pinnedFingerprint : null, instance: app.instance });
   });
   route('POST', '/api/admin/grinder/unpin', async (ctx) => {
@@ -470,7 +472,7 @@ export function authRoutes(route, app) {
     return view(ctx);
   });
   route('POST', '/api/admin/tls/renew', async (ctx) => {
-    if (!cfg.https.enabled) throw httpError(409, 'HTTPS ist aus');
+    if (!cfg.https.enabled) throw httpError(409, t('server.auth.httpsOff'));
     ensureCert(cfg.https.cert, cfg.https.key, { hosts: cfg.https.hosts, force: true });
     hooks.onTls?.();
     log.info(`TLS-Zertifikat neu erzeugt (von ${ctx.ip})`);
@@ -481,7 +483,7 @@ export function authRoutes(route, app) {
   route('POST', '/api/admin/update', async ({ ip }) => {
     // Ohne Update-Dienst auf dem Rechner holt niemand die Anforderung ab – nicht endlos warten lassen
     if (!readUpdate(cfg.dataDir).helperAlive) {
-      throw httpError(409, 'Auf dem Server läuft kein Update-Dienst. Einmal auf dem Server ausführen: sh ~/xenios/install.sh --update (aktualisiert und richtet den Dienst ein).');
+      throw httpError(409, t('server.auth.noUpdateHelper'));
     }
     const info = await updateInfo({ dataDir: cfg.dataDir, version: app.version, fetchImpl: app.fetchImpl });
     requestUpdate(cfg.dataDir);

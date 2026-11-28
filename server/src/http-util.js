@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { t } from '../web/shared/i18n.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -62,7 +63,7 @@ export function readBuffer(req, limit = 64 * 1024) {
     req.on('data', (c) => {
       size += c.length;
       if (size > limit) {
-        reject(Object.assign(new Error('Anfrage zu groß'), { status: 413, expose: true }));
+        reject(Object.assign(new Error(t('server.http.tooLarge')), { status: 413, expose: true }));
         req.destroy();
       } else chunks.push(c);
     });
@@ -79,17 +80,17 @@ export function readJson(req, limit = 64 * 1024) {
     req.on('data', (c) => {
       size += c.length;
       if (size > limit) {
-        reject(Object.assign(new Error('Anfrage zu groß'), { status: 413, expose: true }));
+        reject(Object.assign(new Error(t('server.http.tooLarge')), { status: 413, expose: true }));
         req.destroy();
       } else chunks.push(c);
     });
     req.on('end', () => {
       if (!size) return resolve({});
-      if (!ct.includes('application/json')) return reject(Object.assign(new Error('JSON erwartet'), { status: 415, expose: true }));
+      if (!ct.includes('application/json')) return reject(Object.assign(new Error(t('server.http.jsonExpected')), { status: 415, expose: true }));
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
       } catch {
-        reject(Object.assign(new Error('Ungültiges JSON'), { status: 400, expose: true }));
+        reject(Object.assign(new Error(t('server.http.invalidJson')), { status: 400, expose: true }));
       }
     });
     req.on('error', reject);

@@ -3,6 +3,7 @@
 // Die App schreibt nur Dateien unter dataDir; das Skript auf dem Rechner holt Image/Git und startet neu.
 import fs from 'node:fs';
 import path from 'node:path';
+import { t } from '../web/shared/i18n.js';
 
 export const GITHUB_REPO = 'TimS1998/Xenios';
 const HELPER_MAX_AGE_MS = 90e3;
@@ -98,14 +99,14 @@ export async function fetchLatest({ version = '', fetchImpl = globalThis.fetch, 
     if (res.status === 404) {
       latest = null;
     } else if (!res.ok) {
-      error = res.status === 403 ? 'GitHub bremst gerade' : `GitHub antwortet HTTP ${res.status}`;
+      error = res.status === 403 ? t('server.update.rateLimited') : t('server.update.httpStatus', { status: res.status });
     } else {
       const data = await res.json();
       const tag = String(data.tag_name || '').replace(/^v/i, '');
       if (tag) latest = { version: tag, name: data.name || tag, url: data.html_url || `https://github.com/${GITHUB_REPO}/releases` };
     }
   } catch (e) {
-    error = e.name === 'TimeoutError' ? 'GitHub antwortet nicht' : (e.cause?.code || e.message);
+    error = e.name === 'TimeoutError' ? t('server.update.noAnswer') : (e.cause?.code || e.message);
   }
   if (useCache) {
     cache.at = Date.now();

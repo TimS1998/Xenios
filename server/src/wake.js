@@ -4,6 +4,7 @@ import path from 'node:path';
 import { JsonStore } from './store.js';
 import { logger } from './log.js';
 import { httpError } from './machine.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('wecker');
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -23,6 +24,11 @@ export const WAKE_DEFAULTS = {
   days: [0, 1, 2, 3, 4, 5, 6], // Montag = 0
 };
 
+// Benachrichtigung, wenn die Maschine für einen Wecker eingeschaltet wurde
+export function wakeEventText(time, device, lang) {
+  return { title: t('server.wake.title', null, lang), body: t('server.wake.fired', { time, device }, lang) };
+}
+
 export class Wake {
   constructor(cfg, machine, { onEvent, sessionExists } = {}) {
     this.machine = machine;
@@ -35,10 +41,10 @@ export class Wake {
 
   // Meldung eines Handys. id = Sitzungs-ID (gekürzt), next = Zeitpunkt in ms oder null (kein Wecker gestellt).
   report(id, name, next) {
-    if (next !== null && !(Number.isFinite(next) && next > 0)) throw httpError(400, 'next: Zeitpunkt in ms oder null');
+    if (next !== null && !(Number.isFinite(next) && next > 0)) throw httpError(400, t('server.wake.badNext'));
     const devices = this.store.data.devices;
     const prev = devices[id];
-    devices[id] = { name: String(name || 'Handy').slice(0, 60), next: next ?? null, updated: Date.now(), enabled: prev ? prev.enabled : true };
+    devices[id] = { name: String(name || t('server.wake.defaultDevice')).slice(0, 60), next: next ?? null, updated: Date.now(), enabled: prev ? prev.enabled : true };
     // höchstens 20 Geräte, älteste Meldungen fliegen raus
     const ids = Object.keys(devices).sort((a, b) => devices[b].updated - devices[a].updated);
     for (const old of ids.slice(20)) delete devices[old];
@@ -51,13 +57,13 @@ export class Wake {
     if ('enabled' in config) c.enabled = Boolean(config.enabled);
     if ('leadMin' in config) {
       const n = Math.round(Number(config.leadMin));
-      if (!(n >= 1 && n <= 120)) throw httpError(400, 'Vorlauf: 1 bis 120 Minuten');
+      if (!(n >= 1 && n <= 120)) throw httpError(400, t('server.wake.badLead'));
       c.leadMin = n;
     }
     if ('steam' in config) c.steam = typeof config.steam === 'boolean' ? config.steam : null;
     for (const k of ['from', 'to']) {
       if (k in config) {
-        if (!HHMM.test(String(config[k]))) throw httpError(400, `${k}: Uhrzeit HH:MM erwartet`);
+        if (!HHMM.test(String(config[k]))) throw httpError(400, t('server.wake.badTime', { field: k }));
         c[k] = String(config[k]);
       }
     }
@@ -156,7 +162,7 @@ export class Wake {
       if (m.statusKey === 'off' || m.statusKey === 'eco') {
         await this.machine.power('on', this.store.data.config.steam ?? undefined);
         log.info(`Eingeschaltet für Wecker ${when} (${p.device})`);
-        this.onEvent({ topic: 'power', title: 'Wecker', body: `Xenia eingeschaltet – Wecker um ${when} (${p.device})`, tag: 'wake', at: new Date(now).toISOString() });
+        this.onEvent({ topic: 'power', ...wakeEventText(when, p.device), tag: 'wake', at: new Date(now).toISOString() });
       }
       this.store.data.fired = { id: p.id, alarm: p.alarm };
       this.store.save(0);

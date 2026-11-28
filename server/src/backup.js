@@ -7,6 +7,7 @@ import { unzip } from './grinder.js';
 import { DEFAULTS, SECRET_PATHS, getPath, readConfigFile, writeConfigFile, secretBox, loadConfig } from './config.js';
 import { httpError } from './machine.js';
 import { isPasswordHash } from './auth.js';
+import { t } from '../web/shared/i18n.js';
 
 const inflateRaw = promisify(zlib.inflateRaw);
 const bad = (msg) => httpError(400, msg);
@@ -71,7 +72,7 @@ export function makeZip(files) {
 
 function safeName(name) {
   if (typeof name !== 'string' || name !== path.posix.basename(name) || name.includes('\\') || name.includes('..')) {
-    throw bad('Ungültiger Dateiname in der Sicherung');
+    throw bad(t('server.backup.badFileName'));
   }
   return name;
 }
@@ -110,12 +111,12 @@ export function packBackup(opts) {
 
 export async function readBackup(buf) {
   const raw = buf instanceof Uint8Array ? buf : Buffer.from(buf || []);
-  if (!raw.length || raw.length > BACKUP_MAX) throw bad('Sicherung fehlt oder ist zu groß');
+  if (!raw.length || raw.length > BACKUP_MAX) throw bad(t('server.backup.missingOrTooLarge'));
   let unpacked;
   try {
     unpacked = await unzip(raw, inflateRaw);
   } catch {
-    throw bad('Das ist keine gültige ZIP-Datei');
+    throw bad(t('server.backup.notZip'));
   }
   const files = {};
   for (const [name, data] of Object.entries(unpacked)) {
@@ -127,17 +128,17 @@ export async function readBackup(buf) {
   try {
     manifest = JSON.parse(files['manifest.json']?.toString('utf8') || '');
   } catch {
-    throw bad('Das ist keine Xenios-Sicherung (manifest.json fehlt oder ist ungültig)');
+    throw bad(t('server.backup.noManifest'));
   }
-  if (!manifest || manifest.kind !== BACKUP_KIND) throw bad('Das ist keine Xenios-Sicherung');
-  if (!files['config.json']) throw bad('In der Sicherung fehlt config.json');
+  if (!manifest || manifest.kind !== BACKUP_KIND) throw bad(t('server.backup.notBackup'));
+  if (!files['config.json']) throw bad(t('server.backup.noConfig'));
   let config;
   try {
     config = JSON.parse(files['config.json'].toString('utf8'));
   } catch {
-    throw bad('config.json in der Sicherung ist ungültig');
+    throw bad(t('server.backup.badConfig'));
   }
-  if (!config || typeof config !== 'object' || Array.isArray(config)) throw bad('config.json in der Sicherung ist ungültig');
+  if (!config || typeof config !== 'object' || Array.isArray(config)) throw bad(t('server.backup.badConfig'));
   return { manifest, files, config };
 }
 
@@ -151,7 +152,7 @@ function checkSecrets(config, keyText, liveBox) {
     try {
       box.decrypt(v, p);
     } catch {
-      throw bad('Die Sicherung passt nicht zum Schlüssel (secret.key / XENIOS_SECRET_KEY)');
+      throw bad(t('server.backup.wrongKey'));
     }
   }
 }
@@ -166,7 +167,7 @@ function writeAtomic(dest, buf) {
 export async function applyBackupFiles({ buf, configFile, dataDir, box }) {
   const { files, config, manifest } = await readBackup(buf);
   // Ohne Passwort wäre der Server danach wieder im Einrichtungsmodus und für jeden offen, der ihn erreicht.
-  if (!isPasswordHash(getPath(config, 'auth.passwordHash'))) throw bad('In der Sicherung fehlt das App-Passwort, sie wurde nicht eingespielt');
+  if (!isPasswordHash(getPath(config, 'auth.passwordHash'))) throw bad(t('server.backup.noPassword'));
   checkSecrets(config, files['secret.key']?.toString('utf8'), box);
   const current = readConfigFile(configFile);
   if (current.dataDir !== undefined) config.dataDir = current.dataDir;

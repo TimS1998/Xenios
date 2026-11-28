@@ -7,6 +7,7 @@ import readline from 'node:readline';
 import { configPath, loadConfig, updateConfigFile } from './config.js';
 import { hashPassword, passwordProblem } from './auth.js';
 import { deviceUrl } from './admin.js';
+import { t } from '../web/shared/i18n.js';
 
 const file = configPath();
 const nonInteractive = process.argv.includes('--yes');
@@ -43,50 +44,50 @@ async function askUrl(label, def) {
 }
 
 async function main() {
-  console.log('\n☕  Xenios – Einrichtung');
-  console.log(`   Konfiguration: ${file}\n`);
+  console.log(`\n☕  ${t('server.setup.heading')}`);
+  console.log(`   ${t('server.setup.configFile', { file })}\n`);
   const changes = {};
 
   // 1. App-Passwort
   const hasPw = Boolean(cfg.auth.passwordHash);
   let setPw = !hasPw;
-  if (hasPw && !nonInteractive) setPw = /^[jy]/i.test(await ask('App-Passwort ändern? (j/N)', 'n'));
+  if (hasPw && !nonInteractive) setPw = /^[jy]/i.test(await ask(t('server.setup.changePassword'), 'n'));
   if (nonInteractive) setPw = Boolean(process.env.XENIOS_PASSWORD) || !hasPw;
   while (setPw) {
-    const pw = nonInteractive ? process.env.XENIOS_PASSWORD || '' : await askHidden('Neues App-Passwort (mind. 10 Zeichen): ');
+    const pw = nonInteractive ? process.env.XENIOS_PASSWORD || '' : await askHidden(t('server.setup.newPassword'));
     const err = passwordProblem(pw);
     if (err) {
-      console.log(`  ✗ Zu schwach: ${err}`);
+      console.log(`  ✗ ${t('server.setup.tooWeak', { problem: err })}`);
       if (nonInteractive) process.exit(1);
       continue;
     }
-    if (!nonInteractive && pw !== (await askHidden('Passwort wiederholen: '))) {
-      console.log('  ✗ Stimmt nicht überein');
+    if (!nonInteractive && pw !== (await askHidden(t('server.setup.repeatPassword')))) {
+      console.log(`  ✗ ${t('server.setup.mismatch')}`);
       continue;
     }
     changes['auth.passwordHash'] = hashPassword(pw);
-    console.log('  ✓ Passwort gesetzt (nur als scrypt-Hash gespeichert)');
+    console.log(`  ✓ ${t('server.setup.passwordSet')}`);
     break;
   }
 
   // 2. Geräte (per Umgebungsvariable festgelegte Werte bleiben unberührt)
-  const which = await ask('Welche Xenia? 1 = neu (Brew-by-Sync), 2 = alt (DBL)', cfg.machine.api === 'classic' ? '2' : '1');
+  const which = await ask(t('server.setup.whichXenia'), cfg.machine.api === 'classic' ? '2' : '1');
   changes['machine.api'] = which === '2' || /^alt/i.test(which) ? 'classic' : 'bbs';
-  if (!cfg._locked.includes('machine.url')) changes['machine.url'] = await askUrl('Adresse der Xenia', cfg.machine.url);
-  const useGrinder = !/^n/i.test(await ask('Mahlkönig-Mühle einbinden? (J/n)', cfg.grinder.enabled ? 'j' : 'n'));
+  if (!cfg._locked.includes('machine.url')) changes['machine.url'] = await askUrl(t('server.fields.machineUrl'), cfg.machine.url);
+  const useGrinder = !/^n/i.test(await ask(t('server.setup.useGrinder'), cfg.grinder.enabled ? 'j' : 'n'));
   changes['grinder.enabled'] = useGrinder;
   if (useGrinder) {
-    if (!cfg._locked.includes('grinder.url')) changes['grinder.url'] = await askUrl('Adresse der Mühle', cfg.grinder.url);
+    if (!cfg._locked.includes('grinder.url')) changes['grinder.url'] = await askUrl(t('server.fields.grinderUrl'), cfg.grinder.url);
     if (!cfg._locked.includes('grinder.password')) {
-      const gp = nonInteractive ? '' : await askHidden(`Owner-Passwort der Mühle${cfg.grinder.password ? ' (Enter = unverändert)' : ''}: `);
+      const gp = nonInteractive ? '' : await askHidden(cfg.grinder.password ? t('server.setup.grinderPasswordKeep') : t('server.setup.grinderPassword'));
       if (gp) changes['grinder.password'] = gp;
     }
   }
 
   updateConfigFile(file, changes, cfg._box);
-  console.log(`  ✓ Gespeichert: ${file} (Mühlen-Passwort verschlüsselt)`);
-  console.log('\nFertig. Starten mit:  npm start');
-  console.log('Weitere Einstellungen: in der App unter Einstellungen → Server.\n');
+  console.log(`  ✓ ${t('server.setup.saved', { file })}`);
+  console.log(`\n${t('server.setup.done')}`);
+  console.log(`${t('server.setup.more')}\n`);
   rl.close();
 }
 

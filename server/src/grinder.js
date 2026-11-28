@@ -5,6 +5,7 @@ import zlib from 'node:zlib';
 import { promisify } from 'node:util';
 import { Grinder as GrinderCore } from '../web/shared/grinder-core.js';
 import { logger } from './log.js';
+import { t } from '../web/shared/i18n.js';
 
 const log = logger('muehle');
 const inflateRaw = promisify(zlib.inflateRaw);
@@ -29,14 +30,14 @@ export class GrinderHttp {
 
   // Fehler bei abweichendem Zertifikat, sonst null (erstes Zertifikat wird gemerkt).
   _checkPin(fp) {
-    if (!fp) return new Error('Mühle sendet kein Zertifikat');
+    if (!fp) return new Error(t('server.grinder.noCert'));
     if (!this.pinned) {
       this.pinned = fp;
       this.onFingerprint?.(fp);
       return null;
     }
     if (this.pinned === fp) return null;
-    return Object.assign(new Error('Zertifikat der Mühle hat sich geändert – möglicher Angriff. Unter Einstellungen → Mühle & Grind-by-Sync prüfen und ggf. „Zertifikat vergessen“.'), { status: 502, expose: true });
+    return Object.assign(new Error(t('server.grinder.certChanged')), { status: 502, expose: true });
   }
 
   request(method, path, { body, form, headers = {}, binary = false } = {}) {
@@ -71,7 +72,7 @@ export class GrinderHttp {
           size += d.length;
           if (size > 20 * 1024 * 1024) {
             req.destroy();
-            reject(new Error('Antwort zu groß'));
+            reject(new Error(t('server.grinder.tooLarge')));
           } else chunks.push(d);
         });
         res.on('end', () => {
@@ -79,7 +80,7 @@ export class GrinderHttp {
           resolve({ status: res.statusCode, headers: res.headers, buffer: buf, text: binary ? null : buf.toString('utf8') });
         });
       });
-      req.on('timeout', () => req.destroy(new Error('Zeitüberschreitung (Mühle)')));
+      req.on('timeout', () => req.destroy(new Error(t('server.grinder.timeout'))));
       req.on('error', reject);
       // Header und Body gehen erst nach erfolgreicher Zertifikatsprüfung raus.
       const send = () => {

@@ -1,6 +1,7 @@
 // Daten für die Android-Widgets (GET /api/widget): Zustand, laufender und letzter Bezug, Bezüge der letzten Tage,
 // Bezugszeiten, Pflege und der Verlauf der letzten 10 Minuten. Kompakt gehalten (Widgets laden das oft).
 import { shotPhases, shotMetrics } from '../web/shared/shot-analysis.js';
+import { tRaw } from '../web/shared/i18n.js';
 
 const r1 = (v, d = 1) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 10 ** d) / 10 ** d);
 
@@ -59,7 +60,7 @@ export function widgetExtras({ m, shots = [], maintenance = null, history = null
   // Bezüge pro Tag (7 Tage, ältester zuerst) und die letzten 12 Bezugszeiten
   const day = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const today = day(now);
-  const names = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  const names = tRaw('common.weekdaysShort');
   out.days = Array.from({ length: 7 }, (_, i) => {
     // Kalendertag zurückrechnen (nicht 24 h): über eine Zeitumstellung hinweg trifft das sonst nicht Mitternacht
     const d = new Date(today);

@@ -3,6 +3,7 @@
 import { summarize, profileFromShot } from '../web/shared/visualizer.js';
 import { targetCurve } from '../web/shared/shot-analysis.js';
 import { httpError } from './machine.js';
+import { t } from '../web/shared/i18n.js';
 
 const BASE = 'https://visualizer.coffee';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -22,16 +23,16 @@ export function communityRoutes(route, { version = '', fetchImpl = (...a) => glo
         signal: AbortSignal.timeout(12000),
       });
     } catch (e) {
-      const why = e.name === 'TimeoutError' ? 'Zeitüberschreitung' : e.cause?.code || e.message;
-      throw httpError(502, `visualizer.coffee nicht erreichbar (${why})`);
+      const why = e.name === 'TimeoutError' ? t('server.common.timeout') : e.cause?.code || e.message;
+      throw httpError(502, t('server.community.unreachable', { why }));
     }
-    if (res.status === 429) throw httpError(429, 'visualizer.coffee bremst gerade (zu viele Anfragen). Bitte eine Minute warten.');
-    if (res.status === 404) throw httpError(404, 'Auf visualizer.coffee nicht gefunden');
-    if (!res.ok) throw httpError(502, `visualizer.coffee antwortet mit HTTP ${res.status}`);
+    if (res.status === 429) throw httpError(429, t('server.community.rateLimited'));
+    if (res.status === 404) throw httpError(404, t('server.community.notFound'));
+    if (!res.ok) throw httpError(502, t('server.community.httpStatus', { status: res.status }));
     const text = await res.text();
-    if (text.length > 3e6) throw httpError(502, 'Antwort von visualizer.coffee zu groß');
+    if (text.length > 3e6) throw httpError(502, t('server.community.tooLarge'));
     let data;
-    try { data = JSON.parse(text); } catch { throw httpError(502, 'Unerwartete Antwort von visualizer.coffee'); }
+    try { data = JSON.parse(text); } catch { throw httpError(502, t('server.community.unexpected')); }
     cache.set(url, { at: Date.now(), data });
     if (cache.size > 100) cache.delete(cache.keys().next().value);
     return data;
@@ -54,10 +55,10 @@ export function communityRoutes(route, { version = '', fetchImpl = (...a) => glo
 
   // Ein Bezug als Profil für die Xenia: Druckstufen aus dem gemessenen Verlauf, Vorschau, Eckdaten
   route('GET', '/api/community/shots/:id', async ({ params }) => {
-    if (!UUID.test(params.id)) throw httpError(400, 'Ungültige ID');
+    if (!UUID.test(params.id)) throw httpError(400, t('server.community.badId'));
     const shot = await get(`/api/shots/${params.id}`, 60 * 60e3);
     const p = profileFromShot(shot);
-    if (!p) throw httpError(422, 'Dieser Bezug hat keinen Druckverlauf');
+    if (!p) throw httpError(422, t('server.community.noCurve'));
     // Link nur aus der geprüften ID, nie aus der Antwort
     return { ...p, info: { ...p.info, id: params.id, url: `${BASE}/shots/${params.id}` }, target: targetCurve(p.steps) };
   });
