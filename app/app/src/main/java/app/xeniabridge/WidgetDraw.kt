@@ -109,11 +109,13 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
         val rows = WidgetSpecs.ROWS[spec] ?: return emptyMap()
         val pad = WidgetSpecs.PAD
         val out = mutableMapOf<String, RectF>()
-        val total = rows.sumOf { it.weight.toDouble() }.toFloat()
+        // Kopfzeile und Abstand darunter mit fester Höhe (der Titel bleibt oben), der Rest nach Gewicht – wie im Layout
+        val total = rows.filter { !it.fixed }.sumOf { it.weight.toDouble() }.toFloat()
         val inner = hDp - 2 * pad
+        val flex = (inner - rows.filter { it.fixed }.sumOf { it.weight.toDouble() }.toFloat()).coerceAtLeast(0f)
         var y = pad
         for (r in rows) {
-            val h = inner * r.weight / total
+            val h = if (r.fixed) r.weight else if (total > 0f) flex * r.weight / total else 0f
             val rect = RectF(pad, y, wDp - pad, y + h)
             r.name?.let { out[it] = rect }
             r.cols?.let { cols ->
