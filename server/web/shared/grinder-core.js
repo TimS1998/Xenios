@@ -3,6 +3,7 @@
 import { Emitter } from './emitter.js';
 import { openSqlite } from './sqlite-read.js';
 import { logger } from './log.js';
+import { t, tRaw, locale } from './i18n.js';
 
 let log = logger('muehle');
 
@@ -76,8 +77,8 @@ export class Grinder extends Emitter {
   }
 
   async login() {
-    if (!this.cfg.password) throw Object.assign(new Error('Kein Mühlen-Passwort in der Konfiguration'), { status: 409 });
-    if (Date.now() < this.loginBlockedUntil) throw Object.assign(new Error('Login bei der Mühle pausiert (zu viele Fehlversuche)'), { status: 429 });
+    if (!this.cfg.password) throw Object.assign(new Error(t('core.grinder.noPassword')), { status: 409 });
+    if (Date.now() < this.loginBlockedUntil) throw Object.assign(new Error(t('core.grinder.loginPaused')), { status: 429 });
     this.http.cookies.clear();
     await this.http.request('GET', '/login.php');
     const res = await this.http.request('POST', '/login.php', { form: { userRole: 'Owner', password: this.cfg.password, login: '' } });
@@ -85,7 +86,7 @@ export class Grinder extends Emitter {
     if (check.text.trim() !== 'session_valid') {
       this.loggedIn = false;
       this.loginBlockedUntil = Date.now() + 5 * 60e3;
-      throw Object.assign(new Error(`Login bei der Mühle fehlgeschlagen (HTTP ${res.status}) – Passwort prüfen`), { status: 502 });
+      throw Object.assign(new Error(t('core.grinder.loginFailed', { status: res.status })), { status: 502 });
     }
     this.loggedIn = true;
     log.info('Bei der Mühle angemeldet');
@@ -107,19 +108,19 @@ export class Grinder extends Emitter {
     try {
       return JSON.parse(res.text);
     } catch {
-      throw new Error(`Unerwartete Antwort der Mühle auf ${cmd}`);
+      throw new Error(t('core.grinder.unexpectedResponse', { cmd }));
     }
   }
 
   async downloadDatabase() {
     const res = await this._authed('GET', '/rest_api/download_database', { binary: true });
-    if (res.status !== 200 || !String(res.headers['content-type']).includes('octet-stream')) throw new Error(`Datenbank-Download fehlgeschlagen (HTTP ${res.status})`);
+    if (res.status !== 200 || !String(res.headers['content-type']).includes('octet-stream')) throw new Error(t('core.grinder.dbDownloadFailed', { status: res.status }));
     return { buffer: res.buffer, filename: filenameFrom(res.headers) || 'grinder.db' };
   }
 
   async downloadLogs() {
     const res = await this._authed('GET', '/rest_api/download_machine_logs', { binary: true });
-    if (res.status !== 200 || !String(res.headers['content-type']).includes('octet-stream')) throw new Error(`Log-Download fehlgeschlagen (HTTP ${res.status})`);
+    if (res.status !== 200 || !String(res.headers['content-type']).includes('octet-stream')) throw new Error(t('core.grinder.logDownloadFailed', { status: res.status }));
     return { buffer: res.buffer, filename: filenameFrom(res.headers) || 'machineLogs.zip', files: await unzip(res.buffer, this.inflateRaw) };
   }
 
@@ -132,7 +133,7 @@ export class Grinder extends Emitter {
       if (!this.cfg.password) {
         this.state.online = true;
         this.state.lastSeen = new Date().toISOString();
-        this.state.error = 'Kein Mühlen-Passwort konfiguriert – nur Basisdaten verfügbar.';
+        this.state.error = t('core.grinder.noPasswordState');
         this.emit('state');
         return;
       }
@@ -214,7 +215,7 @@ export class Grinder extends Emitter {
     const cleared = new Set(alerts.filter((a) => a.alert_active === 0 && a.alert_related_id).map((a) => a.alert_related_id));
     this.state.alerts = alerts
       .filter((a) => a.alert_active === 1)
-      .map((a) => ({ id: a.alert_id, type: alertTypes[a.alert_type_id] || `Alarm ${a.alert_type_id}`, at: a.alert_date_time, active: !cleared.has(a.alert_id) }))
+      .map((a) => ({ id: a.alert_id, type: alertTypes[a.alert_type_id] || t('core.grinder.alertNumbered', { id: a.alert_type_id }), at: a.alert_date_time, active: !cleared.has(a.alert_id) }))
       .sort((a, b) => b.id - a.id)
       .slice(0, 20);
 
@@ -251,15 +252,16 @@ export class Grinder extends Emitter {
     // Ereignisse
     if (last && this._lastGrindId !== null && last.id > this._lastGrindId) {
       const g = last;
-      const txt = g.success && g.weightG ? `${fmt(g.weightG)} g in ${fmt(g.durationMs / 1000)} s${g.targetG ? ` (Ziel ${fmt(g.targetG)} g)` : ''}` : 'Mahlvorgang abgebrochen';
-      this.emit('event', { topic: 'grinder', title: 'Mühle: gemahlen', body: txt, tag: 'grind', silent: true });
+      const vals = g.success && g.weightG ? { weight: fmt(g.weightG), time: fmt(g.durationMs / 1000), target: g.targetG ? fmt(g.targetG) : null } : null;
+      const txt = !vals ? t('core.grinder.ground.aborted') : vals.target ? t('core.grinder.ground.bodyTarget', vals) : t('core.grinder.ground.body', vals);
+      this.emit('event', { topic: 'grinder', title: t('core.grinder.ground.title'), body: txt, tag: 'grind', silent: true });
     }
     this._lastGrindId = last ? last.id : 0;
     const relevant = /Hopper|Fan|Agsa|Disc|Loadcell|LoadCell|Ddd|Ntc|Unreliable/;
     for (const a of this.state.alerts.filter((x) => x.active)) {
       if (!this._knownAlerts.has(a.id)) {
         if (this._knownAlertsReady && relevant.test(a.type)) {
-          this.emit('event', { topic: 'grinder', title: 'Mühle meldet', body: alertText(a.type), tag: `galert-${a.id}` });
+          this.emit('event', { topic: 'grinder', title: t('core.grinder.alertTitle'), body: alertText(a.type), tag: `galert-${a.id}` });
         }
         this._knownAlerts.add(a.id);
       }
@@ -280,19 +282,20 @@ export class Grinder extends Emitter {
   }
 }
 
-export const ALERT_TEXT = {
-  HopperNotMounted: 'Bohnenbehälter nicht aufgesetzt',
-  FanFailure: 'Lüfterfehler', Fan1Failure: 'Lüfter 1 defekt', Fan2Failure: 'Lüfter 2 defekt',
-  AgsaBlockage: 'Mahlscheiben blockiert', AgsaBlockagePrediction: 'Blockade der Mahlgradverstellung droht',
-  AgsaTimeout: 'Mahlgradverstellung: Zeitüberschreitung', AgsaOvercurrent: 'Mahlgradverstellung: Überstrom',
-  AgsaBlockedByHopper: 'Mahlgradverstellung durch Behälter blockiert', AgsaLimitLowerHit: 'Untere Mahlgrad-Grenze erreicht',
-  DiscCalibrationMissing: 'Mahlscheiben nicht kalibriert', LoadcellCalibrationMissing: 'Waage nicht kalibriert',
-  LoadCellCalibrationReminder: 'Waage bitte neu kalibrieren', LoadCellDisabled: 'Waage deaktiviert',
-  UnreliableGbwOperation: 'Grind-by-Weight unzuverlässig', InternetConnectionFailed: 'Keine Internetverbindung',
-  WifiConnectionFailed: 'WLAN-Verbindung fehlgeschlagen', NewFirmwareUpdateAvailable: 'Neue Firmware verfügbar',
-  BrewEventIgnoredForGbs: 'Bezug für Grind-by-Sync ignoriert', FastPortafilterSwapDetected: 'Siebträger zu schnell gewechselt',
-};
-const alertText = (t) => ALERT_TEXT[t] || t;
+// Texte im Katalog unter core.grinder.alerts (Schlüssel = Alarmtyp), erst beim Zugriff nachgeschlagen (Getter)
+export const ALERT_TEXT = Object.defineProperties({}, Object.fromEntries([
+  'HopperNotMounted',
+  'FanFailure', 'Fan1Failure', 'Fan2Failure',
+  'AgsaBlockage', 'AgsaBlockagePrediction',
+  'AgsaTimeout', 'AgsaOvercurrent',
+  'AgsaBlockedByHopper', 'AgsaLimitLowerHit',
+  'DiscCalibrationMissing', 'LoadcellCalibrationMissing',
+  'LoadCellCalibrationReminder', 'LoadCellDisabled',
+  'UnreliableGbwOperation', 'InternetConnectionFailed',
+  'WifiConnectionFailed', 'NewFirmwareUpdateAvailable',
+  'BrewEventIgnoredForGbs', 'FastPortafilterSwapDetected',
+].map((id) => [id, { enumerable: true, get: () => tRaw('core.grinder.alerts')[id] }])));
+const alertText = (type) => ALERT_TEXT[type] || type;
 
 function filenameFrom(headers) {
   const m = /filename="?([^";]+)"?/.exec(headers['content-disposition'] || '');
@@ -328,5 +331,5 @@ async function inflateRawWeb(data) {
 }
 
 function fmt(v, d = 1) {
-  return Number(v).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+  return Number(v).toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 }
