@@ -3,11 +3,13 @@
 // Deshalb wird nicht die Decent-Logik übersetzt, sondern der tatsächlich gemessene Druckverlauf eines
 // gelungenen Bezugs in Druckstufen zerlegt (Pausen ohne Druck werden zu „Pumpe aus + Warten“).
 
+import { t } from './i18n.js';
+
 const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
 const r1 = (v) => Math.round(v * 10) / 10;
 
 // Skriptnamen der Xenia: nur A–Z, 0–9, Leerzeichen, - _ #, höchstens 40 Zeichen
-export function scriptName(text, fallback = 'Profil') {
+export function scriptName(text, fallback = t('shots.community.fallbackName')) {
   const s = String(text || '')
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss')
     .normalize('NFKD').replace(/[̀-ͯ]/g, '')
@@ -147,7 +149,7 @@ export function summarize(s) {
   const yieldG = num(s.drink_weight);
   return {
     id: s.id,
-    title: s.profile_title || 'Ohne Titel',
+    title: s.profile_title || t('shots.community.untitled'),
     user: s.user_name || null,
     bean: [s.bean_brand, s.bean_type].filter(Boolean).join(' · ') || null,
     roast: s.roast_level || null,
