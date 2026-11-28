@@ -14,7 +14,7 @@
     "mock:classic": "node mock/mock-devices.js classic",
     "dev": "node src/index.js --config mock/dev-config.json",
     "dev:classic": "node src/index.js --config mock/dev-config-classic.json",
-    "test": "node --test --test-force-exit test/unit.test.js test/integration.test.js test/direct.test.js test/admin.test.js test/shots.test.js test/analysis.test.js test/community.test.js test/gbs.test.js test/gbs-dbl.test.js test/classic.test.js test/dbl.test.js test/poll.test.js test/install.test.js test/widget.test.js test/native-update.test.js"
+    "test": "node --test --test-force-exit test/unit.test.js test/integration.test.js test/direct.test.js test/admin.test.js test/shots.test.js test/analysis.test.js test/community.test.js test/gbs.test.js test/gbs-dbl.test.js test/classic.test.js test/dbl.test.js test/poll.test.js test/install.test.js test/widget.test.js test/native-update.test.js test/i18n.test.js"
   },
   "license": "Apache-2.0"
 }

@@ -4,7 +4,7 @@ const SHELL = [
   '/', '/index.html', '/app.css', '/manifest.webmanifest',
   '/fonts/open-sans-latin-300-normal.woff2', '/fonts/open-sans-latin-400-normal.woff2', '/fonts/open-sans-latin-600-normal.woff2',
   '/js/app.js', '/js/motion.js', '/js/live.js', '/js/api.js', '/js/ui.js', '/js/icons-xenia.js', '/js/prefs.js', '/js/gauge.js', '/js/setup.js',
-  '/js/views/dashboard.js', '/js/views/shot-detail.js', '/js/views/community.js', '/shared/shot-analysis.js', '/shared/visualizer.js', '/shared/machine-core.js', '/shared/machine-api.js', '/shared/grinder-core.js', '/shared/emitter.js', '/shared/sqlite-read.js', '/shared/log.js',
+  '/js/views/dashboard.js', '/js/views/shot-detail.js', '/js/views/community.js', '/shared/shot-analysis.js', '/shared/i18n.js', '/shared/i18n/de/index.js', '/shared/i18n/de/common.js', '/shared/i18n/de/app.js', '/shared/i18n/de/home.js', '/shared/i18n/de/shots.js', '/shared/i18n/de/settings.js', '/shared/i18n/de/core.js', '/shared/i18n/de/server.js', '/shared/visualizer.js', '/shared/machine-core.js', '/shared/machine-api.js', '/shared/grinder-core.js', '/shared/emitter.js', '/shared/sqlite-read.js', '/shared/log.js',
   '/js/views/scripts.js', '/js/views/controls.js', '/js/views/shots.js', '/js/views/timer.js', '/js/views/grinder.js', '/js/views/settings.js', '/js/views/server.js',
   '/icons/icon.svg', '/icons/icon-192.png', '/icons/badge-96.png',
 ];

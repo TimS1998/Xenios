@@ -1,6 +1,7 @@
 import { XENIA_ICONS } from './icons-xenia.js';
 // UI-Hilfen: Elemente bauen (ohne innerHTML für Fremddaten), Icons, Snackbar, Sheets, Dialoge, Formatierung.
 import { store } from './api.js';
+import { locale } from '../shared/i18n.js';
 
 // replaceChildren/append ignorieren null/false (praktisch für bedingte Elemente)
 for (const proto of [Element.prototype, DocumentFragment.prototype]) {
@@ -102,8 +103,8 @@ export function icon(name, cls = '') {
 }
 
 // --- Formatierung (deutsch) ---
-export const fmt = (v, d = 1) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? '–' : Number(v).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }));
-export const fmtInt = (v) => (v === null || v === undefined ? '–' : Number(v).toLocaleString('de-DE'));
+export const fmt = (v, d = 1) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? '–' : Number(v).toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d }));
+export const fmtInt = (v) => (v === null || v === undefined ? '–' : Number(v).toLocaleString(locale()));
 export const hhmm = (min) => (min === null || min === undefined ? '--:--' : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`);
 export function fromHhmm(s) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || ''));
@@ -133,9 +134,9 @@ export function ago(iso) {
   if (s < 60) return 'gerade eben';
   if (s < 3600) return `vor ${Math.round(s / 60)} min`;
   if (s < 86400) return `vor ${Math.round(s / 3600)} h`;
-  return new Date(iso).toLocaleDateString('de-DE', withZone({ day: '2-digit', month: '2-digit' })) + ' ' + new Date(iso).toLocaleTimeString('de-DE', withZone({ hour: '2-digit', minute: '2-digit' }));
+  return new Date(iso).toLocaleDateString(locale(), withZone({ day: '2-digit', month: '2-digit' })) + ' ' + new Date(iso).toLocaleTimeString(locale(), withZone({ hour: '2-digit', minute: '2-digit' }));
 }
-export const dateTime = (iso) => (iso ? new Date(iso).toLocaleString('de-DE', withZone({ day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '–');
+export const dateTime = (iso) => (iso ? new Date(iso).toLocaleString(locale(), withZone({ day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '–');
 
 // --- Bausteine ---
 export function switchEl({ checked, disabled, onChange, label }) {
