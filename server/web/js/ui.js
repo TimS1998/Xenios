@@ -1,7 +1,7 @@
 import { XENIA_ICONS } from './icons-xenia.js';
 // UI-Hilfen: Elemente bauen (ohne innerHTML für Fremddaten), Icons, Snackbar, Sheets, Dialoge, Formatierung.
 import { store } from './api.js';
-import { locale } from '../shared/i18n.js';
+import { locale, t } from '../shared/i18n.js';
 
 // replaceChildren/append ignorieren null/false (praktisch für bedingte Elemente)
 for (const proto of [Element.prototype, DocumentFragment.prototype]) {
@@ -131,9 +131,9 @@ export function withZone(opts) {
 export function ago(iso) {
   if (!iso) return '–';
   const s = Math.round((Date.now() - Date.parse(iso)) / 1000);
-  if (s < 60) return 'gerade eben';
-  if (s < 3600) return `vor ${Math.round(s / 60)} min`;
-  if (s < 86400) return `vor ${Math.round(s / 3600)} h`;
+  if (s < 60) return t('app.ui.justNow');
+  if (s < 3600) return t('app.ui.minutesAgo', { n: Math.round(s / 60) });
+  if (s < 86400) return t('app.ui.hoursAgo', { n: Math.round(s / 3600) });
   return new Date(iso).toLocaleDateString(locale(), withZone({ day: '2-digit', month: '2-digit' })) + ' ' + new Date(iso).toLocaleTimeString(locale(), withZone({ hour: '2-digit', minute: '2-digit' }));
 }
 export const dateTime = (iso) => (iso ? new Date(iso).toLocaleString(locale(), withZone({ day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '–');
@@ -148,7 +148,7 @@ export function switchEl({ checked, disabled, onChange, label }) {
 export function sliderRow({ label, min, max, step = 1, value, unit = '', digits = 1, onInput }) {
   // Wert antippen: genaue Eingabe per Tastatur in einem Dialog (zusätzlich zum Regler). Der eingegebene Wert gilt genau
   // (auf die angezeigten Nachkommastellen), auch zwischen den Rasterschritten des Reglers.
-  const out = h('button', { type: 'button', class: 'value value-edit', title: 'Wert eingeben', 'aria-label': `${label}: Wert eingeben` });
+  const out = h('button', { type: 'button', class: 'value value-edit', title: t('app.ui.enterValue'), 'aria-label': t('app.ui.enterValueFor', { label }) });
   const input = h('input', { type: 'range', min, max, step, value, 'aria-label': label });
   let cur = Number(input.value);
   const paint = () => {
@@ -166,7 +166,7 @@ export function sliderRow({ label, min, max, step = 1, value, unit = '', digits 
     e.stopPropagation();
     const n = await promptNumber(label, { value: cur, min, max, step, unit, digits });
     if (n === null) return;
-    if (!Number.isFinite(n)) { snackbar(`Erlaubt: ${fmt(min, digits)}–${fmt(max, digits)}${unit ? ' ' + unit : ''}`); return; }
+    if (!Number.isFinite(n)) { snackbar(t('app.ui.allowed', { range: `${fmt(min, digits)}–${fmt(max, digits)}${unit ? ' ' + unit : ''}` })); return; }
     const f = 10 ** digits;
     cur = Math.min(max, Math.max(min, Math.round(n * f) / f));
     input.value = String(cur);
@@ -199,7 +199,7 @@ export function closeTopOverlay() {
   const root = document.getElementById('sheet-root');
   const top = [...(root?.children || [])].reverse().find((el) => el.classList.contains('show') && !el.classList.contains('scrim'));
   if (!top) return false;
-  const btn = top.querySelector('.sheet-close, .detail-head .icon-btn, [aria-label="Schließen"], [aria-label="Zurück"]');
+  const btn = top.querySelector(`.sheet-close, .detail-head .icon-btn, [aria-label="${t('common.close')}"], [aria-label="${t('common.back')}"]`);
   if (btn) btn.click();
   else root.querySelector('.scrim.show')?.click();
   return true;
@@ -232,7 +232,7 @@ function overlay(panel, { onClose } = {}) {
 export function sheet(title, content, opts) {
   // Kopf mit Titel und Schließen-Knopf; am Handy füllt das Fenster den Bildschirm fast ganz, ein Wisch-Griff reicht dort nicht
   let close = () => {};
-  const closeBtn = h('button', { class: 'icon-btn sheet-close', type: 'button', 'aria-label': 'Schließen', title: 'Schließen', onclick: () => close() }, icon('close'));
+  const closeBtn = h('button', { class: 'icon-btn sheet-close', type: 'button', 'aria-label': t('common.close'), title: t('common.close'), onclick: () => close() }, icon('close'));
   const panel = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title },
     h('div', { class: 'sheet-head' }, h('h2', { class: 'grow' }, title || ''), closeBtn), content);
   close = overlay(panel, opts);
@@ -252,8 +252,8 @@ export function promptNumber(title, { value, min, max, step = 0.1, unit = '', di
   // Textfeld mit Zifferntastatur: nimmt Komma und Punkt an (ein Zahlenfeld verwirft je nach Sprache das Komma)
   const input = h('input', { class: 'text', type: 'text', inputmode: 'decimal', autocomplete: 'off', value: value == null ? '' : String(Math.round(value * 1000) / 1000).replace('.', ',') });
   const p = dialog(title, h('label', { class: 'field' }, h('span', {}, `${fmt(min, digits)}–${fmt(max, digits)} ${unit}`), input), [
-    { label: 'Abbrechen', value: null },
-    { label: 'OK', value: 'ok', kind: 'filled' },
+    { label: t('common.cancel'), value: null },
+    { label: t('common.ok'), value: 'ok', kind: 'filled' },
   ]).then((r) => {
     if (r !== 'ok') return null;
     const raw = String(input.value).trim().replace(/\s/g, '').replace(',', '.');
@@ -265,8 +265,8 @@ export function promptNumber(title, { value, min, max, step = 0.1, unit = '', di
   return p;
 }
 
-export const confirmDialog = (title, text, okLabel = 'OK', kind = 'filled') =>
-  dialog(title, text, [{ label: 'Abbrechen', value: false }, { label: okLabel, value: true, kind }]).then(Boolean);
+export const confirmDialog = (title, text, okLabel = t('common.ok'), kind = 'filled') =>
+  dialog(title, text, [{ label: t('common.cancel'), value: false }, { label: okLabel, value: true, kind }]).then(Boolean);
 
 export function fullscreen(build) {
   const inner = h('div', { class: 'inner' });
@@ -307,15 +307,15 @@ document.addEventListener('pointerdown', (e) => {
 
 // Zeitwähler im App-Stil: zwei Rädchen (Stunde, Minute) mit Einrasten statt des Browser-Popups.
 // → Minuten seit Mitternacht, null (bei allowClear: „Keine“) oder undefined (abgebrochen)
-export function pickTimeDialog({ title = 'Uhrzeit', value = 7 * 60, allowClear = false } = {}) {
+export function pickTimeDialog({ title = t('app.ui.time'), value = 7 * 60, allowClear = false } = {}) {
   const v = value ?? 7 * 60;
   const hours = wheel(24, Math.floor(v / 60));
   const minutes = wheel(60, v % 60);
   const content = h('div', { class: 'wheels' }, hours.el, h('span', { class: 'wheel-sep' }, ':'), minutes.el);
   const actions = [
-    allowClear ? { label: 'Keine', value: 'clear' } : null,
-    { label: 'Abbrechen', value: 'cancel' },
-    { label: 'OK', value: 'ok', kind: 'filled' },
+    allowClear ? { label: t('app.ui.none'), value: 'clear' } : null,
+    { label: t('common.cancel'), value: 'cancel' },
+    { label: t('common.ok'), value: 'ok', kind: 'filled' },
   ].filter(Boolean);
   setTimeout(() => hours.el.focus(), 60);
   return dialog(title, content, actions).then((r) => (r === 'ok' ? hours.value * 60 + minutes.value : r === 'clear' ? null : undefined));
@@ -353,7 +353,7 @@ function wheel(count, selected) {
 // Android öffnet <select> als System-Dialog (fremde Schrift, schlechte Abstände, Umbruch ohne Trennung). In der App
 // öffnet jede Auswahlliste stattdessen ein Fenster von unten in der Gestaltung der App. Im Browser bleibt es nativ.
 function openSelectSheet(select) {
-  const label = select.getAttribute('aria-label') || select.closest('label, .field')?.querySelector('span, .label')?.textContent || select.title || 'Auswählen';
+  const label = select.getAttribute('aria-label') || select.closest('label, .field')?.querySelector('span, .label')?.textContent || select.title || t('app.ui.choose');
   let close = () => {};
   const opts = [...select.options].filter((o) => !o.hidden);
   const list = h('div', { class: 'pick-list', role: 'listbox' }, opts.map((o) => h('button', {

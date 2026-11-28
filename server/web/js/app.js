@@ -13,43 +13,62 @@ import { serverPage } from './views/server.js';
 import { showSetup } from './setup.js';
 import { quickRate, shotPageView } from './views/shot-detail.js';
 import { hiddenTabs, onPrefs, powerOnBody } from './prefs.js';
+import { t } from '../shared/i18n.js';
 
+// Beschriftung (Leiste) und Titel (Kopfzeile) erst beim Gebrauch nachschlagen; Titel = Beschriftung, wenn nicht anders
+function named(r, label, title = label, short) {
+  Object.defineProperty(r, 'label', { get: label, enumerable: true });
+  Object.defineProperty(r, 'title', { get: title, enumerable: true });
+  if (short) Object.defineProperty(r, 'short', { get: short, enumerable: true });
+  return r;
+}
 const ROUTES = [
   // Home ist das Dashboard (frühere eigene Startseite entfällt; /dashboard leitet hierher)
-  { path: '/', label: 'Home', icon: 'home', view: dashboardView, title: 'Xenios', wide: true },
-  { path: '/bezuege', label: 'Bezüge', icon: 'coffeeLine', view: shotsView, title: 'Bezüge' },
-  { path: '/skripte', label: 'Skripte', icon: 'list', view: scriptsView, title: 'Skripte' },
-  { path: '/steuerung', label: 'Schalter', icon: 'toggleTile', view: controlsView, title: 'Schalter', feature: 'settings' },
-  { path: '/paddle', label: 'Paddle', icon: 'speed', view: paddleView, title: 'Paddle', feature: 'paddle' },
-  { path: '/timer', label: 'Timer', icon: 'event', view: timerView, title: 'Timer' },
-  { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
+  named({ path: '/', icon: 'home', view: dashboardView, wide: true }, () => t('app.nav.home'), () => 'Xenios'),
+  named({ path: '/bezuege', icon: 'coffeeLine', view: shotsView }, () => t('app.nav.shots')),
+  named({ path: '/skripte', icon: 'list', view: scriptsView }, () => t('app.nav.scripts')),
+  named({ path: '/steuerung', icon: 'toggleTile', view: controlsView, feature: 'settings' }, () => t('app.nav.controls')),
+  named({ path: '/paddle', icon: 'speed', view: paddleView, feature: 'paddle' }, () => t('app.nav.paddle')),
+  named({ path: '/timer', icon: 'event', view: timerView }, () => t('app.nav.timer')),
+  named({ path: '/muehle', icon: 'grinder', view: grinderView }, () => t('app.nav.grinder')),
   // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
-  { path: '/einstellungen', label: 'Einstellungen', short: 'Einstell.', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
-  { path: '/bezuege/bezug', label: 'Bezug', icon: 'coffeeLine', view: shotPageView, title: 'Bezug', nav: false, back: '/bezuege' },
-  { path: '/skripte/neu', label: 'Skript erstellen', icon: 'add', view: scriptNewView, title: 'Skript erstellen', nav: false, back: '/skripte' },
-  { path: '/skripte/bearbeiten', label: 'Skript bearbeiten', icon: 'edit', view: scriptEditView, title: 'Skript bearbeiten', nav: false, back: '/skripte' },
-  { path: '/skripte/profil', label: 'Druckprofil erstellen', icon: 'profile', view: profileBuilderView, title: 'Druckprofil erstellen', nav: false, back: '/skripte' },
-  { path: '/skripte/entdecken', label: 'Profile entdecken', icon: 'explore', view: discoverView, title: 'Profile entdecken', nav: false, back: '/skripte' },
+  named({ path: '/einstellungen', icon: 'settings', view: settingsView, fixed: true }, () => t('app.nav.settings'), undefined, () => t('app.nav.settingsShort')),
+  named({ path: '/bezuege/bezug', icon: 'coffeeLine', view: shotPageView, nav: false, back: '/bezuege' }, () => t('app.nav.shot')),
+  named({ path: '/skripte/neu', icon: 'add', view: scriptNewView, nav: false, back: '/skripte' }, () => t('app.nav.scriptNew')),
+  named({ path: '/skripte/bearbeiten', icon: 'edit', view: scriptEditView, nav: false, back: '/skripte' }, () => t('app.nav.scriptEdit')),
+  named({ path: '/skripte/profil', icon: 'profile', view: profileBuilderView, nav: false, back: '/skripte' }, () => t('app.nav.profileBuilder')),
+  named({ path: '/skripte/entdecken', icon: 'explore', view: discoverView, nav: false, back: '/skripte' }, () => t('app.nav.discover')),
   // Unterseiten der Einstellungen; server: nur mit Server (nicht im Direkt-Modus der App)
   ...[
-    ['darstellung', 'Darstellung', appearanceView],
-    ['ansicht', 'Leiste & Ansicht', viewPrefsView],
-    ['temperaturen', 'Temperaturen & Druck', machineSettingsView('temp')],
-    ['bezuege', 'Bezüge & Waage', shotPrefsView],
-    ['einschalten', 'Einschalten & Energiesparen', machineSettingsView('power')],
-    ['modell', 'Modell, Aussehen & Firmware', serverPage('modell'), true],
-    ['firmware', 'Wi-Fi & Firmware', firmwareView],
-    ['muehle', 'Mühle & Grind-by-Sync', serverPage('muehle'), true],
-    ['unterwegs', 'Von unterwegs', serverPage('unterwegs'), true],
-    ['benachrichtigungen', 'Benachrichtigungen', serverPage('benachrichtigungen'), true],
-    ['sicherheit', 'Sicherheit', serverPage('sicherheit'), true],
-    ['system', 'System', serverPage('system'), true],
-  ].map(([id, title, view, server]) => ({ path: `/einstellungen/${id}`, label: title, icon: 'settings', view, title, nav: false, back: '/einstellungen', server })),
+    ['darstellung', () => t('app.settingsPages.appearance'), appearanceView],
+    ['ansicht', () => t('app.settingsPages.view'), viewPrefsView],
+    ['temperaturen', () => t('app.settingsPages.temperatures'), machineSettingsView('temp')],
+    ['bezuege', () => t('app.settingsPages.shots'), shotPrefsView],
+    ['einschalten', () => t('app.settingsPages.power'), machineSettingsView('power')],
+    ['modell', () => t('app.settingsPages.model'), serverPage('modell'), true],
+    ['firmware', () => t('app.settingsPages.firmware'), firmwareView],
+    ['muehle', () => t('app.settingsPages.grinder'), serverPage('muehle'), true],
+    ['unterwegs', () => t('app.settingsPages.remote'), serverPage('unterwegs'), true],
+    ['benachrichtigungen', () => t('app.settingsPages.notifications'), serverPage('benachrichtigungen'), true],
+    ['sicherheit', () => t('app.settingsPages.security'), serverPage('sicherheit'), true],
+    ['system', () => t('app.settingsPages.system'), serverPage('system'), true],
+  ].map(([id, title, view, server]) => named({ path: `/einstellungen/${id}`, icon: 'settings', view, nav: false, back: '/einstellungen', server }, title)),
 ];
 // Frühere Adressen der Einstellungen (Lesezeichen, alte Links)
 const MOVED = { '/einstellungen/maschine': '/einstellungen/temperaturen', '/server': '/einstellungen', '/server#aufzeichnung': '/einstellungen/bezuege', '/einstellungen#aufzeichnung': '/einstellungen/bezuege' };
 
 const $ = (id) => document.getElementById(id);
+
+// Feste Texte in index.html (data-i18n, -placeholder, -aria-label, -title) aus dem Katalog setzen; der deutsche Text im
+// HTML bleibt als Rückfall. Läuft beim Start, bevor Anmeldung bzw. App sichtbar werden.
+const I18N_ATTRS = { 'data-i18n-placeholder': 'placeholder', 'data-i18n-aria-label': 'aria-label', 'data-i18n-title': 'title' };
+export function applyI18n(root = document) {
+  for (const el of root.querySelectorAll('[data-i18n]')) el.textContent = t(el.getAttribute('data-i18n'));
+  for (const [data, attr] of Object.entries(I18N_ATTRS)) {
+    for (const el of root.querySelectorAll(`[${data}]`)) el.setAttribute(attr, t(el.getAttribute(data)));
+  }
+}
+applyI18n();
 
 let current = null;      // { route, dispose }
 
@@ -390,7 +409,7 @@ function render() {
   // Zurück-Pfeil weich ein-/ausblenden (Breite), damit der Titel nicht springt
   $('back-btn').classList.toggle('gone', !route.back);
   $('back-btn').onclick = () => goBack();
-  document.title = route.title === 'Xenios' ? 'Xenios' : `${route.title} · Xenios`;
+  document.title = route.title === 'Xenios' ? 'Xenios' : t('app.shell.pageTitle', { title: route.title });
   markNav();
   const view = $('view');
   view.replaceChildren();
@@ -460,12 +479,12 @@ subscribe(() => {
   const dot = $('conn-dot');
   const m = store.machine;
   dot.className = 'conn-dot ' + (!store.connected ? 'bad' : m && !m.online ? 'warn' : 'ok');
-  dot.title = !store.connected ? 'Keine Verbindung zum Server' : m && !m.online ? 'Maschine nicht erreichbar' : 'Verbunden';
+  dot.title = !store.connected ? t('app.conn.noServer') : m && !m.online ? t('app.conn.machineUnreachable') : t('app.conn.connected');
 });
 
 // Eingestelltes Modell passt nicht zur Maschine (Erkennung wie beim Verbindungstest): Hinweis oben auf jeder Seite,
 // mit Umstellen auf das erkannte Modell
-const MODEL_NAME = { bbs: 'Neue Xenia', classic: 'Alte Xenia (DBL)' };
+const MODEL_NAME = { get bbs() { return t('app.modelHint.bbs'); }, get classic() { return t('app.modelHint.classic'); } };
 let modelHintKey = '';
 subscribe(() => {
   const mm = window.__authed ? store.machine?.apiMismatch : null;
@@ -480,23 +499,23 @@ subscribe(() => {
     try {
       await api('/api/admin/config', { method: 'PUT', body: { changes: { 'machine.api': mm.detected } } });
       await refreshState();
-      snackbar(`Auf „${MODEL_NAME[mm.detected]}“ umgestellt`);
+      snackbar(t('app.modelHint.switched', { model: MODEL_NAME[mm.detected] }));
       render(); // aktuelle Seite mit der richtigen Schnittstelle neu laden
     } catch (e) {
       snackbar(e.message);
       fix.disabled = false;
     }
-  } }, `Auf „${MODEL_NAME[mm.detected]}“ umstellen`);
+  } }, t('app.modelHint.switchTo', { model: MODEL_NAME[mm.detected] }));
   box.replaceChildren(h('div', { class: 'note warn' }, icon('warn', 's18'), h('div', { class: 'grow' },
-    h('div', {}, `Eingestellt ist „${MODEL_NAME[mm.configured]}“, die Maschine antwortet aber wie die ${MODEL_NAME[mm.detected]}. Timer, Einstellungen und Schalter funktionieren so nicht richtig.`),
-    directMode ? h('div', { class: 'small' }, 'In der Einrichtung der App das Modell umstellen.') : fix)));
+    h('div', {}, t('app.modelHint.mismatch', { configured: MODEL_NAME[mm.configured], detected: MODEL_NAME[mm.detected] })),
+    directMode ? h('div', { class: 'small' }, t('app.modelHint.directHint')) : fix)));
 });
 
 // Ereignisse aus dem Server als Snackbar; nach einem Bezug mit „Bewerten“ (Einstell-Assistent)
 subscribe((part, ev) => {
   if (part !== 'event' || !ev || ev.topic === 'grinder') return;
-  if (ev.topic === 'shot' && ev.shotId) snackbar(`${ev.title} – ${ev.body}`, { action: 'Bewerten', onAction: () => quickRate(ev.shotId), duration: 15000 });
-  else snackbar(`${ev.title} – ${ev.body}`);
+  if (ev.topic === 'shot' && ev.shotId) snackbar(t('app.events.message', { title: ev.title, body: ev.body }), { action: t('app.events.rate'), onAction: () => quickRate(ev.shotId), duration: 15000 });
+  else snackbar(t('app.events.message', { title: ev.title, body: ev.body }));
 });
 
 // --- Login --------------------------------------------------------------------
@@ -567,8 +586,8 @@ function chooseDesignOnce() {
     return Promise.resolve();
   }
   const opts = [
-    ['material', 'Material', 'Leiste unten mit Beschriftung, runde Formen, flache Anzeigen'],
-    ['xenia', 'Xenia', 'Wie die Oberfläche der Maschine: Manometer, Navigation mit Symbolen'],
+    ['material', t('app.design.materialTitle'), t('app.design.materialSub')],
+    ['xenia', t('app.design.xeniaTitle'), t('app.design.xeniaSub')],
   ];
   return new Promise((resolve) => {
     const cards = opts.map(([id, title, sub]) => {
@@ -592,10 +611,10 @@ function chooseDesignOnce() {
     };
     screen.replaceChildren(h('div', { class: 'setup-card design-card' },
       h('img', { src: '/icons/icon.svg', alt: '', class: 'login-icon', width: 56, height: 56 }),
-      h('h1', {}, 'Design wählen'),
-      h('p', { class: 'muted' }, 'So sieht Xenios auf diesem Gerät aus. Später änderbar unter Einstellungen → Darstellung.'),
-      h('div', { class: 'design-pick', role: 'radiogroup', 'aria-label': 'Design' }, cards),
-      h('div', { class: 'setup-nav' }, h('span'), h('button', { type: 'button', class: 'btn filled', onclick: done }, 'Weiter'))));
+      h('h1', {}, t('app.design.title')),
+      h('p', { class: 'muted' }, t('app.design.intro')),
+      h('div', { class: 'design-pick', role: 'radiogroup', 'aria-label': t('app.design.group') }, cards),
+      h('div', { class: 'setup-nav' }, h('span'), h('button', { type: 'button', class: 'btn filled', onclick: done }, t('common.next')))));
     paint();
     $('app').hidden = true;
     screen.hidden = false;
@@ -640,19 +659,19 @@ async function handleShortcut() {
     if (action === 'on') {
       const body = powerOnBody();
       await api('/api/machine/power', { method: 'POST', body });
-      snackbar(body.steam === false ? 'Xenia wird ohne Dampf eingeschaltet …' : 'Xenia wird eingeschaltet …');
+      snackbar(body.steam === false ? t('app.shortcuts.turningOnNoSteam') : t('app.shortcuts.turningOn'));
     } else if (action === 'on-nosteam') {
       await api('/api/machine/power', { method: 'POST', body: { mode: 'on', steam: false } });
-      snackbar('Xenia wird ohne Dampf eingeschaltet …');
+      snackbar(t('app.shortcuts.turningOnNoSteam'));
     } else if (action === 'off') {
       await api('/api/machine/power', { method: 'POST', body: { mode: 'off' } });
-      snackbar('Xenia ausgeschaltet');
+      snackbar(t('app.shortcuts.off'));
     } else if (action === 'eco') {
       await api('/api/machine/power', { method: 'POST', body: { mode: 'eco' } });
-      snackbar('Eco-Modus aktiv');
+      snackbar(t('app.shortcuts.eco'));
     } else if (action === 'steam') {
       await api('/api/machine/steam', { method: 'POST', body: { on: true } });
-      snackbar('Dampfkessel an');
+      snackbar(t('app.shortcuts.steamOn'));
     }
   } catch (ex) {
     snackbar(ex.message);
@@ -677,7 +696,7 @@ function announceAppUpdate() {
   try { s = JSON.parse(window.XeniaApp.appUpdate()); } catch { return; }
   if (!s.available || s.phase || s.latestBuild === s.announced) return;
   try { window.XeniaApp.appUpdateSeen(s.latestBuild); } catch { /* egal */ }
-  snackbar(`App-Update ${s.latest} verfügbar`, { action: 'Ansehen', onAction: () => navigate('/einstellungen'), duration: 10000 });
+  snackbar(t('app.android.updateAvailable', { version: s.latest }), { action: t('app.android.updateView'), onAction: () => navigate('/einstellungen'), duration: 10000 });
 }
 const appUpdates = typeof window.XeniaApp?.appUpdate === 'function';
 if (appUpdates) window.addEventListener('xenios-app-update', announceAppUpdate);
@@ -691,11 +710,11 @@ if (appUpdates) window.addEventListener('xenios-app-update', announceAppUpdate);
     else showLogin();
     // Notbetrieb der Android-App: Server weg, die App spricht die Maschine direkt an
     if (window.XeniaApp?.fallback?.()) {
-      snackbar('Server nicht erreichbar – direkt mit der Maschine verbunden', { action: 'Server', onAction: () => window.XeniaApp.retryServer(), duration: 10000 });
+      snackbar(t('app.android.fallback'), { action: t('app.android.fallbackServer'), onAction: () => window.XeniaApp.retryServer(), duration: 10000 });
     } else if (appUpdates) announceAppUpdate();
   } catch {
     // Offline: App-Hülle zeigen, Verbindung wird erneut versucht
     showLogin({ offline: true });
-    $('login-error').textContent = 'Server nicht erreichbar.';
+    $('login-error').textContent = t('app.login.serverUnreachable');
   }
 })();

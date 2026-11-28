@@ -42,10 +42,17 @@ self.addEventListener('fetch', (e) => {
 });
 
 // --- Push -----------------------------------------------------------------------
+// Texte der Benachrichtigungs-Knöpfe und -Rückmeldungen. Der Service Worker ist ein klassisches Skript und kann die
+// Kataloge (shared/i18n/…) nicht als Modul laden; deshalb hier eine eigene kleine Tabelle je Sprache (Sprache des
+// Geräts, sonst Deutsch). Neue Sprache: Eintrag mit denselben Schlüsseln ergänzen.
+const SW_TEXT = {
+  de: { open: 'Öffnen', off: 'Ausschalten', steamOff: 'Dampf aus', switchedOff: 'Ausgeschaltet', steamIsOff: 'Dampfkessel aus', failed: 'Aktion fehlgeschlagen – bitte App öffnen' },
+};
+const tx = (k) => (SW_TEXT[String(self.navigator?.language || '').slice(0, 2).toLowerCase()] || SW_TEXT.de)[k];
 const ACTIONS = {
-  heated: [{ action: 'open', title: 'Öffnen' }, { action: 'off', title: 'Ausschalten' }],
-  power: [{ action: 'off', title: 'Ausschalten' }],
-  steam: [{ action: 'steam-off', title: 'Dampf aus' }],
+  heated: () => [{ action: 'open', title: tx('open') }, { action: 'off', title: tx('off') }],
+  power: () => [{ action: 'off', title: tx('off') }],
+  steam: () => [{ action: 'steam-off', title: tx('steamOff') }],
 };
 
 self.addEventListener('push', (e) => {
@@ -60,7 +67,7 @@ self.addEventListener('push', (e) => {
     badge: '/icons/badge-96.png',
     timestamp: d.at ? Date.parse(d.at) : Date.now(),
     data: { topic: d.topic, url: d.topic === 'grinder' ? '/muehle' : '/' },
-    actions: ACTIONS[d.topic] || [],
+    actions: ACTIONS[d.topic]?.() || [],
     vibrate: d.topic === 'shot' || d.topic === 'heated' ? [80, 40, 80] : undefined,
   }));
 });
@@ -77,14 +84,14 @@ self.addEventListener('notificationclick', (e) => {
     try {
       if (action === 'off') {
         await post('/api/machine/power', { mode: 'off' });
-        return self.registration.showNotification('Xenios', { body: 'Ausgeschaltet', tag: 'action', icon: '/icons/icon-192.png', badge: '/icons/badge-96.png' });
+        return self.registration.showNotification('Xenios', { body: tx('switchedOff'), tag: 'action', icon: '/icons/icon-192.png', badge: '/icons/badge-96.png' });
       }
       if (action === 'steam-off') {
         await post('/api/machine/steam', { on: false });
-        return self.registration.showNotification('Xenios', { body: 'Dampfkessel aus', tag: 'action', icon: '/icons/icon-192.png', badge: '/icons/badge-96.png' });
+        return self.registration.showNotification('Xenios', { body: tx('steamIsOff'), tag: 'action', icon: '/icons/icon-192.png', badge: '/icons/badge-96.png' });
       }
     } catch {
-      return self.registration.showNotification('Xenios', { body: 'Aktion fehlgeschlagen – bitte App öffnen', tag: 'action', icon: '/icons/icon-192.png' });
+      return self.registration.showNotification('Xenios', { body: tx('failed'), tag: 'action', icon: '/icons/icon-192.png' });
     }
     const target = e.notification.data?.url || '/';
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

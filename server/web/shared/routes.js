@@ -1,13 +1,14 @@
 // API-Routen für Maschine und Mühle – gemeinsam für den Server und den Direkt-Modus der Android-App.
 // Downloads geben { download: { data, filename, type } } zurück; Server bzw. App liefern die Datei aus.
 import { SCRIPT_OPS, httpError } from './machine-core.js';
+import { t } from './i18n.js';
 
 // Nur lesende Original-Endpunkte (für Diagnose). Gefährliche GETs sind hier bewusst nicht enthalten.
 export const RAW_READ = ['status', 'overview', 'overview_single', 'diagram/get', 'diagram_get', 'general', 'machine', 'info', 'switches', 'scriptslist', 'scripts/list', 'timer2', 'network', 'mako', 'language', 'brewgroup/pid', 'brewboiler/pid', 'pump/pid', 'steamboiler/pid', 'mahlkonig/get', 'upload/status'];
 
 export function intParam(v) {
   const n = Number(v);
-  if (!Number.isInteger(n) || n < 0 || n > 999) throw httpError(400, 'Ungültige ID');
+  if (!Number.isInteger(n) || n < 0 || n > 999) throw httpError(400, t('app.api.invalidId'));
   return n;
 }
 
@@ -28,7 +29,7 @@ export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('POST', '/api/maintenance/backflush', async () => machine.markBackflush());
   route('POST', '/api/maintenance/backflush/run', async () => machine.runBackflush());
   route('POST', '/api/maintenance/backflush/stop', async () => machine.stopBackflush());
-  route('GET', '/api/shots.csv', async () => ({ download: { data: enc(machine.shotsCsv()), filename: `Xenia-Bezuege-${new Date().toISOString().slice(0, 10)}.csv`, type: 'text/csv; charset=utf-8' } }));
+  route('GET', '/api/shots.csv', async () => ({ download: { data: enc(machine.shotsCsv()), filename: t('app.api.shotsCsvFile', { date: new Date().toISOString().slice(0, 10) }), type: 'text/csv; charset=utf-8' } }));
 
   // Maschine
   route('POST', '/api/machine/power', async ({ body }) => machine.power(body.mode, body.steam));
@@ -61,7 +62,7 @@ export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('GET', '/api/machine/details', async () => machine.details());
   route('GET', '/api/raw/machine/(.+)', async ({ rawMatch }) => {
     const name = rawMatch[1];
-    if (!RAW_READ.includes(name)) throw httpError(403, 'Dieser Endpunkt ist nicht freigegeben');
+    if (!RAW_READ.includes(name)) throw httpError(403, t('app.api.endpointBlocked'));
     return machine.client.get(`/api/v2/${name}`);
   });
 
@@ -78,11 +79,11 @@ export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('GET', '/api/grinder/grinds.csv', async () => {
     const { files } = await grinder.downloadLogs();
     const name = Object.keys(files).find((n) => /GrindLogs/i.test(n));
-    if (!name) throw httpError(404, 'Keine Mahl-Logs gefunden');
+    if (!name) throw httpError(404, t('app.api.noGrindLogs'));
     return { download: { data: files[name], filename: name, type: 'text/csv; charset=utf-8' } };
   });
   route('GET', '/api/grinder/database', async () => {
-    if (!cfg.grinder.allowDatabaseDownload) throw httpError(403, 'Datenbank-Download ist deaktiviert (enthält WLAN-Passwort). In config.json grinder.allowDatabaseDownload = true setzen.');
+    if (!cfg.grinder.allowDatabaseDownload) throw httpError(403, t('app.api.databaseDisabled'));
     const { buffer, filename } = await grinder.downloadDatabase();
     return { download: { data: buffer, filename, type: 'application/octet-stream' } };
   });
